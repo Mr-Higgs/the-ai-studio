@@ -1,0 +1,9 @@
+node_modules/
+.claude/skills/video-use/
+.env
+
+# working files in real projects, but keep the _template skeleton in git
+projects/*/raw/
+projects/*/out/
+!projects/_template/raw/
+!projects/_template/out/

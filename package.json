@@ -1,0 +1,9 @@
+{
+  "name": "studio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Templated agentic video studio: HeyGen -> video-use -> HyperFrames",
+  "dependencies": {
+    "hyperframes": "^0.7"
+  }
+}
