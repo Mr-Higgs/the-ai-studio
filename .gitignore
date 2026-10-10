@@ -1,9 +1,19 @@
 node_modules/
 .claude/skills/video-use/
 .env
+.env.local
+
 
 # working files in real projects, but keep the _template skeleton in git
 projects/*/raw/
 projects/*/out/
 !projects/_template/raw/
 !projects/_template/out/
+
+# studio UI per-project state
+projects/*/.session
+projects/*/.agent
+.DS_Store
+ui/dist/
+business/*
+!business/.gitkeep

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Write(projects/**)",
+      "Write(business/**)",
+      "Exec(ffmpeg)",
+      "Exec(ffprobe)",
+      "Exec(uv run)",
+      "Exec(python3)",
+      "Exec(npx hyperframes)",
+      "Exec(ls)",
+      "Exec(mkdir)",
+      "Exec(cp)",
+      "Fetch(domain:reddit.com)",
+      "Fetch(domain:www.reddit.com)",
+      "Fetch(domain:old.reddit.com)"
+    ]
+  }
+}

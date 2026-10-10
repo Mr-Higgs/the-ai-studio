@@ -4,6 +4,18 @@
   "version": "0.1.0",
   "description": "Templated agentic video studio: HeyGen -> video-use -> HyperFrames",
   "dependencies": {
-    "hyperframes": "^0.7"
+    "hyperframes": "^0.7",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0"
+  },
+  "scripts": {
+    "studio": "vite build ui/web --logLevel warn && node ui/server.mjs",
+    "dev": "vite ui/web",
+    "test": "node --test ui/server.test.mjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.4"
   }
 }
