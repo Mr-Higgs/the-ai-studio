@@ -10,6 +10,12 @@ export async function api(url, opts = {}) {
 export const put = (url, data) => api(url, { method: 'PUT', body: JSON.stringify(data) });
 export const post = (url, data = {}) => api(url, { method: 'POST', body: JSON.stringify(data) });
 
+// App-wide toasts: call toast() from anywhere; <Toasts /> in App renders them. kind: 'err' | 'ok' | 'info'.
+export const toast = (text, kind = 'err') => dispatchEvent(new CustomEvent('toast', { detail: { text, kind } }));
+// Styled confirm(): resolves true/false. <Confirm /> in App renders it.
+export const ask = (text, ok = 'Continue') =>
+  new Promise(resolve => dispatchEvent(new CustomEvent('ask', { detail: { text, ok, resolve } })));
+
 // Turns the server's agent event stream into a flat, ordered list of chat items.
 const initial = { items: [], busy: false, dead: false };
 function reduce(state, ev) {
@@ -86,6 +92,7 @@ export function useAgent(base, onDone) {
   const fail = e => dispatch({ type: 'error', message: e.message });
   return {
     ...state,
+    base,
     send: (text, snapshot) => post(`${base}/prompt`, { text, snapshot }).catch(fail),
     cancel: () => post(`${base}/cancel`).catch(fail),
     answer: (id, optionId) => post(`${base}/permission`, { id, optionId }).catch(fail),

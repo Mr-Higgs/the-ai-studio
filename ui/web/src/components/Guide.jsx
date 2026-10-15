@@ -1,4 +1,4 @@
-import { AGENDA, STEPS } from '../steps.js';
+import { AGENDA, SPRINT, STEPS } from '../steps.js';
 
 const minutes = t => parseInt(t, 10) || 0;
 
@@ -11,7 +11,7 @@ export default function Guide({ ctx, agentName }) {
   return (
     <article className="guide">
       <header className="step-head">
-        <h1>Build your holiday sales engine in a day</h1>
+        <h1>{SPRINT.headline}</h1>
         <p>You’ll work on your own business, with {agentName} as your campaign partner. You bring what you know; {agentName} turns it into an offer, a plan, ready-to-post content, videos and a calendar. Everything is saved on your computer.</p>
         <div className="actions">
           <a className="btn primary" href={'#' + (first?.id || 'profile')}>{first && first.id !== 'profile' ? `Continue: ${first.title}` : 'Start with your business profile'}</a>

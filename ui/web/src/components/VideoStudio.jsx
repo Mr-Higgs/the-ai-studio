@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, post, useAgent } from '../api.js';
-import { VIDEO_FORMATS, VIDEO_PRESETS } from '../steps.js';
+import { api, post, toast, useAgent } from '../api.js';
+import { SPRINT, VIDEO_FORMATS, VIDEO_PRESETS } from '../steps.js';
 import { AGENT_NAMES, ChatGrip } from '../App.jsx';
 import Chat from './Chat.jsx';
 import { StepHead } from './GenerateStep.jsx';
@@ -60,7 +60,7 @@ export default function VideoStudio({ step, projects, ctx }) {
 function ProjectWorkspace({ project, refresh, top, bottom, hasOffer }) {
   const agent = useAgent(`/api/projects/${enc(project.name)}`, refresh);
   const agentName = AGENT_NAMES[project.agent] || 'Devin';
-  const switchAgent = async a => { try { await post(`/api/projects/${enc(project.name)}/agent`, { agent: a }); await refresh(); agent.restart(); } catch (e) { alert(e.message); } };
+  const switchAgent = async a => { try { await post(`/api/projects/${enc(project.name)}/agent`, { agent: a }); await refresh(); agent.restart(); } catch (e) { toast(e.message); } };
   const started = agent.items.some(i => i.kind === 'user');
   return (
     <>
@@ -271,7 +271,7 @@ function HeyGenMake({ project, refresh, close }) {
         <div className="field full">
           <label htmlFor="hg-script">What should they say?</label>
           <textarea id="hg-script" rows={4} maxLength={5000} value={script} onChange={e => setScript(e.target.value)} disabled={working}
-            placeholder="Hi, I’m … This holiday season, …" />
+            placeholder={SPRINT.introPh} />
         </div>
         <div className="field">
           <label htmlFor="hg-shape">Shape</label>
@@ -303,9 +303,9 @@ function Brief({ project, agent, hasOffer }) {
       b.audio ? 'clean up and level the audio' : 'leave the audio as-is',
       b.presenter ? 'an AI presenter: use the HeyGen clip(s) already in raw/ (heygen-*.mp4); only generate a new one with HeyGen if none are there' : 'no AI presenter (skip HeyGen)',
     ];
-    agent.send(`Edit the footage in projects/${project.name}/raw/ into a holiday promo video, following the pipeline in CLAUDE.md (video-use for the cut; HyperFrames for title/end cards; HeyGen only if a presenter is requested).
+    agent.send(`Edit the footage in projects/${project.name}/raw/ into a ${SPRINT.adj}promo video, following the pipeline in CLAUDE.md (video-use for the cut; HyperFrames for title/end cards; HeyGen only if a presenter is requested).
 
-For context, read business/profile.json and business/offer.md if they exist: use the business name, the holiday offer, the price and the call-to-action from there in any on-screen text, and match the brand voice.
+For context, read business/profile.json and business/offer.md if they exist: use the business name, the ${SPRINT.offerTitle.toLowerCase()}, the price and the call-to-action from there in any on-screen text, and match the brand voice.
 
 Brief:
 - What: ${b.what.trim() || '(not given — infer from the footage)'}
@@ -320,8 +320,8 @@ Record this brief in projects/${project.name}/project.md. Look at the material, 
     <section className="panel brief">
       <h2>Brief</h2>
       <p className="hint brief-offer">{hasOffer
-        ? <>Using your offer from <a href="#offer">Holiday offer ✓</a> for on-screen text and the call-to-action.</>
-        : <>No <a href="#offer">holiday offer</a> yet, so on-screen text stays generic. You can come back and re-cut later.</>}</p>
+        ? <>Using your offer from <a href="#offer">{SPRINT.offerTitle} ✓</a> for on-screen text and the call-to-action.</>
+        : <>No <a href="#offer">{SPRINT.offerTitle.toLowerCase()}</a> yet, so on-screen text stays generic. You can come back and re-cut later.</>}</p>
       <div className="presets" role="group" aria-label="Start from a preset">
         {VIDEO_PRESETS.map(p => <button key={p.id} type="button" className={'chip-btn' + (b.preset === p.id ? ' active' : '')} aria-pressed={b.preset === p.id} onClick={() => pick(p)}>{p.label}</button>)}
       </div>

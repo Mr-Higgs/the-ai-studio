@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { api, post, toast } from '../api.js';
 
 const STATUS = { pending: '○', in_progress: '◐', completed: '✓', failed: '✕' };
 // Machine-wide grants and bypass mode don't belong behind a one-click button.
@@ -9,6 +11,11 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
   const [text, setText] = useState('');
   const scroller = useRef(null);
   const pinned = useRef(true);
+  const [convos, setConvos] = useState({ current: '', list: [] });
+
+  useEffect(() => { if (agent.base && !agent.busy) api(`${agent.base}/conversations`).then(setConvos).catch(() => {}); }, [agent.base, agent.busy, agent.items.length === 0]);
+
+  const switchTo = (action, id) => post(`${agent.base}/conversations/${action}`, { id }).then(agent.restart).catch(e => toast(e.message));
 
   useEffect(() => {
     const el = scroller.current;
@@ -24,6 +31,14 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
 
   return (
     <div className="chat">
+      <div className="chat-bar">
+        <select aria-label="Past conversations" value={convos.current} disabled={agent.busy || !convos.list.length}
+          onChange={e => switchTo('open', e.target.value)}>
+          {!convos.list.some(c => c.id === convos.current) && <option value={convos.current}>{convos.current ? 'Current conversation' : 'New conversation'}</option>}
+          {convos.list.map(c => <option key={c.id} value={c.id}>{new Date(c.at).toLocaleDateString()} · {c.title}</option>)}
+        </select>
+        <button type="button" className="btn" disabled={agent.busy || !agent.items.length} onClick={() => switchTo('new')}>New conversation</button>
+      </div>
       <div
         className="chat-log"
         ref={scroller}
@@ -55,7 +70,7 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
 function Item({ item, agent, agentName, items }) {
   switch (item.kind) {
     case 'user': return <div className="msg user">{item.text}</div>;
-    case 'agent': return <div className="msg agent"><Markdown>{item.text}</Markdown></div>;
+    case 'agent': return <div className="msg agent"><Markdown remarkPlugins={[remarkGfm]}>{item.text}</Markdown></div>;
     case 'sys': return <div className="msg sys">{item.text}</div>;
     case 'err': return <div className="msg err" role="alert">{item.text}</div>;
     case 'tool': return (

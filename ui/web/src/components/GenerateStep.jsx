@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import Calendar from './Calendar.jsx';
+import LinkedInAutopilot from './LinkedInAutopilot.jsx';
 
 export function StepHead({ step, ctx, children }) {
   return (
@@ -167,9 +169,10 @@ export default function GenerateStep({ step, ...ctx }) {
             <span>Saved to <code>business/{step.file}</code> · updated {ago(doc.mtime)}</span>
             <span className="doc-bar-actions"><History files={history} /><CopyButton text={doc.content} label="Copy all" /></span>
           </div>
-          <div className="prose"><Markdown>{doc.content}</Markdown></div>
+          <div className="prose"><Markdown remarkPlugins={[remarkGfm]}>{doc.content}</Markdown></div>
         </article>
       )}
+      {step.id === 'automation' && <LinkedInAutopilot step={step} ctx={ctx} />}
       {!has && !mine && (
         <div className="placeholder">
           <p>Nothing here yet. Answer what you can above (blanks are fine) and {agentName} will write this step from your profile and everything you’ve made so far.</p>

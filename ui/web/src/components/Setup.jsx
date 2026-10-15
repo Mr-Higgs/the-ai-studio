@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SETUP_ACCOUNT } from '../steps.js';
+import { SETUP_ACCOUNT, SETUP_INTEGRATIONS } from '../steps.js';
 import { post } from '../api.js';
 import { CopyButton } from './GenerateStep.jsx';
 
@@ -33,7 +33,7 @@ function KeyInput({ item, recheck }) {
   );
 }
 
-export default function Setup({ health, recheck }) {
+export default function Setup({ health, integrations, agentName, recheck }) {
   const [checking, setChecking] = useState(false);
   const missing = g => health?.filter(h => h.group === g && !h.ok) || [];
   const req = missing('required'), vid = missing('video');
@@ -77,6 +77,67 @@ export default function Setup({ health, recheck }) {
           </ul>
         </section>
       ))}
+
+      <section className="setup-group">
+        <h2>What {agentName} can connect to</h2>
+        <p className="hint setup-how">{SETUP_INTEGRATIONS.intro}</p>
+
+        <h3 className="integ-h">Connected tools (MCP servers)</h3>
+        {integrations?.mcpError === 'devin-missing' ? (
+          <p className="hint">Install the Devin CLI (above) to see these.</p>
+        ) : integrations?.mcp?.length ? (
+          <ul className="health">
+            {integrations.mcp.map(m => (
+              <li key={m.name}>
+                <span className={'dot ' + (m.disabled ? 'warn' : 'ok')} />
+                <span className="health-name">{m.name}{m.target && <small>{m.target}</small>}</span>
+                {m.disabled && <span className="hint">Disabled</span>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="hint">{integrations ? 'No extra tools yet — add one below.' : 'Checking…'}</p>
+        )}
+
+        <h3 className="integ-h">Plugins</h3>
+        {integrations && !integrations.loggedIn && (
+          <p className="hint">Sign in to Devin (<code>devin auth login</code>) to install or update plugins; the list below is what’s already on this computer.</p>
+        )}
+        {integrations?.plugins?.length ? (
+          <ul className="health">
+            {integrations.plugins.map(p => (
+              <li key={p.name}>
+                <span className="dot ok" />
+                <span className="health-name">{p.name === 'default' ? 'Your own skills' : p.displayName}
+                  {(p.name === 'default' || p.description) && <small className="integ-desc">{p.name === 'default' ? 'Skills uploaded to your Devin account' : p.description}</small>}</span>
+                <span className="integ-meta">
+                  {p.keywords.map(k => <span key={k} className="chip">{k}</span>)}
+                  {p.skills.length > 0 && <span className="chip">{p.skills.length} skill{p.skills.length === 1 ? '' : 's'}</span>}
+                  {p.mcpServers.length > 0 && <span className="chip">includes MCP</span>}
+                  {p.homepage && <a href={p.homepage} target="_blank" rel="noreferrer">website</a>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          integrations && <p className="hint">No plugins installed yet — add one below.</p>
+        )}
+
+        <h3 className="integ-h">{SETUP_INTEGRATIONS.title}</h3>
+        <div className="howto">
+          {SETUP_INTEGRATIONS.howtos.map(h => (
+            <div key={h.id} className="setup-account">
+              <h3>{h.title}</h3>
+              <ol>
+                {h.steps.map((s, i) => (
+                  <li key={i}>{s.text}{s.code && <div className="howto-code"><code>{s.code}</code><CopyButton text={s.code} /></div>}</li>
+                ))}
+              </ol>
+              {h.link && <a className="btn" href={h.link} target="_blank" rel="noreferrer">{h.linkLabel}</a>}
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="actions">
         <button className="btn" disabled={checking} onClick={() => { setChecking(true); recheck().finally(() => setChecking(false)); }}>

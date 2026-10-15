@@ -54,7 +54,7 @@ npm install
 ```
 
 **7. Promo videos only (optional).** Skip this if you won't edit video. Every other step works without it.
-- Mac: `brew install ffmpeg uv` (no Homebrew? Install it from [brew.sh](https://brew.sh) first)
+- Mac: `brew install ffmpeg uv` (no Homebrew? Install it from [brew.sh](https://brew.sh) first) — the Homebrew/apt/Gyan builds include libass, which subtitle burning needs; if Setup says "no libass", run the reinstall command it shows.
 - Windows: `winget install Gyan.FFmpeg astral-sh.uv`
 - Both: `git clone https://github.com/browser-use/video-use .claude/skills/video-use`
 - ElevenLabs key for transcription: `cp .env.example .env` (Windows: `copy .env.example .env`), then paste your key into `.env`.
@@ -95,6 +95,8 @@ Everything participants see and everything Devin is asked to do is in **`ui/web/
   "How to do this step" box (`guide`: time, why, done-looks-like, tips), what each step
   builds on (`uses`) and the exact prompt sent to Devin (`prompt`).
 - `AGENDA`: the full-day schedule on the Start here page.
+- `SETUP_ACCOUNT` and `SETUP_INTEGRATIONS`: the Devin account note and the "add more tools"
+  how-to cards on the Setup page.
 - `VIDEO_PRESETS` and `VIDEO_FORMATS`: the promo video briefs.
 - `TRACKER_INSIGHTS`: what "Ask Devin what to do next" sends.
 

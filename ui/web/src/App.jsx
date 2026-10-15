@@ -1,6 +1,6 @@
-import { Component, useCallback, useEffect, useState } from 'react';
-import { api, post, put, useAgent } from './api.js';
-import { STEPS } from './steps.js';
+import { Component, useCallback, useEffect, useRef, useState } from 'react';
+import { api, ask, post, put, toast, useAgent } from './api.js';
+import { SPRINTS, STEPS, countdown, setSprint } from './steps.js';
 import Chat from './components/Chat.jsx';
 import GenerateStep from './components/GenerateStep.jsx';
 import Guide from './components/Guide.jsx';
@@ -61,19 +61,6 @@ function ThemePick() {
   );
 }
 
-// The one bold thing on screen: how long until the season peaks.
-export function countdown(now = new Date()) {
-  const y = now.getFullYear(), day = 864e5;
-  const today = new Date(y, now.getMonth(), now.getDate());
-  const nov1 = new Date(y, 10, 1);
-  const blackFriday = new Date(y, 10, 1 + ((4 - nov1.getDay() + 7) % 7) + 22); // day after the 4th Thursday
-  const christmas = new Date(y, 11, 25);
-  for (const [date, label] of [[blackFriday, 'Black Friday'], [christmas, 'Christmas']]) {
-    if (today <= date) return { days: Math.round((date - today) / day), label };
-  }
-  return { days: Math.round((new Date(y + 1, 0, 1) - today) / day), label: 'the New Year' };
-}
-
 // A broken view (e.g. a file Devin wrote in an unexpected shape) shouldn't blank the app.
 class StepBoundary extends Component {
   state = { error: null };
@@ -93,6 +80,7 @@ export default function App() {
   const [biz, setBiz] = useState(null);
   const [projects, setProjects] = useState([]);
   const [health, setHealth] = useState(null);
+  const [integrations, setIntegrations] = useState(null);
   const [workingOn, setWorkingOn] = useState(null);
   const [hash, go] = useHash();
 
@@ -102,11 +90,12 @@ export default function App() {
   ]).catch(() => {}), []);
   const agent = useAgent('/api/business', refresh);
 
-  useEffect(() => { refresh(); api('/api/health').then(setHealth).catch(() => {}); }, [refresh]);
+  useEffect(() => { refresh(); api('/api/health').then(setHealth).catch(() => {}); api('/api/integrations').then(setIntegrations).catch(() => {}); }, [refresh]);
   useEffect(() => { if (!agent.busy) setWorkingOn(null); }, [agent.busy]);
 
   if (!biz) return <div className="boot">Loading your workspace…</div>;
 
+  setSprint(biz.sprint?.id); // before anything reads STEPS
   const agentName = AGENT_NAMES[biz.agent] || 'Devin';
   const byId = Object.fromEntries(STEPS.map(s => [s.id, s]));
   // When each step's output last changed (null = not done). Drives ticks and "out of date".
@@ -121,25 +110,26 @@ export default function App() {
   const doneCount = STEPS.filter(s => isDone(s.id)).length;
   const missing = g => health ? health.some(h => h.group === g && !h.ok) : null;
   const setupOk = health ? !missing('required') : undefined; // video tools only matter on the video step
+  const integCount = integrations ? integrations.mcp.length + integrations.plugins.length : 0;
   const route = hash || 'guide'; // Start here; its button jumps to the first unfinished step
   const step = byId[route] || null;
   const next = step && STEPS[STEPS.indexOf(step) + 1];
-  const { days, label } = countdown();
+  const { days, label } = countdown(biz.sprint);
 
   const saveProfile = async profile => { await put('/api/business/profile.json', profile); await refresh(); };
   // Step answers live apart from the profile so saving them doesn't make every step look out of date.
-  const saveInputs = (id, inputs) => put('/api/business/inputs.json', { ...biz.inputs, [id]: inputs }).then(refresh).catch(() => {});
+  const saveInputs = (id, inputs) => put('/api/business/inputs.json', { ...biz.inputs, [id]: inputs }).then(refresh).catch(e => toast(`Couldn’t save your answers: ${e.message}`));
   const generate = (s, prompt, snapshot) => { setWorkingOn(s.title); agent.send(prompt, snapshot); };
   const switchAgent = async a => {
     try { await post('/api/business/agent', { agent: a }); agent.restart(); refresh(); }
-    catch (e) { alert(e.message); }
+    catch (e) { toast(e.message); }
   };
 
-  const ctx = { biz, agent, agentName, workingOn, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId };
+  const ctx = { biz, agent, agentName, workingOn, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId, linkedinReady: !!health?.find(h => h.id === 'linkedin')?.ok };
   const chatEmpty = <><strong>{agentName} is your campaign partner.</strong><p>Use the button on the left to write this step, then ask for changes here — “make it shorter”, “more playful”, “add a gift-card option”.</p></>;
 
   let page;
-  if (route === 'setup') page = <main className="main wide"><Setup health={health} recheck={() => api('/api/health').then(setHealth)} /></main>;
+  if (route === 'setup') page = <main className="main wide"><Setup health={health} integrations={integrations} agentName={agentName} recheck={() => api('/api/health').then(setHealth).then(() => api('/api/integrations?fresh=1').then(setIntegrations).catch(() => {}))} /></main>;
   else if (route === 'guide' || !step) page = <main className="main wide"><Guide ctx={ctx} agentName={agentName} /></main>;
   else if (step.kind === 'video') page = <StepBoundary key="video"><VideoStudio step={step} projects={projects} ctx={{ ...ctx, videoSetupMissing: missing('video') }} /></StepBoundary>;
   else page = (
@@ -171,12 +161,14 @@ export default function App() {
     <div className="shell">
       <aside className="rail">
         <div className="brand">
-          <span className="brand-name">Holiday Growth Sprint</span>
+          <span className="brand-name">{SPRINTS[biz.sprint?.id]?.name || SPRINTS.holiday.name}</span>
           <div className="countdown" aria-label={`${days} days to ${label}`}>
             <span className="countdown-n">{days}</span>
             <span className="countdown-l">{days === 1 ? 'day' : 'days'} to {label}</span>
           </div>
         </div>
+        <BusinessPick current={biz.profile?.name} busy={agent.busy} />
+        <SprintPick sprint={biz.sprint} busy={agent.busy} />
         <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={STEPS.length} aria-valuenow={doneCount} aria-label="Workshop progress">
           <div className="progress-bar" style={{ width: `${(doneCount / STEPS.length) * 100}%` }} />
           <span>{doneCount} of {STEPS.length} done</span>
@@ -200,6 +192,7 @@ export default function App() {
           <a href="#setup" className={'setup-link' + (route === 'setup' ? ' active' : '')}>
             <span className={'dot ' + (!health ? '' : !setupOk ? 'bad' : missing('video') ? 'warn' : 'ok')} />
             {setupOk === false ? 'Finish setup' : 'Setup'}
+            {setupOk !== false && integCount > 0 && <small>{integCount} integration{integCount === 1 ? '' : 's'}</small>}
           </a>
           <label className="agent-pick">
             <span>Assistant</span>
@@ -212,6 +205,101 @@ export default function App() {
         </div>
       </aside>
       {page}
+      <Toasts />
+      <Confirm />
+    </div>
+  );
+}
+
+// Which business this workspace is for. Switching swaps the whole workspace, so reload to pick it all up.
+function BusinessPick({ current, busy }) {
+  const [list, setList] = useState([]);
+  useEffect(() => { api('/api/businesses').then(r => setList(r.list)).catch(() => {}); }, [current]);
+  const pick = async v => {
+    if (v === 'new' && !(await ask('Start a new business? This one is saved and you can switch back any time.', 'Start new'))) return;
+    try {
+      await post(`/api/businesses/${v === 'new' ? 'new' : 'switch'}`, { id: v });
+      location.hash = v === 'new' ? '#profile' : '#guide';
+      location.reload();
+    } catch (e) { toast(e.message); }
+  };
+  return (
+    <label className="agent-pick">
+      <span>Business</span>
+      <select value="" onChange={e => pick(e.target.value)} disabled={busy}>
+        <option value="" disabled>{current || 'Unnamed business'}</option>
+        {list.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        <option value="new">+ New business</option>
+      </select>
+    </label>
+  );
+}
+
+// Same steps either way; the sprint changes the wording, prompts and countdown. Saved per business.
+function SprintPick({ sprint, busy }) {
+  const current = SPRINTS[sprint?.id] ? sprint.id : 'holiday';
+  const pick = async id => {
+    if (!(await ask(`Switch to ${SPRINTS[id].name}? Your existing plans stay; regenerate steps to fit the new sprint.`, 'Switch sprint'))) return;
+    try {
+      await put('/api/business/sprint.json', { id, name: SPRINTS[id].name, started: new Date().toLocaleDateString('en-CA') });
+      location.reload();
+    } catch (e) { toast(e.message); }
+  };
+  return (
+    <label className="agent-pick">
+      <span>Sprint</span>
+      <select value={current} onChange={e => pick(e.target.value)} disabled={busy}>
+        {Object.values(SPRINTS).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+// One question at a time via ask(); native <dialog> handles focus, Esc and the backdrop.
+function Confirm() {
+  const [req, setReq] = useState(null);
+  const ref = useRef(null);
+  useEffect(() => {
+    const on = e => setReq(e.detail);
+    addEventListener('ask', on);
+    return () => removeEventListener('ask', on);
+  }, []);
+  useEffect(() => { if (req && !ref.current.open) { ref.current.returnValue = ''; ref.current.showModal(); } }, [req]);
+  const close = () => { req?.resolve(ref.current.returnValue === 'ok'); setReq(null); };
+  return (
+    <dialog ref={ref} className="confirm" onClose={close}>
+      <form method="dialog">
+        <p>{req?.text}</p>
+        <div className="confirm-actions">
+          <button className="btn" value="cancel">Cancel</button>
+          <button className="btn primary" value="ok" autoFocus>{req?.ok}</button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+// Stacks toasts bottom-right; each clears itself after a few seconds (errors linger longer) or on ×.
+function Toasts() {
+  const [list, setList] = useState([]);
+  useEffect(() => {
+    let n = 0;
+    const on = e => {
+      const t = { id: ++n, ...e.detail };
+      setList(l => [...l.slice(-3), t]); // ponytail: keep the last 4, older ones just drop
+      setTimeout(() => setList(l => l.filter(x => x.id !== t.id)), t.kind === 'err' ? 8000 : 4000);
+    };
+    addEventListener('toast', on);
+    return () => removeEventListener('toast', on);
+  }, []);
+  return (
+    <div className="toasts" role="status" aria-live="polite">
+      {list.map(t => (
+        <div key={t.id} className={'toast ' + t.kind}>
+          <span>{t.text}</span>
+          <button onClick={() => setList(l => l.filter(x => x.id !== t.id))} aria-label="Dismiss">×</button>
+        </div>
+      ))}
     </div>
   );
 }

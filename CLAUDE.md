@@ -10,17 +10,23 @@ between them from their skills — this file is the whole "workflow", there is n
   color-grades, burns subtitles, composites the final render. Needs `ELEVENLABS_API_KEY` in `.env`.
 - **HyperFrames** — plugin (`hyperframes:*`), npm dep `hyperframes`. HTML/CSS/JS → deterministic MP4
   for title cards, lower-thirds, animated overlays.
+- **LinkedIn** — project MCP in `.devin/mcp_config.json`: `linkedin` (`mcp/linkedin.mjs`, stdlib stdio server,
+  `LINKEDIN_ACCESS_TOKEN` in `.env`) posts as the user, only text they approved; `microsoft-learn` searches LinkedIn API docs.
 
-## UI — Holiday Growth Sprint workspace
+## UI — Growth Sprint workspace (Holiday Growth Sprint / Growth Hack Sprint)
 `npm run studio` → http://localhost:4321. Builds the Vite + React app in `ui/web/` into `ui/dist/`,
 then serves it from `ui/server.mjs` (Node stdlib). The server drives the agent over ACP: Devin
 (`devin acp`) by default, Claude Code via `@agentclientprotocol/claude-agent-acp` (switch in the UI,
 or `STUDIO_AGENT=claude`). Hot reload while developing: `node ui/server.mjs` + `npm run dev`
 (Vite on :5173 proxies to :4321).
 
-The UI walks a small business owner through the workshop. Each step's inputs and agent prompt
+The UI walks a small business owner through the workshop. Two sprints share the same steps and files; only
+the wording differs (`SPRINTS` in steps.js, picked per business in `business/sprint.json`, missing = holiday). Each step's inputs and agent prompt
 live in `ui/web/src/steps.js`; edit prompts there. Everything is saved in `business/`
-(gitignored, one business per clone):
+(gitignored). That's the *active* business. Other profiles are parked in `businesses/<id>/`, and the rail's
+Business picker (`/api/businesses/new|switch`) moves files between them, so every `business/...` path
+stays valid. Each business carries its own chat (`.session`, `.sessions.json`). Video projects in `projects/` are
+shared across businesses. Files in `business/`:
 - `profile.json`, `inputs.json` (each step's answers), `tracker.json` — written by the UI only
 - `calendar.json` — written by the agent (schema pinned in steps.js), status ticked in the UI;
   the server drops malformed items and reports `calendarIssues`
@@ -36,6 +42,8 @@ live in `ui/web/src/steps.js`; edit prompts there. Everything is saved in `busin
 
 Setup checks (and the per-OS install commands) are `setupItems()`/`health()` in `ui/server.mjs`;
 the Devin account / promo-code text is `SETUP_ACCOUNT` in `ui/web/src/steps.js`. Mac + Windows supported.
+Setup also lists Devin MCP servers (`devin mcp list`) and plugins (CLI plugin cache) via
+`GET /api/integrations`; the add-more how-to copy is `SETUP_INTEGRATIONS` in steps.js.
 
 Agent state: one session for the business (`business/.session`), one per video project
 (`projects/<name>/.session`); `.agent` stores the chosen agent. All gitignored.

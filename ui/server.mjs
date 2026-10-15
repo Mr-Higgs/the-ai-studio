@@ -3,14 +3,17 @@
 //   npm run studio  ->  http://localhost:4321
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
+import { postToLinkedIn } from '../mcp/linkedin.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const PROJECTS = path.join(ROOT, 'projects');
-const BUSINESS = path.join(ROOT, 'business');
+const BUSINESS = path.join(ROOT, 'business'); // the active profile; prompts and skills all point here
+const BUSINESSES = path.join(ROOT, 'businesses'); // parked profiles, one folder each
 const DIST = path.join(import.meta.dirname, 'dist');
 const PORT = Number(process.env.PORT) || 4321;
 const WIN = process.platform === 'win32';
@@ -30,7 +33,7 @@ export function projectFile(name, sub, file) {
   return path.join(PROJECTS, name, sub, base);
 }
 // Files the browser may overwrite in business/ (Devin writes the .md docs itself).
-export const BUSINESS_JSON = ['profile.json', 'inputs.json', 'calendar.json', 'tracker.json'];
+export const BUSINESS_JSON = ['profile.json', 'inputs.json', 'calendar.json', 'tracker.json', 'sprint.json'];
 export const BUSINESS_DOCS = ['offer', 'research', 'strategy', 'content', 'visibility', 'automation', 'action-plan']; // step order
 // Files the server snapshots into business/history/ before Devin rewrites them.
 export const SNAPSHOT_FILES = [...BUSINESS_DOCS.map(d => `${d}.md`), 'calendar.json'];
@@ -43,6 +46,48 @@ export function cleanCalendar(data) {
   const items = data.filter(x => x && typeof x === 'object' && /^\d{4}-\d{2}-\d{2}$/.test(x.date) && typeof x.title === 'string');
   return { items, issues: data.length - items.length };
 }
+// LinkedIn autopilot: calendar items the user approved (autopost) whose local date+time has come.
+// Over 24 h late stays put, so reopening Studio after a week doesn't fire a backlog.
+const DAY = 864e5;
+export const autopostAt = x => new Date(`${x.date}T${/^\d{2}:\d{2}$/.test(x.time) ? x.time : '09:00'}`);
+export function autopostDue(items, now = new Date()) {
+  return (items || []).flatMap((x, i) => {
+    const late = now - autopostAt(x);
+    return /linkedin/i.test(x.channel) && x.autopost === true && x.status !== 'posted' && late >= 0 && late <= DAY ? [i] : [];
+  });
+}
+// ponytail: runs only while Studio is open, for the active business. launchd/cron if it must run unattended.
+let autopilotBusy = false;
+async function autopilotTick() {
+  if (autopilotBusy) return;
+  autopilotBusy = true;
+  const file = path.join(BUSINESS, 'calendar.json');
+  const read = () => { try { return cleanCalendar(JSON.parse(fs.readFileSync(file, 'utf8'))).items; } catch { return null; } };
+  // Re-read before each write so edits made in the UI meanwhile survive; match by date+title, not index.
+  const patch = (item, fields) => {
+    const items = read(); const x = items?.find(y => y.date === item.date && y.title === item.title);
+    if (!x) return;
+    Object.assign(x, fields);
+    fs.writeFileSync(file + '.tmp', JSON.stringify(items, null, 2) + '\n');
+    fs.renameSync(file + '.tmp', file);
+  };
+  try {
+    const items = read();
+    for (const i of autopostDue(items)) {
+      const item = items[i];
+      patch(item, { status: 'posted' }); // mark first: a crash mid-post must not double-post
+      try {
+        const url = await postToLinkedIn([item.copy, item.cta].filter(Boolean).join('\n\n'));
+        patch(item, { url, postedAt: new Date().toISOString(), autopostError: undefined });
+        console.log(`LinkedIn autopilot posted "${item.title}" → ${url}`);
+      } catch (e) {
+        patch(item, { status: 'planned', autopost: false, autopostError: e.message }); // untick: no retry loop
+        console.error(`LinkedIn autopilot failed "${item.title}": ${e.message}`);
+      }
+    }
+  } finally { autopilotBusy = false; }
+}
+
 // Built frontend: /assets/<file> only, no nesting, no dotfiles.
 export function distFile(urlPath) {
   if (urlPath === '/' || urlPath === '/index.html') return path.join(DIST, 'index.html');
@@ -55,8 +100,8 @@ export const HEYGEN_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const readEnv = () => { try { return fs.readFileSync(path.join(ROOT, '.env'), 'utf8'); } catch { return ''; } };
 const envKey = name => process.env[name] || new RegExp(`^${name}=(.+)$`, 'm').exec(readEnv())?.[1].trim();
 // Keys the Setup page may write into .env. Printable ASCII, no spaces: a pasted value can't add a line.
-export const ENV_KEYS = ['HEYGEN_API_KEY', 'ELEVENLABS_API_KEY'];
-export const ENV_VALUE = /^[\x21-\x7e]{8,256}$/;
+export const ENV_KEYS = ['HEYGEN_API_KEY', 'ELEVENLABS_API_KEY', 'LINKEDIN_ACCESS_TOKEN'];
+export const ENV_VALUE = /^[\x21-\x7e]{8,1024}$/;
 export function setEnvLine(text, name, value) {
   const line = `${name}=${value}`, re = new RegExp(`^${name}=.*$`, 'm');
   return re.test(text) ? text.replace(re, () => line) : `${text}${text && !text.endsWith('\n') ? '\n' : ''}${line}\n`;
@@ -161,7 +206,17 @@ function getSession(name) {
 
 function stopSession(name) {
   const s = sessions.get(name);
-  if (s) s.proc.kill();
+  sessions.delete(name); // a reconnect right after this spawns fresh instead of reusing the dying process
+  if (s) { s.emit({ type: 'exit', message: 'Conversation closed.' }); for (const res of s.clients) res.end(); s.proc.kill(); }
+}
+
+// Past conversations: <dir>/.sessions.json = [{ id, agent, title, at }]. Transcripts live with the agent.
+const pastSessions = name => { try { return JSON.parse(readOpt(name, '.sessions.json')) || []; } catch { return []; } };
+function rememberSession(name, id, agent, text) {
+  const list = pastSessions(name);
+  if (!id || list.some(c => c.id === id)) return;
+  list.unshift({ id, agent, title: text.replace(/\s+/g, ' ').slice(0, 60), at: new Date().toISOString() });
+  fs.writeFileSync(path.join(dirFor(name), '.sessions.json'), JSON.stringify(list, null, 2));
 }
 
 async function prompt(name, text) {
@@ -171,6 +226,7 @@ async function prompt(name, text) {
   s.emit({ type: 'user', text });
   try {
     await s.ready;
+    rememberSession(name, s.sessionId, s.agent, text);
     const r = await s.request('session/prompt', { sessionId: s.sessionId, prompt: [{ type: 'text', text }] });
     s.emit({ type: 'done', stopReason: r.stopReason });
   } catch (e) {
@@ -191,8 +247,9 @@ export function setupItems(platform = process.platform) {
     { id: 'devin', group: 'required', name: 'Devin CLI', why: 'The assistant that writes every step with you.',
       fix: pick({ mac: 'curl -fsSL https://cli.devin.ai/install.sh | bash', linux: 'curl -fsSL https://cli.devin.ai/install.sh | bash', win: 'irm https://static.devin.ai/cli/setup.ps1 | iex' }) },
     { id: 'devin-auth', group: 'required', name: 'Signed in to Devin', why: 'Connects the assistant to your Devin account.', fix: 'devin auth login' },
-    { id: 'ffmpeg', group: 'video', name: 'ffmpeg', why: 'Cuts and renders video.',
-      fix: pick({ mac: 'brew install ffmpeg', linux: 'sudo apt install ffmpeg', win: 'winget install Gyan.FFmpeg' }) },
+    { id: 'ffmpeg', group: 'video', name: 'ffmpeg', why: 'Cuts, renders and burns subtitles into video.',
+      fix: pick({ mac: 'brew install ffmpeg', linux: 'sudo apt install ffmpeg', win: 'winget install Gyan.FFmpeg' }),
+      refix: pick({ mac: 'brew reinstall ffmpeg', linux: 'sudo apt install --reinstall ffmpeg', win: 'winget install --force Gyan.FFmpeg' }) },
     { id: 'uv', group: 'video', name: 'uv (Python)', why: 'Runs the video editing tools.',
       fix: pick({ mac: 'brew install uv', linux: 'curl -LsSf https://astral.sh/uv/install.sh | sh', win: 'winget install astral-sh.uv' }) },
     { id: 'video-use', group: 'video', name: 'Video editing skill', why: 'Teaches the assistant how to edit footage.', fix: VIDEO_USE },
@@ -202,19 +259,112 @@ export function setupItems(platform = process.platform) {
     { id: 'heygen', group: 'optional', name: 'HeyGen API key', why: 'Imports your HeyGen videos and makes new ones from your avatars.',
       key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API',
       fix: pick({ mac: 'cp .env.example .env   # then paste HEYGEN_API_KEY into .env', linux: 'cp .env.example .env   # then paste HEYGEN_API_KEY into .env', win: 'copy .env.example .env   # then paste HEYGEN_API_KEY into .env' }) },
+    { id: 'linkedin', group: 'optional', name: 'LinkedIn access token', why: 'Lets Devin publish posts you approve to your LinkedIn. Expires every 60 days. See "Post to LinkedIn" under Add more.',
+      key: 'LINKEDIN_ACCESS_TOKEN', link: 'https://www.linkedin.com/developers/tools/oauth/token-generator',
+      fix: pick({ mac: 'cp .env.example .env   # then paste LINKEDIN_ACCESS_TOKEN into .env', linux: 'cp .env.example .env   # then paste LINKEDIN_ACCESS_TOKEN into .env', win: 'copy .env.example .env   # then paste LINKEDIN_ACCESS_TOKEN into .env' }) },
   ];
 }
 const has = bin => { try { execFileSync(WIN ? 'where' : 'which', [bin], { stdio: 'ignore' }); return true; } catch { return false; } };
+export function hasSubtitlesFilter(text) { return /^\s*\S+\s+subtitles\s/m.test(text); }
+function ffmpegStatus() {
+  try {
+    const out = execFileSync('ffmpeg', ['-hide_banner', '-filters'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    return hasSubtitlesFilter(out) ? 'ok' : 'no-libass';
+  } catch { return 'missing'; }
+}
+const devinLoggedIn = () => { try { return /Logged in/.test(execFileSync('devin', ['auth', 'status'], { encoding: 'utf8' })); } catch { return false; } };
 function health() {
   const env = readEnv();
-  const devinAuth = (() => { try { return /Logged in/.test(execFileSync('devin', ['auth', 'status'], { encoding: 'utf8' })); } catch { return false; } })();
+  const devinAuth = devinLoggedIn();
+  const ff = ffmpegStatus();
   const ok = {
-    devin: has('devin'), 'devin-auth': devinAuth, ffmpeg: has('ffmpeg'), uv: has('uv'),
+    devin: has('devin'), 'devin-auth': devinAuth, ffmpeg: ff === 'ok', uv: has('uv'),
     'video-use': fs.existsSync(path.join(ROOT, '.claude/skills/video-use/SKILL.md')),
     elevenlabs: /^ELEVENLABS_API_KEY=(?!your_api_key_here)\S+/m.test(env),
     heygen: /^HEYGEN_API_KEY=(?!your_api_key_here)\S+/m.test(env) || !!process.env.HEYGEN_API_KEY,
+    linkedin: /^LINKEDIN_ACCESS_TOKEN=(?!your_api_key_here)\S+/m.test(env) || !!process.env.LINKEDIN_ACCESS_TOKEN,
   };
-  return setupItems().map(i => ({ ...i, ok: ok[i.id] }));
+  return setupItems().map(i => {
+    const { refix, ...rest } = i;
+    if (i.id === 'ffmpeg' && ff === 'no-libass')
+      return { ...rest, ok: false, fix: i.refix, why: "ffmpeg is installed but this build can't burn subtitles (no libass) — reinstall it." };
+    return { ...rest, ok: ok[i.id] };
+  });
+}
+
+// ---- integrations: the MCP servers and plugins Devin can reach (read-only, for Setup) ----
+// `devin mcp list` prints "• name" entries with indented "URL:"/"Command:" detail lines.
+export function parseMcpList(text) {
+  const out = [];
+  for (const line of String(text).split('\n')) {
+    const m = /^\s*[•\-*]\s+(\S+)(\s+\(disabled\))?/.exec(line);
+    if (m) { out.push({ name: m[1], kind: null, target: '', disabled: !!m[2] }); continue; }
+    const d = /^\s+(URL|Command):\s+(.+)$/.exec(line);
+    if (d && out.length) { out.at(-1).kind = d[1] === 'URL' ? 'url' : 'command'; out.at(-1).target = d[2].trim(); }
+  }
+  return out;
+}
+// No secrets to the page: URLs drop their query string; commands keep only the executable
+// plus the basename of its first argument (later args can carry tokens or env paths).
+export function safeTarget(kind, target) {
+  target = String(target).trim();
+  if (kind === 'url') {
+    try { const u = new URL(target); return u.origin + u.pathname; } // drops query, hash, userinfo
+    catch { return target.split('?')[0]; }
+  }
+  const [bin, arg] = target.split(/\s+/);
+  return arg ? `${path.basename(bin)} ${path.basename(arg)}` : path.basename(bin);
+}
+// Installed plugins live in the CLI cache as <slug>/<version>/, manifest in
+// .devin-plugin/ or .claude-plugin/ or the version dir itself.
+export function readPluginManifests(cacheDir) {
+  const out = [];
+  let slugs;
+  try { slugs = fs.readdirSync(cacheDir, { withFileTypes: true }); } catch { return []; }
+  for (const slug of slugs) {
+    if (!slug.isDirectory()) continue;
+    let versions;
+    try { versions = fs.readdirSync(path.join(cacheDir, slug.name), { withFileTypes: true }); } catch { continue; }
+    for (const v of versions) {
+      if (!v.isDirectory()) continue;
+      const dir = path.join(cacheDir, slug.name, v.name);
+      const manifest = ['.devin-plugin', '.claude-plugin', ''].map(sub => path.join(dir, sub, 'plugin.json')).find(fs.existsSync);
+      if (!manifest) continue;
+      let j;
+      try { j = JSON.parse(fs.readFileSync(manifest, 'utf8')); } catch { continue; }
+      let skills = [];
+      try { skills = fs.readdirSync(path.join(dir, 'skills'), { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name); } catch {}
+      out.push({
+        name: j.name || slug.name,
+        displayName: j.displayName || j.name || slug.name,
+        description: j.description || '',
+        homepage: j.homepage || '',
+        keywords: j.keywords || [],
+        mcpServers: Object.keys(j.mcpServers || {}),
+        skills,
+      });
+    }
+  }
+  return out.sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+const PLUGIN_CACHE = process.platform === 'win32'
+  ? path.join(process.env.LOCALAPPDATA || 'x', 'devin', 'cli', 'plugins', 'cache')
+  : path.join(os.homedir(), '.local', 'share', 'devin', 'cli', 'plugins', 'cache');
+let integCache = { at: 0, value: null };
+function integrations(fresh = false) {
+  if (!fresh && integCache.value && Date.now() - integCache.at < 30000) return integCache.value;
+  let mcp = [], mcpError = null;
+  try {
+    mcp = parseMcpList(execFileSync('devin', ['mcp', 'list'], { encoding: 'utf8' }))
+      .map(m => ({ ...m, target: safeTarget(m.kind, m.target) }));
+  } catch { mcpError = 'devin-missing'; }
+  const value = {
+    mcp, mcpError,
+    plugins: readPluginManifests(PLUGIN_CACHE),
+    loggedIn: devinLoggedIn(),
+    hasProjectMcpConfig: ['mcp_config.json', 'mcp_config.local.json'].some(f => fs.existsSync(path.join(ROOT, '.devin', f))),
+  };
+  return (integCache = { at: Date.now(), value }).value;
 }
 
 function businessState() {
@@ -232,16 +382,50 @@ function businessState() {
   try { for (const f of fs.readdirSync(path.join(BUSINESS, 'history')).sort().reverse()) if (historyFile(f)) (history[f.replace(/-\d{8}T.*$/, '')] ||= []).push(f); } catch {}
   const obj = f => { const v = json(f); return v === 'invalid' ? null : v; };
   return {
-    profile: obj('profile.json'), inputs: obj('inputs.json') || {}, tracker: obj('tracker.json'), calendar: cal.items, calendarIssues: cal.issues, docs, history,
+    sprint: obj('sprint.json'), profile: obj('profile.json'), inputs: obj('inputs.json') || {}, tracker: obj('tracker.json'), calendar: cal.items, calendarIssues: cal.issues, docs, history,
     mtimes: { profile: mtime('profile.json'), calendar: mtime('calendar.json'), tracker: mtime('tracker.json') },
     agent: agentOf(BIZ), busy: !!sessions.get(BIZ)?.busy,
   };
 }
 
+// ---- business profiles ----
+// Switching moves files between business/ and businesses/<id>/, so every `business/...` path keeps working.
+// Each profile carries its own .session/.sessions.json, so chats follow the business.
+export const businessId = (name, taken) => {
+  const base = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'business';
+  let id = base;
+  for (let n = 2; taken.includes(id); n++) id = `${base}-${n}`;
+  return id;
+};
+const parkedIds = () => { try { return fs.readdirSync(BUSINESSES).filter(f => /^[a-z0-9-]+$/.test(f)); } catch { return []; } };
+const profileName = dir => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'profile.json'), 'utf8')).name || ''; } catch { return ''; } };
+// ponytail: not transactional; a crash mid-move leaves files split between the two folders (both kept, nothing lost)
+const moveAll = (from, to) => {
+  fs.mkdirSync(to, { recursive: true });
+  for (const f of fs.readdirSync(from)) if (f !== '.gitkeep') fs.renameSync(path.join(from, f), path.join(to, f));
+};
+function listBusinesses() {
+  return {
+    current: profileName(BUSINESS),
+    list: parkedIds().map(id => ({ id, name: profileName(path.join(BUSINESSES, id)) || id })),
+  };
+}
+function parkBusiness() {
+  fs.mkdirSync(BUSINESS, { recursive: true });
+  if (!fs.readdirSync(BUSINESS).some(f => f !== '.gitkeep' && !f.startsWith('.'))) { // nothing worth keeping, not even its chat
+    for (const f of fs.readdirSync(BUSINESS)) if (f !== '.gitkeep') fs.rmSync(path.join(BUSINESS, f), { recursive: true, force: true });
+    return;
+  }
+  const id = readOpt(BIZ, '.id') || businessId(profileName(BUSINESS), parkedIds());
+  if (fs.existsSync(path.join(BUSINESSES, id))) throw Object.assign(new Error(`businesses/${id} already exists`), { status: 409 });
+  fs.writeFileSync(path.join(BUSINESS, '.id'), id);
+  moveAll(BUSINESS, path.join(BUSINESSES, id));
+}
+
 // Everything in one Markdown file to take home.
 function exportMarkdown() {
   const b = businessState();
-  const out = [`# Holiday Growth Sprint — ${b.profile?.name || 'my business'}`, `_Exported ${new Date().toLocaleString()}_`];
+  const out = [`# ${b.sprint?.name || 'Holiday Growth Sprint'} — ${b.profile?.name || 'my business'}`, `_Exported ${new Date().toLocaleString()}_`];
   if (b.profile) out.push('## Business profile', ...Object.entries(b.profile).filter(([, v]) => typeof v === 'string' && v).map(([k, v]) => `- **${k}:** ${v}`));
   for (const id of BUSINESS_DOCS) if (b.docs[id]) out.push(`\n---\n`, b.docs[id].content.trim());
   if (b.calendar?.length) out.push('\n---\n', '## Campaign calendar', ...b.calendar.map(c => `- **${c.date}** · ${c.channel || ''} ${c.format || ''} · ${c.title}${c.status === 'posted' ? ' ✓' : ''}\n\n  ${(c.copy || '').replace(/\n/g, '\n  ')}${c.cta ? `\n\n  _CTA:_ ${c.cta}` : ''}`));
@@ -305,8 +489,19 @@ const server = http.createServer(async (req, res) => {
       return file ? serveFile(req, res, file) : send(res, 404, { error: 'not found' });
     }
     if (req.method === 'GET' && url.pathname === '/api/business') return send(res, 200, businessState());
+    if (req.method === 'GET' && url.pathname === '/api/businesses') return send(res, 200, listBusinesses());
+    if (req.method === 'POST' && parts[0] === 'api' && parts[1] === 'businesses' && ['new', 'switch'].includes(parts[2])) {
+      if (sessions.get(BIZ)?.busy) return send(res, 409, { error: 'The agent is still working. Stop it or wait.' });
+      const { id } = await readJson(req);
+      const from = parts[2] === 'switch' && parkedIds().includes(id) ? path.join(BUSINESSES, id) : null;
+      if (parts[2] === 'switch' && !from) return send(res, 404, { error: 'no such business' });
+      stopSession(BIZ);
+      parkBusiness();
+      if (from) { moveAll(from, BUSINESS); fs.rmdirSync(from); }
+      return send(res, 200, listBusinesses());
+    }
     if (req.method === 'GET' && url.pathname === '/api/business/export.md') {
-      res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Content-Disposition': 'attachment; filename="holiday-growth-sprint.md"' });
+      res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Content-Disposition': `attachment; filename="${businessState().sprint?.id === 'growth' ? 'growth-hack' : 'holiday-growth'}-sprint.md"` });
       return res.end(exportMarkdown());
     }
     if (req.method === 'GET' && parts[0] === 'business' && parts[1] === 'history' && parts.length === 3) {
@@ -324,6 +519,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
     if (req.method === 'GET' && url.pathname === '/api/health') return send(res, 200, health());
+    if (req.method === 'GET' && url.pathname === '/api/integrations') return send(res, 200, integrations(url.searchParams.has('fresh')));
     if (req.method === 'GET' && url.pathname === '/api/heygen/videos') {
       const q = new URLSearchParams({ limit: '24' });
       if (url.searchParams.get('token')) q.set('token', url.searchParams.get('token'));
@@ -453,6 +649,21 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 200, { ok: true });
     }
+    if (req.method === 'GET' && action === 'conversations') {
+      const agent = agentOf(name);
+      return send(res, 200, { current: readOpt(name, '.session'), list: pastSessions(name).filter(c => c.agent === agent) });
+    }
+    if (req.method === 'POST' && action === 'conversations' && (parts.at(-1) === 'new' || parts.at(-1) === 'open')) {
+      if (sessions.get(name)?.busy) return send(res, 409, { error: 'The agent is still working.' });
+      const file = path.join(dirFor(name), '.session');
+      // ponytail: conversations from before this list existed get a generic title
+      if (parts.at(-1) === 'new') { rememberSession(name, readOpt(name, '.session'), agentOf(name), 'Earlier conversation'); stopSession(name); fs.rmSync(file, { force: true }); return send(res, 200, { ok: true }); }
+      const { id } = await readJson(req);
+      if (!pastSessions(name).some(c => c.id === id && c.agent === agentOf(name))) return send(res, 404, { error: 'no such conversation' });
+      stopSession(name);
+      fs.writeFileSync(file, id);
+      return send(res, 200, { ok: true });
+    }
     if (req.method === 'POST' && action === 'agent') {
       const { agent } = await readJson(req);
       if (!AGENTS[agent]) return send(res, 400, { error: 'unknown agent' });
@@ -471,5 +682,6 @@ const server = http.createServer(async (req, res) => {
 
 if (process.argv[1] === import.meta.filename) {
   server.listen(PORT, '127.0.0.1', () => console.log(`Studio → http://localhost:${PORT}  (agent: ${DEFAULT_AGENT})`));
+  setInterval(autopilotTick, 60e3).unref();
   process.on('SIGINT', () => { for (const n of sessions.keys()) stopSession(n); process.exit(0); });
 }

@@ -13,7 +13,9 @@ projects/*/out/
 # studio UI per-project state
 projects/*/.session
 projects/*/.agent
+projects/*/.sessions.json
 .DS_Store
 ui/dist/
 business/*
 !business/.gitkeep
+businesses/

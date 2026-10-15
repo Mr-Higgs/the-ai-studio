@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "microsoft-learn": {
+      "url": "https://learn.microsoft.com/api/mcp",
+      "transport": "http"
+    },
+    "linkedin": {
+      "command": "node",
+      "args": ["mcp/linkedin.mjs"],
+      "transport": "stdio"
+    }
+  }
+}
