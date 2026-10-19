@@ -2,6 +2,8 @@ node_modules/
 .claude/skills/video-use/
 .env
 .env.local
+app/.next/
+app/.env*.local
 
 
 # working files in real projects, but keep the _template skeleton in git
