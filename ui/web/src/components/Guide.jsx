@@ -1,4 +1,4 @@
-import { AGENDA, SPRINT, STEPS } from '../steps.js';
+import { AGENDA, PHASES, SPRINT, STEPS } from '../steps.js';
 
 const minutes = t => parseInt(t, 10) || 0;
 
@@ -20,14 +20,22 @@ export default function Guide({ ctx, agentName }) {
 
       <section>
         <h2>What you’ll leave with</h2>
-        <ol className="outcomes">
-          {STEPS.map(s => (
-            <li key={s.id} className={isDone(s.id) ? 'done' : ''}>
-              <a href={'#' + s.id}>{s.title}</a>
-              <span>{s.blurb}</span>
-            </li>
-          ))}
-        </ol>
+        {PHASES.map(p => {
+          const steps = p.steps.map(id => byId[id]).filter(Boolean);
+          return (
+            <div key={p.name} className="phase-outcomes">
+              <h3>{p.name}</h3>
+              <ol className="outcomes" style={{ counterReset: `o ${STEPS.indexOf(steps[0])}` }}>
+                {steps.map(s => (
+                  <li key={s.id} className={isDone(s.id) ? 'done' : ''}>
+                    <a href={'#' + s.id}>{s.title}</a>
+                    <span>{s.blurb}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          );
+        })}
       </section>
 
       <section>

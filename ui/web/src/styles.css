@@ -110,6 +110,10 @@ code { font-family: var(--mono); font-size: .88em; }
 .progress-bar { position: absolute; inset: 0 auto 0 0; background: var(--accent); transition: width .5s ease; }
 .progress span { position: relative; display: block; text-align: center; font-size: 12.5px; font-weight: 600; line-height: 28px; }
 .steps { list-style: none; margin: 0; padding: 0; flex: 1; }
+.steps ol { list-style: none; margin: 0; padding: 0; }
+.phase + .phase { margin-top: 14px; }
+.phase-name { display: flex; justify-content: space-between; padding: 0 10px 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rail-muted); }
+.phase-name small { font-size: 11px; font-weight: 600; letter-spacing: 0; }
 .steps a { display: flex; align-items: center; gap: 11px; padding: 8px 10px; border-radius: var(--r-sm); text-decoration: none; color: var(--rail-ink); font-size: 14.5px; }
 .steps a:hover { background: var(--rail-hover); }
 .steps a.active { background: var(--rail-active-bg); color: var(--rail-active-ink); box-shadow: 0 0 0 1px var(--line); font-weight: 600; }
@@ -135,6 +139,7 @@ code { font-family: var(--mono); font-size: .88em; }
 
 /* ---------- step content ---------- */
 .step-head { margin-bottom: 26px; }
+.step-head .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
 .step-head h1 { font: 700 38px/1.08 var(--display); letter-spacing: -.02em; margin: 0 0 10px; }
 .step-head p { margin: 0; color: var(--muted); font-size: 16.5px; }
 .banner { display: block; background: var(--accent-soft); border-radius: var(--r); padding: 10px 14px; margin-bottom: 22px; text-decoration: none; font-size: 14px; }
@@ -208,6 +213,7 @@ textarea { resize: vertical; line-height: 1.45; }
 .guide section { margin-top: 36px; }
 .guide h2 { font: 700 22px/1.2 var(--display); margin: 0 0 12px; letter-spacing: -.01em; }
 .guide .step-head h1 { font-size: 44px; max-width: 16ch; }
+.phase-outcomes h3 { font-size: 14px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; }
 .outcomes { margin: 0; padding: 0; list-style: none; counter-reset: o; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 28px; }
 .outcomes li { counter-increment: o; display: grid; grid-template-columns: 28px 1fr; align-content: start; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .outcomes li::before { content: counter(o); grid-row: span 2; font: 700 15px/1.4 var(--display); color: var(--muted); }
@@ -419,6 +425,8 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
   .countdown-n { font-size: 44px; }
   .steps { display: flex; overflow-x: auto; gap: 4px; padding-bottom: 6px; }
   .steps a { white-space: nowrap; }
+  .phase, .steps ol { display: contents; }
+  .phase-name { display: none; }
   .rail-foot { grid-template-columns: 1fr 1fr; }
   .main { padding: 24px 16px 40px; overflow: visible; }
   .side { border-left: 0; border-top: 1px solid var(--line); height: 80vh; height: 80dvh; }

@@ -25,6 +25,15 @@ const answers = (inputs, fields) => fields
   })
   .filter(Boolean).join('\n') || '- (nothing extra — use the profile)';
 
+// Rail / Start-here grouping, same for both sprints. Keep in STEPS order.
+export const PHASES = [
+  { name: 'Lay the Groundwork', steps: ['profile', 'offer', 'research', 'strategy'] },
+  { name: 'Create', steps: ['content', 'video'] },
+  { name: 'Prepare to Launch', steps: ['calendar', 'visibility', 'automation', 'tracker'] },
+  { name: '🚀 Launch', steps: ['action-plan'] },
+];
+export const phaseOf = id => PHASES.find(p => p.steps.includes(id));
+
 // Two sprints, same steps and files; only the wording changes. Picked per business (business/sprint.json).
 // `adj` prefixes "offer", "promo", etc.: 'holiday ' → "holiday offer", '' → "offer".
 export const SPRINTS = {

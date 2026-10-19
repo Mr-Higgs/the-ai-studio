@@ -3,10 +3,12 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Calendar from './Calendar.jsx';
 import LinkedInAutopilot from './LinkedInAutopilot.jsx';
+import { STEPS, phaseOf } from '../steps.js';
 
 export function StepHead({ step, ctx, children }) {
   return (
     <header className="step-head">
+      <div className="eyebrow">{phaseOf(step.id)?.name} · Step {STEPS.indexOf(step) + 1} of {STEPS.length}</div>
       <h1>{step.title}</h1>
       <p>{step.blurb}</p>
       {ctx && <BuildsOn step={step} ctx={ctx} />}

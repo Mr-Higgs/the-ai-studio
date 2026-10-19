@@ -1,6 +1,6 @@
 import { Component, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ask, post, put, toast, useAgent } from './api.js';
-import { SPRINTS, STEPS, countdown, setSprint } from './steps.js';
+import { PHASES, SPRINTS, STEPS, countdown, setSprint } from './steps.js';
 import Chat from './components/Chat.jsx';
 import GenerateStep from './components/GenerateStep.jsx';
 import Guide from './components/Guide.jsx';
@@ -176,13 +176,20 @@ export default function App() {
         <nav aria-label="Workshop steps">
           <a href="#guide" className={'start-here' + (route === 'guide' ? ' active' : '')} aria-current={route === 'guide' ? 'page' : undefined}>Start here</a>
           <ol className="steps">
-            {STEPS.map((s, i) => (
-              <li key={s.id}>
-                <a href={'#' + s.id} className={(s === step ? 'active ' : '') + (isDone(s.id) ? 'done' : '')} aria-current={s === step ? 'page' : undefined}>
-                  <span className="step-n">{isDone(s.id) ? '✓' : i + 1}</span>
-                  <span>{s.title}</span>
-                  {workingOn === s.title && <span className="working" title={`${agentName} is working on this`} />}
-                </a>
+            {PHASES.map(p => (
+              <li key={p.name} className="phase">
+                <span className="phase-name">{p.name}<small>{p.steps.filter(isDone).length}/{p.steps.length}</small></span>
+                <ol>
+                  {p.steps.map(id => byId[id]).filter(Boolean).map(s => (
+                    <li key={s.id}>
+                      <a href={'#' + s.id} className={(s === step ? 'active ' : '') + (isDone(s.id) ? 'done' : '')} aria-current={s === step ? 'page' : undefined}>
+                        <span className="step-n">{isDone(s.id) ? '✓' : STEPS.indexOf(s) + 1}</span>
+                        <span>{s.title}</span>
+                        {workingOn === s.title && <span className="working" title={`${agentName} is working on this`} />}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
               </li>
             ))}
           </ol>
