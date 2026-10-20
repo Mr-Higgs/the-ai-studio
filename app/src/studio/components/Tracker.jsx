@@ -8,7 +8,7 @@ const money = n => n.toLocaleString([], { style: 'currency', currency: 'USD', ma
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function Tracker({ step, ...ctx }) {
-  const { biz, agent, writingSoon, generate, next, go, refresh } = ctx;
+  const { biz, agent, generate, next, go, refresh } = ctx;
   const [rows, setRows] = useState(biz.tracker || []);
   const [saveState, setSaveState] = useState('');
   const timer = useRef();
@@ -48,9 +48,17 @@ export default function Tracker({ step, ...ctx }) {
       </dl>
       <div className="tracker-bar">
         <button className="btn primary" onClick={add}>Add a lead</button>
-        <button className="btn" onClick={() => generate()} disabled={agent.busy || !rows.length}>AI insights coming soon</button>
+        <button
+          className="btn"
+          onClick={() => generate(
+            `Review these lead tracker entries and give me 3 concise insights and 3 follow-up actions. Don't change the tracker; I will update it myself.\n\n${JSON.stringify(rows)}`,
+            'Lead tracker insights',
+          )}
+          disabled={agent.busy || !rows.length}
+        >
+          Ask Devin for insights
+        </button>
         <span className="hint" aria-live="polite">{saveState}</span>
-        {writingSoon && <span className="hint" role="status">AI writing is coming in the next update — add your Devin key in <a href="#settings">Settings</a>.</span>}
       </div>
       {rows.length ? (
         <div className="table-wrap">

@@ -337,6 +337,8 @@ progress { width: 110px; accent-color: var(--accent); }
 .chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .chat-bar { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .chat-bar select { flex: 1; min-width: 0; }
+.chat-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 14px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.chat-actions a { color: var(--accent); }
 .chat-log { flex: 1; overflow: auto; padding: 18px; }
 .chat-empty { color: var(--muted); font-size: 14px; }
 .chat-empty strong { color: var(--ink); display: block; margin-bottom: 4px; }
@@ -479,6 +481,13 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .settings-key-heading a { color: var(--accent); font-size: 13px; }
 .settings-key-saved .hint { color: var(--ok); }
 .settings-key .key-form { margin-top: 12px; }
+.settings-devin { margin-top: 28px; padding: 18px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); }
+.settings-devin h2 { margin: 0 0 4px; font: 600 18px/1.2 var(--display); }
+.settings-devin > p { margin: 0 0 16px; }
+.settings-devin-form { display: grid; grid-template-columns: 1fr; gap: 8px; max-width: 520px; }
+.settings-devin-form label { font-size: 13px; font-weight: 600; }
+.settings-devin-form input { width: 100%; }
+.settings-devin-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
 
 @media (max-width: 480px) {
   .auth-card { padding: 26px 22px; }

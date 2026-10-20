@@ -77,11 +77,10 @@ class StepBoundary extends Component {
 
 export default function App() {
   const [biz, setBiz] = useState(null);
-  const [writingSoon, setWritingSoon] = useState(false);
   const [hash, go] = useHash();
 
   const refresh = useCallback(() => api('/api/business').then(setBiz).catch(() => {}), []);
-  const agent = useAgent();
+  const agent = useAgent(refresh);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -108,10 +107,10 @@ export default function App() {
   const saveProfile = async profile => { await put('/api/business/profile.json', profile); await refresh(); };
   // Step answers live apart from the profile so saving them doesn't make every step look out of date.
   const saveInputs = (id, inputs) => put('/api/business/inputs.json', { ...biz.inputs, [id]: inputs }).then(refresh).catch(e => toast(`Couldn’t save your answers: ${e.message}`));
-  const generate = () => setWritingSoon(true);
+  const generate = (text, title) => agent.send(text, title);
 
-  const ctx = { biz, agent, agentName, writingSoon, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId };
-  const chatEmpty = <><strong>AI writing is coming in the next update.</strong><p>Add your Devin key in <a href="#settings">Settings</a> to get ready.</p></>;
+  const ctx = { biz, agent, agentName, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId };
+  const chatEmpty = <><strong>Start a conversation with Devin.</strong><p>Use the step button to start with a prompt, or send your own message. Add your Devin token and Org ID in <a href="#settings">Settings</a>.</p></>;
 
   let page;
   if (route === 'settings') page = <main className="main wide"><Settings /></main>;
@@ -131,8 +130,9 @@ export default function App() {
           <ChatGrip />
           <div className="side-head">
             <span>AI writing</span>
+            {agent.status && <span className="side-status">{agent.status}</span>}
           </div>
-          <Chat agent={agent} agentName={agentName} empty={chatEmpty} />
+          <Chat agent={agent} empty={chatEmpty} />
         </aside>
       )}
     </>

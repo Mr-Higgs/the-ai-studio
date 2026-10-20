@@ -15,7 +15,7 @@
 //    prompt  (answers, step) => the message sent to Devin
 // ============================================================================
 
-const rules = file => `Write for a busy, non-technical owner: plain words, short sections, concrete examples and real numbers, nothing generic. If something critical is missing, ask me at most 3 short questions in chat and wait for my answers; otherwise go straight to writing. Save the result as Markdown to business/${file} (overwrite it if it exists). Then reply with a 3-line summary of what you made.`;
+const rules = file => `Write for a busy, non-technical owner: plain words, short sections, concrete examples and real numbers, nothing generic. If something critical is missing, ask me at most 3 short questions in chat and wait for my answers; otherwise go straight to writing. Save the result as Markdown to ${file} through the app API (PUT /docs/${file}). Then reply with a 3-line summary of what you made.`;
 
 const answers = (inputs, fields) => fields
   .map(f => {
@@ -77,7 +77,7 @@ export function setSprint(id) {
   SPRINT = v;
   const offerLower = v.offerTitle.toLowerCase();
 
-CONTEXT = `We're in the "${v.name}" workshop, ${v.campaign} for my small business. First read business/profile.json and every file that exists in business/ (earlier steps), so your work builds on what's already decided. If business/profile.json doesn't exist, ask me 3 quick questions about the business (what I sell, to whom, where) before anything else. Steps can be done in any order: if an earlier step's file is missing, make sensible assumptions, label them "(assumed)", and keep going.`;
+CONTEXT = `We're in the "${v.name}" workshop, ${v.campaign} for my small business. First GET /context from the app API, so your work builds on the profile and every earlier step's document that's already saved. If the profile is empty, ask me 3 quick questions about the business (what I sell, to whom, where) before anything else. Steps can be done in any order: if an earlier step's document is missing, make sensible assumptions, label them "(assumed)", and keep going.`;
 
 STEPS = [
   {
@@ -116,13 +116,16 @@ STEPS = [
     ],
     prompt: (i, s) => `${CONTEXT}
 
-Build my ${offerLower} and target customer. Use the grand-slam-offer skill (.devin/skills/grand-slam-offer). Skip any interview questions the profile and the answers below already cover, and keep the interview to at most 2 short rounds.
+Build my ${offerLower} and target customer. Use the grand-slam-offer skill (included below). Skip any interview questions the profile and the answers below already cover, and keep the interview to at most 2 short rounds.
 
 ${answers(i, s.inputs)}
 
 The document must include: (1) the target customer — who they are, ${v.want}, what stops them buying; (2) 3 ${v.adj}offer options built with the skill's framework (bonuses, guarantee, ${v.urgency}, a name); (3) your recommended offer and why; (4) the one-sentence pitch and main call-to-action.
 
-${rules('offer.md')}`,
+${rules('offer.md')}
+
+## grand-slam-offer skill
+<!-- studio:include-grand-slam-offer -->`,
   },
   {
     id: 'research', kind: 'doc', title: 'Customer conversations', file: 'research.md', uses: ['profile', 'offer'],
@@ -229,7 +232,7 @@ Build my ${v.adj}content calendar from business/strategy.md and business/content
 
 ${answers(i, s.inputs)}
 
-Save it as JSON (not Markdown) to business/calendar.json: an array sorted by date, where each item is exactly
+Save it as JSON through the app API (PUT /calendar): an array sorted by date, where each item is exactly
 {"date": "YYYY-MM-DD", "channel": "Instagram", "format": "Reel | Post | Story | Email | Ad | Other", "title": "short label", "copy": "the full ready-to-post text", "cta": "the call-to-action", "status": "planned"}.
 Line the dates up with the campaign phases and ${v.calendarDates}. After saving, check the file parses as valid JSON. If something critical is missing, ask me at most 3 short questions first. Then reply with a 3-line summary.`,
   },
