@@ -26,5 +26,17 @@ alter table public.devin_conversations enable row level security;
 drop policy if exists "Users can manage their Devin conversations" on public.devin_conversations;
 create policy "Users can manage their Devin conversations"
   on public.devin_conversations for all
-  using ((select auth.uid()) = owner_id)
-  with check ((select auth.uid()) = owner_id);
+  using (
+    (select auth.uid()) = owner_id
+    and exists (
+      select 1 from public.businesses b
+      where b.id = business_id and b.owner_id = (select auth.uid())
+    )
+  )
+  with check (
+    (select auth.uid()) = owner_id
+    and exists (
+      select 1 from public.businesses b
+      where b.id = business_id and b.owner_id = (select auth.uid())
+    )
+  );
