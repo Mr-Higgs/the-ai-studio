@@ -12,7 +12,7 @@ export default function Guide({ ctx }) {
     <article className="guide">
       <header className="step-head">
         <h1>{SPRINT.headline}</h1>
-        <p>Build a growth plan for your own business. Your profile, calendar and tracker are saved to your account. AI writing is coming in the next update; promo videos are coming soon.</p>
+        <p>Build a growth plan for your own business. Your profile, calendar and tracker are saved to your account. Use Devin to write and refine your plans; promo videos are coming soon.</p>
         <div className="actions">
           <a className="btn primary" href={'#' + (first?.id || 'profile')}>{first && first.id !== 'profile' ? `Continue: ${first.title}` : 'Start with your business profile'}</a>
         </div>
@@ -59,10 +59,10 @@ export default function Guide({ ctx }) {
       <section className="two-col">
         <div>
           <h2>Start anywhere</h2>
-          <p>The order above builds each step on the last, but nothing is locked. Profile, tracker and calendar changes are saved to your account. AI writing and promo videos will arrive in a later update.</p>
+          <p>The order above builds each step on the last, but nothing is locked. Profile, tracker and calendar changes are saved to your account. Devin can help with each plan; promo videos will arrive in a later update.</p>
         </div>
         <div>
-          <h2>Talking to {agentName}</h2>
+          <h2>Talking to {ctx.agentName}</h2>
           <ul>
             <li>Be specific about your situation: “I can only post 3 times a week.”</li>
             <li>Ask for options: “Give me 3 versions of this headline.”</li>

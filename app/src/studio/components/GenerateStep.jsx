@@ -122,7 +122,7 @@ function History({ files }) {
 
 // A step Devin writes: a few inputs, one button, and the saved result underneath.
 export default function GenerateStep({ step, ...ctx }) {
-  const { biz, agent, agentName, writingSoon, generate, saveInputs, refresh, next, go } = ctx;
+  const { biz, agent, agentName, generate, saveInputs, refresh, next, go } = ctx;
   const [inputs, setInputs] = useState(biz.inputs?.[step.id] || {});
   const doc = step.kind === 'doc' ? biz.docs[step.file.replace('.md', '')] : null;
   const has = step.kind === 'calendar' ? !!biz.calendar?.length : !!doc;
@@ -130,7 +130,7 @@ export default function GenerateStep({ step, ...ctx }) {
 
   const run = () => {
     saveInputs(step.id, inputs);
-    generate();
+    generate(step.prompt(inputs, step), step.title);
   };
 
   const form = (
@@ -141,7 +141,6 @@ export default function GenerateStep({ step, ...ctx }) {
           {has ? `Rewrite with ${agentName}` : `Write it with ${agentName}`}
         </button>
         {!biz.profile?.name && <span className="hint">Start with your <a href="#profile">business profile</a>.</span>}
-        {writingSoon && <span className="hint" role="status">AI writing is coming in the next update — add your Devin key in <a href="#settings">Settings</a>.</span>}
       </div>
     </div>
   );
@@ -171,7 +170,7 @@ export default function GenerateStep({ step, ...ctx }) {
       )}
       {!has && (
         <div className="placeholder">
-          <p>Nothing here yet. Answer what you can above (blanks are fine). AI writing is coming in the next update — add your Devin key in <a href="#settings">Settings</a>.</p>
+          <p>Nothing here yet. Answer what you can above (blanks are fine), then write it with Devin.</p>
         </div>
       )}
       {has && next && <div className="next"><button className="btn" onClick={() => go(next.id)}>Next: {next.title}</button></div>}
