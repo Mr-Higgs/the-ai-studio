@@ -16,6 +16,7 @@
         - Breakeven analysis
         - Hourly rate and time valuation
 
+
         - Value proposition: Customer column 
 
 
@@ -30,12 +31,9 @@
 
 # Devin Integrations (Plugins)
     - Add integrations for email, calendar, and other tools
-    - Allow the user to connect their accounts and use them in the app: Facebook, Linkedin (already implemented)
+    - Allow the user to connect their accounts and use them in the app: Facebook (MCP) - Automate It Section, Linkedin (already implemented)
 
 # Lead Tracker
     - The responses from the form sent out to their customers should be tracked and stored in a database
     - The user should be able to view and manage their leads from the app
 
-# HeyGen Integration
-    - Add a cinematic video generation section with HeyGen integration.
-    
