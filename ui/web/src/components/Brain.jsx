@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { put, toast } from '../api.js';
-import { BRAIN_SECTIONS, BRAIN_STEP, ITEM_FIELDS, MAX_ITEMS, TAGS, answerOf, brainMath, brainReady, brainReviewPrompt, cleanBrain, profileWithBrain, sectionProgress } from '../brain.js';
+import { BRAIN_SECTIONS, BRAIN_STEP, ITEM_FIELDS, MAX_ITEMS, TAGS, answerOf, brainMath, brainReady, brainReviewPrompt, cleanBrain, helpPrompt, profileWithBrain, sectionProgress } from '../brain.js';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -8,7 +8,6 @@ const BrainGraph = lazy(() => import('./BrainGraph.jsx')); // canvas + d3 only l
 
 const money = n => (n == null ? '—' : `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })}`);
 const clean = b => { const c = cleanBrain(b); return { answers: c.answers, items: c.items.length ? c.items : [{}] }; };
-const same = (a, b) => JSON.stringify(cleanBrain(a)) === JSON.stringify(cleanBrain(b));
 
 function Tag({ id, value, onChange }) {
   return (
@@ -113,17 +112,33 @@ function Numbers({ m }) {
 }
 
 export default function Brain({ ctx }) {
-  const { biz, agent, workingOn, generate, refresh, go, byId, isDone } = ctx;
-  const [brain, setBrain] = useState(() => clean(biz.brain));
-  const [profile, setProfile] = useState(() => profileWithBrain(biz.profile, biz.brain));
+  const { biz, agent, agentName, workingOn, generate, refresh, go, byId, isDone } = ctx;
+  const serverBrain = clean(biz.brain);
+  const serverProfile = profileWithBrain(biz.profile, biz.brain);
+  const serverBrainJson = JSON.stringify(cleanBrain(biz.brain));
+  const serverProfileJson = JSON.stringify(serverProfile);
+  const [brain, setBrain] = useState(() => serverBrain);
+  const [profile, setProfile] = useState(() => serverProfile);
   const [open, setOpen] = useState(() => new Set([BRAIN_SECTIONS.find(s => s.required && !sectionProgress(biz.brain, biz.profile, s).ready)?.id || 'basics']));
   const [saving, setSaving] = useState(false);
-  const dirtyBrain = !same(brain, biz.brain);
-  const dirtyProfile = JSON.stringify(profile) !== JSON.stringify(biz.profile || {});
+  const synced = useRef({ brain: serverBrainJson, profile: serverProfileJson });
+  const dirtyBrain = JSON.stringify(cleanBrain(brain)) !== synced.current.brain;
+  const dirtyProfile = JSON.stringify(profile) !== synced.current.profile;
   const dirty = dirtyBrain || dirtyProfile;
   const m = useMemo(() => brainMath(brain, profile), [brain, profile]);
   const ready = brainReady(brain, profile);
   const doc = biz.docs.brain;
+
+  useEffect(() => {
+    if (JSON.stringify(cleanBrain(brain)) === synced.current.brain) {
+      setBrain(serverBrain);
+      synced.current.brain = serverBrainJson;
+    }
+    if (JSON.stringify(profile) === synced.current.profile) {
+      setProfile(serverProfile);
+      synced.current.profile = serverProfileJson;
+    }
+  }, [serverBrainJson, serverProfileJson]);
 
   // Autosave shortly after edits and when leaving the page via the nav (hash changes don't fire beforeunload).
   const latest = useRef(null);
@@ -136,6 +151,7 @@ export default function Brain({ ctx }) {
     try {
       if (cur.dirtyProfile) await put('/api/business/profile.json', cur.profile);
       if (cur.dirtyBrain) await put('/api/business/brain.json', cleanBrain(cur.brain));
+      synced.current = { brain: JSON.stringify(cleanBrain(cur.brain)), profile: JSON.stringify(cur.profile) };
       await refresh();
       return true;
     } catch (e) { toast(`Couldn’t save your Business Brain: ${e.message}`); return false; }
@@ -163,6 +179,11 @@ export default function Brain({ ctx }) {
   };
   const setItem = (i, f, patch) => setBrain(b => ({ ...b, items: b.items.map((it, j) => (j === i ? { ...it, [f]: { ...it[f], ...patch } } : it)) }));
   const review = async () => { if (dirty && !(await save())) return; generate(BRAIN_STEP, brainReviewPrompt(brain, profile), doc ? BRAIN_STEP.file : undefined); };
+  const helpIds = BRAIN_SECTIONS.flatMap(s => s.questions).filter(q => answerOf(brain, profile, q).s === 'help').map(q => q.id);
+  const workOut = async () => {
+    if (dirty && !(await save())) return;
+    generate(BRAIN_STEP, helpPrompt(profile, brain, helpIds));
+  };
   const toggle = (id, on) => setOpen(s => { const n = new Set(s); (on ?? !n.has(id)) ? n.add(id) : n.delete(id); return n; });
   const reveal = (id, q) => {
     toggle(id, true);
@@ -218,6 +239,7 @@ export default function Brain({ ctx }) {
 
       <div className="actions sticky">
         <button className="btn" disabled={!dirty || saving} onClick={save}>{saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}</button>
+        {helpIds.length > 0 && <button className="btn" disabled={agent.busy || saving} onClick={workOut}>Work out {helpIds.length} ‘Help me’ answers with {agentName}</button>}
         <button className="btn primary" disabled={agent.busy || saving} onClick={review} title={ready ? '' : 'Works best once the required sections are done'}>
           {workingOn === BRAIN_STEP.title ? 'Devin is reviewing…' : doc ? 'Review it again' : 'Review my Business Brain'}
         </button>

@@ -67,7 +67,7 @@ export function BuildsOn({ step, ctx }) {
   );
 }
 
-export function Fields({ fields, values, onChange }) {
+export function Fields({ fields, values, onChange, after }) {
   const set = (id, v) => onChange({ ...values, [id]: v });
   return fields.map(f => {
     if (f.heading) return (
@@ -98,6 +98,7 @@ export function Fields({ fields, values, onChange }) {
               {f.options.map(o => <option key={o}>{o}</option>)}
             </select>
           ) : <input id={id} type={f.type || 'text'} inputMode={f.num ? 'decimal' : undefined} value={v || ''} placeholder={f.placeholder} onChange={e => set(f.id, e.target.value)} />}
+        {after?.(f)}
       </div>
     );
   });

@@ -26,23 +26,24 @@ export const PROFILE_FIELDS = [
   { id: 'socials', label: 'Social handles', placeholder: 'e.g. @juniperwick on Instagram and TikTok' },
   { id: 'proof', label: 'Reviews, awards or numbers you’re proud of', placeholder: 'e.g. 4.9★ on Etsy, 300+ reviews' },
   { heading: 'Your time and pay', blurb: 'So every offer pays you for your time, not just your costs. Rough numbers are fine.' },
-  { id: 'hoursWeek', label: 'Hours you work in the business each week', num: true, placeholder: 'e.g. 45 — include admin, messages, deliveries' },
-  { id: 'payGoal', label: 'What you want to take home from the business per year ($)', num: true, placeholder: 'e.g. 60000' },
-  { id: 'rate', label: 'What an hour of your time is worth ($/hour)', num: true, placeholder: 'e.g. 30' },
-  { id: 'replaceRate', label: 'What you’d pay someone else to do your work ($/hour)', num: true, placeholder: 'e.g. 22' },
+  { id: 'hoursWeek', label: 'Hours you work in the business each week', num: true, how: 'Count a normal week: making or serving, plus messages, admin, buying supplies and deliveries.', placeholder: 'e.g. 45 — include admin, messages, deliveries' },
+  { id: 'payGoal', label: 'What you want to take home from the business per year ($)', num: true, how: 'What you need for your personal bills and savings for a year, plus what would make the work worth it.', placeholder: 'e.g. 60000' },
+  { id: 'rate', label: 'What an hour of your time is worth ($/hour)', num: true, how: 'Start from your pay goal ÷ (hours a week × 48 weeks), then compare it with what you’d earn doing similar work for someone else.', placeholder: 'e.g. 30' },
+  { id: 'replaceRate', label: 'What you’d pay someone else to do your work ($/hour)', num: true, how: 'What local job ads or freelancers charge for the same kind of work.', placeholder: 'e.g. 22' },
   { heading: 'Running costs in a typical month', blurb: 'Enter 0 for anything you don’t have — a blank means “don’t know yet”.' },
-  { id: 'revenueMonth', label: 'Sales ($)', num: true, placeholder: 'e.g. 6000' },
-  { id: 'laborMonth', label: 'Staff and contractor pay — not your own ($)', num: true, placeholder: 'e.g. 0 if it’s just you' },
-  { id: 'materialsMonth', label: 'Materials, stock and supplies ($)', num: true, placeholder: 'e.g. 1800' },
-  { id: 'overhead', label: 'Other running costs — rent, software, insurance, utilities, fees ($)', num: true, placeholder: 'e.g. 450' },
+  { id: 'revenueMonth', label: 'Sales ($)', num: true, how: 'Average of the last 3 months of sales from your bank, card reader or shop reports.', placeholder: 'e.g. 6000' },
+  { id: 'laborMonth', label: 'Staff and contractor pay — not your own ($)', num: true, how: 'Wages and contractor payments in a normal month; 0 if it’s just you.', placeholder: 'e.g. 0 if it’s just you' },
+  { id: 'materialsMonth', label: 'Materials, stock and supplies ($)', num: true, how: 'Supplier receipts or card statements for ingredients, stock, packaging and supplies, averaged over 3 months.', placeholder: 'e.g. 1800' },
+  { id: 'overhead', label: 'Other running costs — rent, software, insurance, utilities, fees ($)', num: true, how: 'Rent, software, insurance, phone, utilities, platform and card fees — a monthly average from bank statements.', placeholder: 'e.g. 450' },
   { heading: 'Customers over time' },
-  { id: 'newMonth', label: 'New customers in a typical month', num: true, placeholder: 'e.g. 25' },
-  { id: 'cac', label: 'What it costs to win one new customer — ads, samples, discounts (CAC, $)', num: true, placeholder: 'marketing spend ÷ new customers' },
-  { id: 'buysPerYear', label: 'How many times a customer buys from you per year', num: true, placeholder: 'e.g. 3' },
-  { id: 'years', label: 'How many years a customer usually stays', num: true, placeholder: 'e.g. 2' },
-  { id: 'ltv', label: 'What a typical customer spends with you over time (lifetime value, $)', num: true, placeholder: 'leave blank and the app works it out' },
+  { id: 'newMonth', label: 'New customers in a typical month', num: true, how: 'First-time buyers in a normal month — from order history, booking records, or a rough count.', placeholder: 'e.g. 25' },
+  { id: 'cac', label: 'What it costs to win one new customer — ads, samples, discounts (CAC, $)', num: true, how: 'Marketing spend over the last 1–3 months (ads, samples, giveaways, first-order discounts) ÷ new customers in that time.', placeholder: 'marketing spend ÷ new customers' },
+  { id: 'buysPerYear', label: 'How many times a customer buys from you per year', num: true, how: 'Look up a few regular customers in your order history and count their purchases in the last year.', placeholder: 'e.g. 3' },
+  { id: 'years', label: 'How many years a customer usually stays', num: true, how: 'How long your regulars have been buying from you; use 1 if most buy once.', placeholder: 'e.g. 2' },
+  { id: 'ltv', label: 'What a typical customer spends with you over time (lifetime value, $)', num: true, how: 'Average sale × purchases a year × years they stay.', placeholder: 'leave blank and the app works it out' },
 ];
 export const PROFILE_LABELS = Object.fromEntries(PROFILE_FIELDS.filter(f => f.id).map(f => [f.id, f.label]));
+const profileHow = id => PROFILE_FIELDS.find(f => f.id === id)?.how;
 
 // Offer costs: one row per product/service the owner might promote (max 2).
 export const MAX_ITEMS = 2;
@@ -86,10 +87,10 @@ export const BRAIN_SECTIONS = [
     id: 'costs', title: 'Prices and costs', required: true, items: true,
     blurb: 'Fill this in for one or two products or services you’d promote this campaign — not your whole catalog.',
     questions: [
-      { id: 'rate', profile: 'rate', label: 'Hourly labor cost ($/hour) — your own pay allowance, or blended with staff', num: true, key: true, placeholder: 'e.g. 25' },
-      { id: 'hoursWeek', profile: 'hoursWeek', label: 'Hours you work in the business each week', num: true },
-      { id: 'payGoal', profile: 'payGoal', label: 'What you want to take home from the business per year ($)', num: true },
-      { id: 'replaceRate', profile: 'replaceRate', label: 'What you’d pay someone else to do your work ($/hour)', num: true },
+      { id: 'rate', profile: 'rate', label: 'Hourly labor cost ($/hour) — your own pay allowance, or blended with staff', num: true, how: profileHow('rate'), key: true, placeholder: 'e.g. 25' },
+      { id: 'hoursWeek', profile: 'hoursWeek', label: 'Hours you work in the business each week', num: true, how: profileHow('hoursWeek') },
+      { id: 'payGoal', profile: 'payGoal', label: 'What you want to take home from the business per year ($)', num: true, how: profileHow('payGoal') },
+      { id: 'replaceRate', profile: 'replaceRate', label: 'What you’d pay someone else to do your work ($/hour)', num: true, how: profileHow('replaceRate') },
       { id: 'batch', label: 'For batches: what a whole batch costs, how long it takes, and how many sellable units it makes', type: 'textarea' },
       { id: 'package', label: 'For packages: what exactly is included, and where an extra charge begins', type: 'textarea' },
       { id: 'mixed', label: 'For mixed businesses: product and service costs, separately', type: 'textarea' },
@@ -99,10 +100,10 @@ export const BRAIN_SECTIONS = [
     id: 'expenses', title: 'Operating expenses and owner earnings',
     questions: [
       { id: 'recurring', label: 'Recurring expenses that keep the business running (rent, insurance, software, utilities, equipment, marketing, admin)', type: 'textarea' },
-      { id: 'overhead', profile: 'overhead', label: 'Those recurring expenses, per month ($)', num: true },
-      { id: 'revenueMonth', profile: 'revenueMonth', label: 'Sales in a typical month ($)', num: true },
-      { id: 'laborMonth', profile: 'laborMonth', label: 'Staff and contractor pay per month, not your own ($)', num: true },
-      { id: 'materialsMonth', profile: 'materialsMonth', label: 'Materials, stock and supplies per month ($)', num: true },
+      { id: 'overhead', profile: 'overhead', label: 'Those recurring expenses, per month ($)', num: true, how: profileHow('overhead') },
+      { id: 'revenueMonth', profile: 'revenueMonth', label: 'Sales in a typical month ($)', num: true, how: profileHow('revenueMonth') },
+      { id: 'laborMonth', profile: 'laborMonth', label: 'Staff and contractor pay per month, not your own ($)', num: true, how: profileHow('laborMonth') },
+      { id: 'materialsMonth', profile: 'materialsMonth', label: 'Materials, stock and supplies per month ($)', num: true, how: profileHow('materialsMonth') },
       { id: 'overheadIncluded', label: 'Are those already counted in your per-sale costs above?', type: 'select', options: ['No', 'Partly', 'Yes'] },
       { id: 'coverSales', label: 'How many sales or billable hours normally cover those expenses?' },
       { id: 'campaignCosts', label: 'Extra costs this campaign creates (samples, ads, seasonal help, photography, subscriptions)', type: 'textarea' },
@@ -144,11 +145,11 @@ export const BRAIN_SECTIONS = [
       { id: 'website', profile: 'website', label: 'Website', placeholder: 'https://…' },
       { id: 'socials', profile: 'socials', label: 'Social accounts, business listings, opted-in email list' },
       { id: 'budget', label: 'Marketing budget and weekly time you can commit' },
-      { id: 'newMonth', profile: 'newMonth', label: 'New customers in a typical month', num: true },
-      { id: 'cac', profile: 'cac', label: 'What it costs you to win one new customer today (CAC, $)', num: true, placeholder: 'ad spend ÷ new customers, if you know it' },
-      { id: 'buysPerYear', profile: 'buysPerYear', label: 'How many times a customer buys from you per year', num: true },
-      { id: 'years', profile: 'years', label: 'How many years a customer usually stays', num: true },
-      { id: 'ltv', profile: 'ltv', label: 'What a typical customer spends with you over time (lifetime value, $)', num: true, placeholder: 'leave blank and the app works it out' },
+      { id: 'newMonth', profile: 'newMonth', label: 'New customers in a typical month', num: true, how: profileHow('newMonth') },
+      { id: 'cac', profile: 'cac', label: 'What it costs you to win one new customer today (CAC, $)', num: true, how: profileHow('cac'), placeholder: 'ad spend ÷ new customers, if you know it' },
+      { id: 'buysPerYear', profile: 'buysPerYear', label: 'How many times a customer buys from you per year', num: true, how: profileHow('buysPerYear') },
+      { id: 'years', profile: 'years', label: 'How many years a customer usually stays', num: true, how: profileHow('years') },
+      { id: 'ltv', profile: 'ltv', label: 'What a typical customer spends with you over time (lifetime value, $)', num: true, how: profileHow('ltv'), placeholder: 'leave blank and the app works it out' },
       { id: 'assets', label: 'Photos, footage, logo, testimonials or previous content you have', type: 'textarea' },
       { id: 'voice', label: 'How the business should sound — and words or promises to avoid', type: 'textarea' },
       { id: 'camera', label: 'Comfortable on camera, with an avatar, or recording your voice?', type: 'checks', options: ['On camera', 'Avatar', 'Voice only', 'None of these'] },
@@ -245,6 +246,72 @@ const round = (n, d = 2) => (n == null ? null : Math.round(n * 10 ** d) / 10 ** 
 // Deterministic numbers the app shows and hands to Devin, so it never has to guess them.
 const QBY = Object.fromEntries(BRAIN_SECTIONS.flatMap(s => s.questions).map(q => [q.id, q]));
 const WORK_WEEKS = 48; // a year with ~4 weeks off
+
+const PROFILE_NUMS = new Map(PROFILE_FIELDS.filter(f => f.id && f.num).map(f => [f.id, f]));
+const ANSWER_IDS = new Set([...Object.keys(QBY), ...PROFILE_NUMS.keys()]);
+
+export function answersFromDevin(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const answers = {};
+  for (const [id, value] of Object.entries(raw)) {
+    if (!ANSWER_IDS.has(id) || Object.keys(answers).length >= 60) continue;
+    if (typeof value !== 'string' && !(typeof value === 'number' && Number.isFinite(value))) continue;
+    const v = String(value).trim().slice(0, 200);
+    if (v) answers[id] = v;
+  }
+  return Object.keys(answers).length ? answers : null;
+}
+
+export function mergeDevinAnswers(profile, brain, answers) {
+  const nextProfile = { ...(profile || {}) };
+  const nextBrain = { ...(brain || {}), answers: { ...(brain?.answers || {}) } };
+  const changed = [];
+  for (const [id, v] of Object.entries(answers || {})) {
+    const q = QBY[id];
+    const pkey = q?.profile ?? PROFILE_NUMS.get(id)?.id;
+    if (!q && !pkey) continue;
+    const current = q ? answerOf(brain, profile, q) : { v: profile?.[pkey] };
+    if (!blank(current.v) && current.s !== 'help') continue;
+    if (pkey) nextProfile[pkey] = v;
+    else nextBrain.answers[id] = { ...(nextBrain.answers[id] || {}), v };
+    if (q) nextBrain.answers[id] = { ...(nextBrain.answers[id] || {}), s: 'estimate' };
+    changed.push(id);
+  }
+  return { profile: nextProfile, brain: nextBrain, changed };
+}
+
+export function helpPrompt(profile, brain, ids) {
+  const promptIds = [...new Set((Array.isArray(ids) ? ids : []).filter(id => ANSWER_IDS.has(id)))];
+  const getAnswer = id => {
+    const q = QBY[id];
+    return q ? answerOf(brain, profile, q) : { v: profile?.[id] };
+  };
+  const numberLines = promptIds.map(id => {
+    const q = QBY[id];
+    const field = PROFILE_NUMS.get(id);
+    const answer = getAnswer(id);
+    const value = blank(answer.v) ? (answer.s === 'help' ? 'not sure' : 'blank')
+      : answer.s === 'help' ? `not sure (I put ${answer.v})` : String(answer.v);
+    return `- ${id} — ${q?.label || field?.label} — ${field?.how || 'ask me'} — ${value}`;
+  });
+  const filled = [];
+  if (!promptIds.includes('price') && !blank(profile?.price)) filled.push(`- Average sale: ${profile.price}`);
+  for (const field of PROFILE_FIELDS.filter(f => f.id && f.num && !promptIds.includes(f.id))) {
+    const answer = getAnswer(field.id);
+    if (!blank(answer.v)) filled.push(`- ${field.label}: ${answer.v}`);
+  }
+  return `Help me work out some numbers for my business — I don’t know them yet. Walk me through them one at a time, like a patient bookkeeper:
+- Ask at most 2 simple questions per number, about things I’m likely to know (last month’s spend, roughly how many customers), and tell me where to look (bank statement, Etsy/Square/Shopify reports, invoices, my calendar).
+- Do the math for me and show it in one line, e.g. “$300 ads ÷ 12 new customers = $25 per customer”.
+- If I can’t find a figure, help me make a reasonable estimate from what I do know, and call it an estimate. Mention a typical range for businesses like mine only if you say where it comes from, and only as a starting point I agree to.
+- Confirm each number with me before moving to the next.
+- As soon as I confirm a number, add it to the structured output as answers.json: {"<id>": "<value>"} using the ids below (just the number — no $ or units). Never fill in a number I haven’t confirmed.
+When we’re done, sum up the numbers in 3 lines and say which are estimates.
+
+The numbers to work out (id — question — how to work it out — what I have now):
+${numberLines.join('\n')}
+${filled.length ? `\nAlready filled in (use these in the math):\n${filled.join('\n')}` : ''}`;
+}
 
 export function brainMath(raw, profile) {
   const brain = cleanBrain(raw);

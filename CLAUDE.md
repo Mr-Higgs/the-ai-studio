@@ -36,7 +36,8 @@ how Devin reads it (`brainContext`, inlined by `buildContext`). Pure JS, shared 
 The Business profile step's fields (`PROFILE_FIELDS`: basics, time and pay, monthly costs,
 customers over time) live there too; Brain questions with `profile: <id>` edit the same profile value.
 Saved as `businesses.brain` with its own `brain_updated_at`; steps that list `'brain'` in `uses`
-show "changed" when it moves. The graph (`BrainGraph.jsx`, react-force-graph-2d) is lazy-loaded.
+show "changed" when it moves. Guided number help returns confirmed values through `answers.json`,
+which `mergeDevinAnswers` applies only to blank or help-tagged answers. The graph (`BrainGraph.jsx`, react-force-graph-2d) is lazy-loaded.
 Meta MCP servers are added in the user's Devin org; `user_settings.integrations` only toggles the
 prompt notes (`INTEGRATIONS` in api/index.js).
 

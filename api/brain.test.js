@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { brainContext, brainMath, brainReady, cleanBrain, profileWithBrain } from '../ui/web/src/brain.js';
-import { buildContext, GROUNDING } from './_lib/prompts.js';
+import { answersFromDevin, brainContext, brainMath, brainReady, cleanBrain, helpPrompt, mergeDevinAnswers, profileWithBrain } from '../ui/web/src/brain.js';
+import { applyStructuredOutput, buildContext, GROUNDING } from './_lib/prompts.js';
 import { integrationNotes } from './index.js';
 
 const a = (v, s = 'known') => ({ v, s });
@@ -117,4 +117,58 @@ test('blank monthly costs stay unknown; old Brain answers carry into the profile
   assert.equal(brainMath({ answers: { rate: a('22'), ltv: a('300') } }, {}).rate, 22);
   assert.equal(brainMath({ answers: { rate: a('22') } }, { rate: '' }).rate, null);
   assert.deepEqual(profileWithBrain({ name: 'J' }, { answers: { rate: a('22'), cac: a('') } }), { name: 'J', rate: '22' });
+});
+
+test('answersFromDevin keeps only known, nonblank string and finite number values', () => {
+  assert.deepEqual(answersFromDevin({
+    rate: 22,
+    cac: ' 25 ',
+    unknown: '1',
+    overhead: '  ',
+    ltv: { value: 400 },
+    weekly: Infinity,
+  }), { rate: '22', cac: '25' });
+  assert.equal(answersFromDevin({ unknown: '1', rate: '', cac: {} }), null);
+});
+
+test('mergeDevinAnswers fills only blank or help-tagged answers without mutating inputs', () => {
+  const profile = { cac: '', rate: '20', revenueMonth: '1000' };
+  const initialBrain = { answers: {
+    cac: { v: '', s: 'help' },
+    rate: { v: '20', s: 'help' },
+    revenueMonth: { v: '1000', s: 'known' },
+    coverSales: { v: '' },
+  }, items: [] };
+  const answers = { cac: '25', rate: '30', revenueMonth: '1200', coverSales: '40' };
+  const merged = mergeDevinAnswers(profile, initialBrain, answers);
+  assert.deepEqual(merged.changed, ['cac', 'rate', 'coverSales']);
+  assert.equal(merged.profile.cac, '25');
+  assert.equal(merged.profile.rate, '30');
+  assert.equal(merged.profile.revenueMonth, '1000');
+  assert.equal(merged.brain.answers.cac.s, 'estimate');
+  assert.equal(merged.brain.answers.rate.s, 'estimate');
+  assert.deepEqual(merged.brain.answers.coverSales, { v: '40', s: 'estimate' });
+  assert.equal(profile.cac, '');
+  assert.deepEqual(initialBrain.answers.coverSales, { v: '' });
+  assert.deepEqual(mergeDevinAnswers(merged.profile, merged.brain, answers).changed, []);
+});
+
+test('applyStructuredOutput accepts confirmed answers and rejects unknown-only answers', () => {
+  const applied = applyStructuredOutput({ files: { 'answers.json': { cac: '25' } } });
+  assert.deepEqual(applied.answers, { cac: '25' });
+  assert.ok(applied.hash);
+  assert.equal(applyStructuredOutput({ files: { 'answers.json': { unknown: '1' } } }), null);
+});
+
+test('helpPrompt describes ids, guidance, and current help-tagged values', () => {
+  const prompt = helpPrompt(
+    { cac: '', rate: '20' },
+    { answers: { rate: { v: '20', s: 'help' } } },
+    ['rate', 'cac'],
+  );
+  assert.match(prompt, /rate — Hourly labor cost/);
+  assert.match(prompt, /Start from your pay goal ÷ \(hours a week × 48 weeks\)/);
+  assert.match(prompt, /not sure \(I put 20\)/);
+  assert.match(prompt, /cac — What it costs you to win one new customer today \(CAC, \$\)/);
+  assert.match(prompt, /Never fill in a number I haven’t confirmed/);
 });

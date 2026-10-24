@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { BUSINESS_DOCS, cleanCalendar } from './business.js';
-import { brainContext } from '../../ui/web/src/brain.js';
+import { answersFromDevin, brainContext } from '../../ui/web/src/brain.js';
 
 const MAX_DOC = 12000;
 const cut = (t, n = MAX_DOC) => (t && t.length > n ? `${t.slice(0, n)}\n\n(truncated)` : t);
@@ -26,7 +26,8 @@ document you create or change into the structured output as
 ${BUSINESS_DOCS.map(d => `${d}.md`).join(', ')} (Markdown strings) or calendar.json (the JSON
 array itself, not a string). Update the structured output whenever a document changes — the app
 reads it from there. Still reply in chat with a 3-line summary of what you did. Never say
-"saved to business/…" — you can't write those files.`;
+"saved to business/…" — you can't write those files.
+If I ask you to work out numbers for my profile or Business Brain, also return the ones I've confirmed as "answers.json": {"<question id>": "<value>"} (strings, no units). The app only fills answers that are blank or marked "help me work this out", and marks them as estimates for me to check.`;
 
 // Workshop feedback: constraints were ignored, testimonials were made up, answers were generic.
 export const GROUNDING = `
@@ -48,25 +49,27 @@ export const STRUCTURED_SCHEMA = {
   },
 };
 
-const ALLOWED = [...BUSINESS_DOCS.map(d => `${d}.md`), 'calendar.json'];
+const ALLOWED = [...BUSINESS_DOCS.map(d => `${d}.md`), 'calendar.json', 'answers.json'];
 
-// Validate what Devin wrote into its structured output. Returns { docs, calendar, issues, hash }.
+// Validate what Devin wrote into its structured output. Returns { docs, calendar, issues, answers, hash }.
 export function applyStructuredOutput(so) {
   const files = so?.files;
   if (!files || typeof files !== 'object') return null;
   const docs = {};
-  let calendar, issues = 0;
+  let calendar, answers, issues = 0;
   for (const [name, content] of Object.entries(files)) {
     if (!ALLOWED.includes(name)) continue; // drop anything unexpected
-    if (name === 'calendar.json') {
+    if (name === 'answers.json') {
+      answers = answersFromDevin(content);
+    } else if (name === 'calendar.json') {
       const c = cleanCalendar(content);
       if (c.items) { calendar = c.items; issues = c.issues; }
     } else if (typeof content === 'string' && content.length <= 200000) {
       docs[name.replace(/\.md$/, '')] = content;
     }
   }
-  if (!Object.keys(docs).length && !calendar) return null;
-  return { docs, calendar, issues, hash: hashOf(files) };
+  if (!Object.keys(docs).length && !calendar && !answers) return null;
+  return { docs, calendar, issues, answers, hash: hashOf(files) };
 }
 export const hashOf = files => crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex');
 
