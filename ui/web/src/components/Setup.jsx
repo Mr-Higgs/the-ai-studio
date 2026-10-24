@@ -32,33 +32,77 @@ function KeyInput({ item, recheck }) {
   );
 }
 
-// Meta's MCP servers plug into Devin, not Studio: the user adds them in their Devin org,
-// then flips this on so Devin's prompts know it may use them.
-function Integration({ item, recheck }) {
+// MCP servers plug into Devin, not Studio: the user adds them in their Devin org (marketplace
+// listing or custom URL), then flips this on so Devin's prompts know it may use them.
+// ponytail: Devin has no per-listing deep link, so everything opens the MCPs tab.
+const DEVIN_MCPS = 'https://app.devin.ai/customize?tab=mcps';
+function Toggle({ item, recheck }) {
   const [state, setState] = useState('');
   const flip = async on => {
     setState('saving');
     try { await post('/api/setup/integration', { id: item.id, on }); await recheck(); setState(''); }
     catch (err) { setState(err.message); }
   };
+  return <>
+    <label className="chip" title="Connected in Devin">
+      <input type="checkbox" checked={item.ok} disabled={state === 'saving'} onChange={e => flip(e.target.checked)} aria-label={`${item.name} connected in Devin`} />
+      <span>{item.ok ? 'On' : 'Off'}</span>
+    </label>
+    {state && state !== 'saving' && <p className="msg err" role="alert">{state}</p>}
+  </>;
+}
+
+// Meta servers are custom MCPs: Devin walks the owner through adding one, then checks it works.
+function MetaRow({ item, recheck }) {
+  const [state, setState] = useState('');
+  const start = async () => {
+    const w = window.open('', '_blank'); // opened now so the popup blocker allows it
+    setState('starting');
+    try { const { url } = await post(`/api/setup/integration/${item.id}/devin`, {}); if (w) w.location = url; else window.location.href = url; await recheck(); setState(''); }
+    catch (err) { w?.close(); setState(err.message); }
+  };
   return (
-    <div className="integration">
-      <details>
-        <summary>How to connect</summary>
-        <ol>
-          <li>In Devin, open <a href="https://app.devin.ai/settings/mcp-marketplace" target="_blank" rel="noreferrer">Settings → MCP servers</a> and add a remote (HTTP) server with this URL: <code>{item.url}</code></li>
-          <li>Sign in with the Facebook account that manages your business, and approve access.</li>
-          <li>Come back here and switch it on.</li>
-        </ol>
-        <p className="hint">Devin will only read your ads and create new ones <strong>paused</strong> — you review and switch them on in Meta. <a href="https://developers.facebook.com/documentation/mcp" target="_blank" rel="noreferrer">Meta’s guide</a></p>
-      </details>
-      <label className="chip">
-        <input type="checkbox" checked={item.ok} disabled={state === 'saving'} onChange={e => flip(e.target.checked)} />
-        Connected in Devin
-      </label>
-      {state && state !== 'saving' && <p className="msg err" role="alert">{state}</p>}
-    </div>
+    <li className={item.ok ? 'ok' : 'bad'}>
+      <span className={'dot ' + (item.ok ? 'ok' : '')} />
+      <span className="health-name">{item.name}<small>{item.why}</small></span>
+      {item.setup
+        ? <a className="btn ghost" href={item.setup.url} target="_blank" rel="noreferrer">Open Devin session</a>
+        : !item.ok && <button className="btn primary" disabled={state === 'starting'} onClick={start}>{state === 'starting' ? 'Starting…' : 'Set up with Devin'}</button>}
+      <Toggle item={item} recheck={recheck} />
+      {item.setup && <p className="hint integ-note">{item.setup.note || 'Devin is guiding you in the session tab. When it’s done, click Check again.'}</p>}
+      {state && state !== 'starting' && <p className="msg err" role="alert">{state}</p>}
+      {!item.ok && (
+        <details className="integ-note">
+          <summary className="hint">Do it yourself</summary>
+          <ol>
+            <li>In Devin, open <a href={DEVIN_MCPS} target="_blank" rel="noreferrer">Customize → MCPs</a>, choose <strong>Add custom MCP</strong>, and add a remote (HTTP) server with this URL: <code>{item.url}</code></li>
+            <li>Sign in with the Facebook account that manages your business, and approve access.</li>
+            <li>Come back here and switch it on.</li>
+          </ol>
+          <p className="hint">Devin will only read your ads and create new ones <strong>paused</strong> — you review and switch them on in Meta. <a href="https://developers.facebook.com/documentation/mcp" target="_blank" rel="noreferrer">Meta’s guide</a></p>
+        </details>
+      )}
+    </li>
   );
+}
+
+function Integrations({ items, recheck }) {
+  const meta = items.filter(i => i.url), market = items.filter(i => i.marketplace);
+  return <>
+    <ul className="health">{meta.map(i => <MetaRow key={i.id} item={i} recheck={recheck} />)}</ul>
+    <div className="integ-market">
+      <p className="hint">From Devin’s marketplace: open <strong>Customize → MCPs → Browse marketplace</strong>, install the app, choose <strong>Connect</strong> and sign in. Then switch it on here.</p>
+      <a className="btn ghost" href={DEVIN_MCPS} target="_blank" rel="noreferrer">Open Devin MCPs</a>
+    </div>
+    <ul className="integ-grid">
+      {market.map(i => (
+        <li key={i.id} className="integ-tile">
+          <span className="health-name" title={i.why}>{i.name}<small>{i.why}</small></span>
+          <Toggle item={i} recheck={recheck} />
+        </li>
+      ))}
+    </ul>
+  </>;
 }
 
 // The Devin item needs two values: the cog_ key and the organization ID from the same page.
@@ -116,18 +160,18 @@ export default function Setup({ health, recheck }) {
       {GROUPS.map(([g, title]) => (
         <section key={g} className="setup-group">
           <h2>{title}</h2>
+          {g === 'integrations' ? health && <Integrations items={health.filter(h => h.group === g)} recheck={recheck} /> :
           <ul className="health">
             {health?.filter(h => h.group === g).map(h => (
               <li key={h.id} className={h.ok ? 'ok' : 'bad'}>
-                <span className={'dot ' + (h.ok ? 'ok' : g === 'required' ? 'bad' : g === 'integrations' ? '' : 'warn')} />
+                <span className={'dot ' + (h.ok ? 'ok' : g === 'required' ? 'bad' : 'warn')} />
                 <span className="health-name">{h.name}<small>{h.why}</small></span>
-                {h.toggle ? <Integration item={h} recheck={recheck} />
-                  : h.id === 'devin' ? <DevinKeys item={h} recheck={recheck} />
+                {h.id === 'devin' ? <DevinKeys item={h} recheck={recheck} />
                   : h.key ? <KeyInput item={h} recheck={recheck} />
                   : h.ok ? <span className="hint">Ready</span> : null}
               </li>
             ))}
-          </ul>
+          </ul>}
         </section>
       ))}
 

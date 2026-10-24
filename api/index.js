@@ -14,14 +14,41 @@ const send = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'appli
 const readJson = async req => req.body ?? JSON.parse(await new Promise(r => { let b = ''; req.on('data', c => b += c); req.on('end', () => r(b || '{}')); }));
 const BIZ_FIELDS = { 'brain.json': 'brain', 'profile.json': 'profile', 'inputs.json': 'inputs', 'tracker.json': 'tracker', 'sprint.json': 'sprint', 'calendar.json': 'calendar' };
 const ENV_KEYS = { DEVIN_API_KEY: 'devin_api_key', DEVIN_ORG_ID: 'devin_org_id', HEYGEN_API_KEY: 'heygen_api_key' };
-// Meta's remote MCP servers. Devin is the MCP client, so users add these in their own Devin
-// org (Customize → MCPs); the toggle here only tells Devin it may use them.
+// MCP servers Devin can use. Devin is the MCP client, so users add these in their own Devin
+// org (Customize → MCPs): Meta's as custom remote servers (`url`), the rest from Devin's
+// marketplace (`marketplace` = listing name). The toggle here only tells Devin it may use them.
 export const INTEGRATIONS = {
   meta_ads: { name: 'Meta Ads (Facebook + Instagram)', url: 'https://mcp.facebook.com/ads', why: 'Lets Devin read your ad performance and draft paused ads and campaigns.',
     prompt: 'The owner connected the Meta Ads MCP server (https://mcp.facebook.com/ads) in Devin. Use its tools to read their ad accounts, campaign performance and audiences when it helps. Never publish, activate or spend: create any new campaign, ad set or ad as PAUSED, and tell the owner exactly what to review and switch on.' },
   meta_social: { name: 'Meta Social Technologies (developers)', url: 'https://mcp.facebook.com/devtools', why: 'For owners who build their own Meta app — webhooks, app review, API health.',
     prompt: 'The owner connected the Meta Social Technologies MCP server (https://mcp.facebook.com/devtools) in Devin. Use it read-only to check their Meta app setup (webhooks, app status) when relevant; don’t change configuration without asking.' },
+  hubspot: { name: 'HubSpot', marketplace: 'HubSpot', why: 'Lets Devin read your contacts, deals and lists to aim offers at real customers.',
+    prompt: 'The owner connected HubSpot in Devin. Read their contacts, companies, deals and lists to ground audiences, offers and follow-ups in real customer data. Never send emails, enroll contacts or change records without asking.' },
+  stripe: { name: 'Stripe', marketplace: 'Stripe', why: 'Lets Devin check your products, prices and recent sales against the offer math.',
+    prompt: 'The owner connected Stripe in Devin. Use it read-only to check products, prices and recent sales against the offer math and tracker. Never create charges, refunds, payment links or change prices without asking.' },
+  square: { name: 'Square', marketplace: 'Square', why: 'Lets Devin check your catalog and recent sales against the offer math.',
+    prompt: 'The owner connected Square in Devin. Use it read-only to check their catalog, prices and recent sales against the offer math and tracker. Never take payments, issue refunds or change the catalog without asking.' },
+  notion: { name: 'Notion', marketplace: 'Notion', why: 'Lets Devin read the notes and plans you already keep in Notion.',
+    prompt: 'The owner connected Notion in Devin. Read their existing pages for context on the business when it helps. Only create or edit pages when the owner asks.' },
+  airtable: { name: 'Airtable', marketplace: 'Airtable', why: 'Lets Devin read the customer lists and trackers you keep in Airtable.',
+    prompt: 'The owner connected Airtable in Devin. Read their bases for customer lists, leads and trackers when it helps. Only create or edit records when the owner asks.' },
+  firecrawl: { name: 'Firecrawl', marketplace: 'Firecrawl', why: 'Lets Devin read competitor websites for positioning research.',
+    prompt: 'The owner connected Firecrawl in Devin. Use it to read competitor and reference websites (from the profile or brain) for positioning, pricing and messaging research. Cite the pages you used.' },
+  google_maps: { name: 'Google Maps', marketplace: 'Google Maps', why: 'Lets Devin look up local competitors, ratings and review themes near you.',
+    prompt: 'The owner connected Google Maps in Devin. Use it to find local competitors near the business, their categories, ratings and common review themes. Cite the places you used.' },
 };
+// Devin has no API for adding org MCPs and Meta needs the owner's own Facebook login, so for
+// custom (url) servers a Devin session walks them through it, then checks the tools respond.
+const SETUP_SCHEMA = { type: 'object', properties: { connected: { type: 'boolean' }, note: { type: 'string' } }, required: ['connected', 'note'] };
+const setupPrompt = i => `You are helping a small business owner who is not technical connect "${i.name}" to their Devin account as an MCP server. Be warm and plain-spoken. Give ONE step per message and wait for them to reply before the next.
+
+1. Open https://app.devin.ai/customize?tab=mcps, choose "Add MCP", then "Add custom MCP". (No button? They need the Manage MCP Servers permission from their Devin org admin.)
+2. Fill in: Server Name "${i.name}", Transport "HTTP", Server URL ${i.url}, Authentication "OAuth", Access "Personal". Save.
+3. Choose "Connect" on the new server and sign in with the Facebook account that manages their business, approving every permission asked.
+4. When they say it's done, call one read-only tool from the server (e.g. list their ad accounts or app info) to check it works. Never create, change, publish or spend anything.
+
+Set the structured output: connected=true only after a tool call succeeded; otherwise connected=false. note = one plain sentence for the owner. If the server's tools don't show up in this session, set connected=false and tell them to go back to Studio Setup and click "Set up with Devin" again — a fresh session will see it.`;
+
 export function integrationNotes(on) {
   const lines = Object.entries(INTEGRATIONS).filter(([id]) => on?.[id]).map(([, i]) => i.prompt);
   return lines.length ? `Connected tools:\n- ${lines.join('\n- ')}` : null;
@@ -94,9 +121,26 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && url.pathname === '/api/auth/me') return send(res, 200, { hosted: true, email: user.email });
     if (req.method === 'GET' && url.pathname === '/api/health') {
       const s = await settings(uid);
+      // Settle pending "Set up with Devin" sessions: Devin's structured output decides.
+      const integ = { ...(s.integrations || {}) }, pending = { ...(integ._setup || {}) };
+      const client = Object.keys(pending).length && await devinCreds(uid).then(devinClient, () => null);
+      if (client) {
+        await Promise.all(Object.entries(pending).map(async ([id, p]) => {
+          try {
+            const ses = await client.getSession(p.id);
+            const so = ses.structured_output;
+            if (so?.note) p.note = so.note;
+            if (so?.connected === true) { integ[id] = true; delete pending[id]; }
+            else if (['expired', 'finished', 'suspended', 'exit', 'error'].includes(ses.status_enum || ses.status)) delete pending[id];
+          } catch { delete pending[id]; }
+        }));
+        integ._setup = pending;
+        await db.from('user_settings').upsert({ user_id: uid, integrations: integ, updated_at: new Date().toISOString() });
+        s.integrations = integ;
+      }
       return send(res, 200, { hosted: true, items: [
         { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: !!(s.devin_api_key && s.devin_org_id), key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
-        ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, toggle: true, ok: !!s.integrations?.[id] })),
+        ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: !!s.integrations?.[id], setup: s.integrations?._setup?.[id] })),
         { id: 'heygen', group: 'optional', name: 'HeyGen API key', why: 'Imports your HeyGen videos and makes new ones from your avatars.', ok: !!s.heygen_api_key, key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
       ] });
     }
@@ -115,6 +159,15 @@ export default async function handler(req, res) {
       const s = await settings(uid);
       await db.from('user_settings').upsert({ user_id: uid, integrations: { ...(s.integrations || {}), [id]: !!on }, updated_at: new Date().toISOString() });
       return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && parts[1] === 'setup' && parts[2] === 'integration' && parts[4] === 'devin') {
+      const i = INTEGRATIONS[parts[3]];
+      if (!i?.url) return send(res, 400, { error: 'unknown integration' });
+      const ses = await devinClient(await devinCreds(uid)).createSession({ prompt: setupPrompt(i), title: `Connect ${i.name} · Studio`, schema: SETUP_SCHEMA, tags: ['studio', 'setup'] });
+      const setup = { id: ses.session_id, url: ses.url || `https://app.devin.ai/sessions/${ses.session_id}` };
+      const s = await settings(uid);
+      await db.from('user_settings').upsert({ user_id: uid, integrations: { ...(s.integrations || {}), _setup: { ...(s.integrations?._setup || {}), [parts[3]]: setup } }, updated_at: new Date().toISOString() });
+      return send(res, 200, { url: setup.url });
     }
 
     // ---- business state ----

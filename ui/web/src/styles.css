@@ -91,7 +91,7 @@ code { font-family: var(--mono); font-size: .88em; }
 /* ---------- shell ---------- */
 /* chat column width = --chat-w (dragged via .side-grip), capped so the page never gets squeezed out */
 .shell { --chat-col: clamp(280px, var(--chat-w), 55vw); display: grid; grid-template-columns: 268px minmax(0, 1fr) var(--chat-col); height: 100%; }
-.main { overflow: auto; padding: 40px 48px 64px; min-width: 0; }
+.main { overflow: auto; padding: 40px 48px 64px; min-width: 0; container-type: inline-size; } /* content rules use @container: the chat column squeezes this, not the viewport */
 .shell > .main:last-child { grid-column: 2 / -1; }
 .video > .main:only-child { grid-column: 1 / -1; }
 /* content column is centered; !important beats the shorthand margins on children like .stats/.render */
@@ -282,7 +282,7 @@ textarea { resize: vertical; line-height: 1.45; }
 .ap-row .cal-body { grid-column: 2 / -1; }
 .ap-row.posted .cal-title, .ap-row.posted .cal-date { color: var(--muted); }
 .ap-status { padding-right: 14px; font-size: 13.5px; color: var(--muted); }
-@media (max-width: 640px) { .ap-row { grid-template-columns: 44px 1fr auto; } .ap-row .cal-main { grid-column: 2 / -1; } }
+@container (max-width: 640px) { .ap-row { grid-template-columns: 44px 1fr auto; } .ap-row .cal-main { grid-column: 2 / -1; } }
 .cal-body p { margin: 0 0 8px; white-space: pre-wrap; }
 .cal-cta { color: var(--muted); }
 
@@ -388,11 +388,15 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .setup-group { margin-bottom: 22px; }
 .health-name small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
 .health { list-style: none; padding: 0; margin: 0; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); }
-.health li { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); flex-wrap: wrap; }
-.health li:first-child { border-top: 0; }
-.health-name { font-weight: 600; flex: 0 0 300px; min-width: 0; }
-.health li > .hint { margin-left: auto; color: var(--ok); }
-.health code { background: var(--frost); padding: 4px 8px; border-radius: var(--r-sm); flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; user-select: all; }
+.health > li { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.health > li:first-child { border-top: 0; }
+.health-name { font-weight: 600; flex: 1 1 240px; min-width: 0; }
+.health > li > .hint { margin-left: auto; color: var(--ok); }
+.health > li > .integ-note { flex-basis: 100%; margin: 0 0 0 21px; color: var(--muted); font-size: 13.5px; }
+.integ-note ol { margin: 6px 0; padding-left: 18px; font-size: 14px; }
+.integ-note summary { cursor: pointer; }
+.integ-note code { background: var(--frost); padding: 2px 6px; border-radius: var(--r-sm); overflow-wrap: anywhere; user-select: all; }
+.health > li > code { background: var(--frost); padding: 4px 8px; border-radius: var(--r-sm); flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; user-select: all; }
 .setup-link small { margin-left: auto; color: var(--rail-muted); font-size: 12px; }
 .integ-h { font: 600 14px/1.3 var(--display); margin: 18px 0 8px; }
 .integ-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: 1; min-width: 0; }
@@ -412,14 +416,14 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 @media (max-width: 1180px) {
   .shell { --chat-col: clamp(280px, var(--chat-w), 40vw); grid-template-columns: 236px minmax(0, 1fr) var(--chat-col); }
   .main { padding: 32px 30px 56px; }
+}
+@container (max-width: 960px) {
   .stats { grid-template-columns: repeat(3, 1fr); }
   .stats div:nth-child(4) { border-left: 0; }
   .stats div:nth-child(n+4) { border-top: 1px solid var(--line); }
 }
 @media (max-width: 860px) {
   .shell, .video { display: block; height: auto; }
-  .outcomes, .two-col, .step-guide-cols { grid-template-columns: 1fr; }
-  .guide .step-head h1 { font-size: 32px; }
   .rail { padding: 18px 16px 12px; }
   .countdown { margin: 6px 0 14px; }
   .countdown-n { font-size: 44px; }
@@ -432,11 +436,15 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
   .side { border-left: 0; border-top: 1px solid var(--line); height: 80vh; height: 80dvh; }
   .side-grip { display: none; }
   .rail { border-right: 0; border-bottom: 1px solid var(--line); }
+}
+/* ponytail: thresholds eyeballed; tune if a layout flips too early/late */
+@container (max-width: 720px) {
+  .outcomes, .two-col, .step-guide-cols { grid-template-columns: 1fr; }
+  .guide .step-head h1 { font-size: 32px; }
   .stats { grid-template-columns: repeat(2, 1fr); }
   .stats div:nth-child(4) { border-left: 1px solid var(--line); }
   .stats div:nth-child(odd) { border-left: 0; }
   .stats div:nth-child(n+3) { border-top: 1px solid var(--line); }
-  .health-name { flex-basis: 100%; }
   .doc-bar { flex-wrap: wrap; }
   .fields { grid-template-columns: 1fr; }
   .cal-main { grid-template-columns: 64px 1fr; }
@@ -528,6 +536,11 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .flags { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
 .actions.sticky { position: sticky; bottom: 0; background: var(--paper); padding: 12px 0; border-top: 1px solid var(--line); margin-top: 16px; z-index: 2; align-items: center; }
 .brain-review { margin-top: 24px; }
-.integration { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-.integration ol { margin: 6px 0; padding-left: 18px; font-size: 14px; }
+.integ-market { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin: 14px 0 10px; }
+.integ-market .hint { flex: 1 1 280px; margin: 0; }
+.integ-grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.integ-tile { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); }
+.integ-tile .health-name { flex: 1; }
+.integ-tile .health-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.integ-tile .msg { flex-basis: 100%; }
 .brain-unpin { position: absolute; top: 8px; right: 8px; font-size: 12px; }
