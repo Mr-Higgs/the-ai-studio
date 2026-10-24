@@ -14,7 +14,8 @@ export default function Guide({ ctx, agentName }) {
         <h1>{SPRINT.headline}</h1>
         <p>You’ll work on your own business, with {agentName} as your campaign partner. You bring what you know; {agentName} turns it into an offer, a plan, ready-to-post content, videos and a calendar. Everything is saved on your computer.</p>
         <div className="actions">
-          <a className="btn primary" href={'#' + (first?.id || 'profile')}>{first && first.id !== 'profile' ? `Continue: ${first.title}` : 'Start with your business profile'}</a>
+          {!isDone('brain') && <a className="btn primary" href="#brain">Fill in your Business Brain</a>}
+          <a className={'btn' + (isDone('brain') ? ' primary' : '')} href={'#' + (first?.id || 'profile')}>{first && first.id !== 'profile' ? `Continue: ${first.title}` : 'Start with your business profile'}</a>
         </div>
       </header>
 

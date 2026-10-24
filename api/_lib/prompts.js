@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { BUSINESS_DOCS, cleanCalendar } from './business.js';
+import { brainContext } from '../../ui/web/src/brain.js';
 
 const MAX_DOC = 12000;
 const cut = (t, n = MAX_DOC) => (t && t.length > n ? `${t.slice(0, n)}\n\n(truncated)` : t);
@@ -8,6 +9,8 @@ const cut = (t, n = MAX_DOC) => (t && t.length > n ? `${t.slice(0, n)}\n\n(trunc
 // (cloud sessions have no access to our DB; follow-ups get no re-inline).
 export function buildContext(biz, docs) {
   const out = [`Business profile (JSON): ${JSON.stringify(biz.profile || {})}`];
+  const brain = brainContext(biz.brain, biz.profile);
+  if (brain) out.push(brain);
   if (biz.inputs && Object.keys(biz.inputs).length) out.push(`Step answers (JSON): ${JSON.stringify(biz.inputs)}`);
   if (biz.tracker?.length) out.push(`Lead tracker (JSON): ${cut(JSON.stringify(biz.tracker))}`);
   for (const k of BUSINESS_DOCS) if (docs?.[k]?.content) out.push(`### ${k}.md\n${cut(docs[k].content)}`);
@@ -24,6 +27,18 @@ ${BUSINESS_DOCS.map(d => `${d}.md`).join(', ')} (Markdown strings) or calendar.j
 array itself, not a string). Update the structured output whenever a document changes — the app
 reads it from there. Still reply in chat with a 3-line summary of what you did. Never say
 "saved to business/…" — you can't write those files.`;
+
+// Workshop feedback: constraints were ignored, testimonials were made up, answers were generic.
+export const GROUNDING = `
+Accuracy rules — follow every one:
+- Use only facts from the context above, what I tell you, or research you actually did in this
+  session (name the source). If you didn't research something, say so instead of guessing.
+- Never invent testimonials, reviews, ratings, customer quotes, statistics or past results. If a
+  piece needs one and none is given, write a clearly marked placeholder like [ADD A REAL REVIEW].
+- Respect every constraint I gave: budget, capacity, dates, prices, minimum earnings, discounts,
+  policies, words to avoid. If a recommendation would break one, say so plainly.
+- Label anything that rests on an estimate or an assumption. Use the app-calculated numbers as given.
+- Be specific to this business — concrete names, numbers, dates and next actions, nothing generic.`;
 
 export const STRUCTURED_SCHEMA = {
   type: 'object',
@@ -56,5 +71,5 @@ export function applyStructuredOutput(so) {
 export const hashOf = files => crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex');
 
 export function sessionPrompt(ctx, text, { skill, extra } = {}) {
-  return [skill, ctx, OUTPUT_CONTRACT, extra, `My request: ${text}`].filter(Boolean).join('\n\n');
+  return [skill, ctx, GROUNDING, OUTPUT_CONTRACT, extra, `My request: ${text}`].filter(Boolean).join('\n\n');
 }

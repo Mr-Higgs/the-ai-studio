@@ -11,7 +11,7 @@ sprint; Devin (cloud API) writes each step's documents. This file is the archite
   `STUDIO_SECRET_KEY`), `business.js` (business state + cleanCalendar + export), `devin.js`
   (v3 org-sessions client), `prompts.js` (context builder + output contract + schema).
 - **Supabase**: auth.users + tables `user_settings` (encrypted keys), `businesses`
-  (one `is_active` per user, holds sprint/profile/inputs/tracker/calendar JSON),
+  (one `is_active` per user, holds sprint/profile/inputs/tracker/calendar/brain JSON),
   `docs` (per-kind markdown), `doc_history`, `agent_sessions` (Devin session per scope),
   `projects`; private storage bucket `videos` under `<uid>/<project>/`. RLS on everything.
 - **Devin**: v3 `POST /v3/organizations/{org}/sessions` with `structured_output_schema` —
@@ -29,6 +29,14 @@ prompt; `OUTPUT_CONTRACT` tells it to write results back through `files` in the 
 output and never say "saved to business/…". Per-step prompt text lives in
 `ui/web/src/steps.js` (`STEPS`, `SPRINTS`, `PHASES`, `AGENDA`); the offer step inlines
 `.devin/skills/grand-slam-offer/SKILL.md` (bundled via vercel.json `includeFiles`).
+
+## Business Brain (`ui/web/src/brain.js`, `#brain`)
+Questions (8 sections, each answer tagged known/estimate/help), the offer math (`brainMath`) and
+how Devin reads it (`brainContext`, inlined by `buildContext`). Pure JS, shared by UI and API.
+Saved as `businesses.brain` with its own `brain_updated_at`; steps that list `'brain'` in `uses`
+show "changed" when it moves. The graph (`BrainGraph.jsx`, react-force-graph-2d) is lazy-loaded.
+Meta MCP servers are added in the user's Devin org; `user_settings.integrations` only toggles the
+prompt notes (`INTEGRATIONS` in api/index.js).
 
 ## Env vars
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`

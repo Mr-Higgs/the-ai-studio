@@ -1,6 +1,7 @@
 import { admin } from './supabase.js';
+import { brainContext } from '../../ui/web/src/brain.js';
 
-export const BUSINESS_DOCS = ['offer', 'research', 'strategy', 'content', 'visibility', 'automation', 'action-plan'];
+export const BUSINESS_DOCS = ['brain', 'offer', 'research', 'strategy', 'content', 'visibility', 'automation', 'action-plan'];
 
 // The agent writes calendar items; keep only ones the UI can render and count the rest.
 export function cleanCalendar(data) {
@@ -38,9 +39,9 @@ export async function businessState(uid) {
   const cal = cleanCalendar(biz.calendar);
   const mt = f => (biz[f] ? Date.parse(biz.updated_at) : null);
   return {
-    sprint: biz.sprint, profile: biz.profile, inputs: biz.inputs || {}, tracker: biz.tracker,
+    sprint: biz.sprint, profile: biz.profile, inputs: biz.inputs || {}, tracker: biz.tracker, brain: biz.brain || {},
     calendar: cal.items, calendarIssues: Math.max(cal.issues, biz.calendar_issues || 0), docs: docsOut, history,
-    mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker') },
+    mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null },
     agent: 'devin', busy: (sess || []).some(s => s.devin_status === 'working'),
   };
 }
@@ -73,6 +74,8 @@ export async function exportMarkdown(uid) {
   const b = await businessState(uid);
   const out = [`# ${b.sprint?.name || 'Holiday Growth Sprint'} — ${b.profile?.name || 'my business'}`, `_Exported ${new Date().toLocaleString()}_`];
   if (b.profile) out.push('## Business profile', ...Object.entries(b.profile).filter(([, v]) => typeof v === 'string' && v).map(([k, v]) => `- **${k}:** ${v}`));
+  const brain = brainContext(b.brain, b.profile);
+  if (brain) out.push('\n---\n', brain);
   for (const id of BUSINESS_DOCS) if (b.docs[id]) out.push(`\n---\n`, b.docs[id].content.trim());
   if (b.calendar?.length) out.push('\n---\n', '## Campaign calendar', ...b.calendar.map(c => `- **${c.date}** · ${c.channel || ''} ${c.format || ''} · ${c.title}${c.status === 'posted' ? ' ✓' : ''}\n\n  ${(c.copy || '').replace(/\n/g, '\n  ')}${c.cta ? `\n\n  _CTA:_ ${c.cta}` : ''}`));
   return out.join('\n\n') + '\n';

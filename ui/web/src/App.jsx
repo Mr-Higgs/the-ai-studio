@@ -2,6 +2,8 @@ import { Component, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ask, post, put, toast, useAgent } from './api.js';
 import { supabase } from './supabase.js';
 import { PHASES, SPRINTS, STEPS, countdown, setSprint } from './steps.js';
+import { BRAIN_STEP, brainReady, sectionProgress, BRAIN_SECTIONS } from './brain.js';
+import Brain from './components/Brain.jsx';
 import Chat from './components/Chat.jsx';
 import GenerateStep from './components/GenerateStep.jsx';
 import Guide from './components/Guide.jsx';
@@ -118,16 +120,17 @@ export default function App() {
 
   setSprint(biz.sprint?.id); // before anything reads STEPS
   const agentName = AGENT_NAMES[biz.agent] || 'Devin';
-  const byId = Object.fromEntries(STEPS.map(s => [s.id, s]));
+  const byId = { ...Object.fromEntries(STEPS.map(s => [s.id, s])), brain: BRAIN_STEP };
   // When each step's output last changed (null = not done). Drives ticks and "out of date".
   const mtimeOf = id => {
     const s = byId[id];
     if (!s) return null;
+    if (s.kind === 'brain') return biz.mtimes.brain ?? null;
     if (s.kind === 'doc') return biz.docs[s.file.replace('.md', '')]?.mtime ?? null;
     if (s.kind === 'video') return projects.some(p => p.videos.length) ? 0 : null;
     return biz.profile?.name || s.kind !== 'profile' ? biz.mtimes[s.kind] ?? null : null;
   };
-  const isDone = id => mtimeOf(id) != null && (id !== 'calendar' || !!biz.calendar?.length) && (id !== 'tracker' || !!biz.tracker?.length);
+  const isDone = id => id === 'brain' ? brainReady(biz.brain, biz.profile) : mtimeOf(id) != null && (id !== 'calendar' || !!biz.calendar?.length) && (id !== 'tracker' || !!biz.tracker?.length);
   const doneCount = STEPS.filter(s => isDone(s.id)).length;
   const missing = g => health ? health.some(h => h.group === g && !h.ok) : null;
   const setupOk = health ? !missing('required') : undefined; // video tools only matter on the video step
@@ -158,6 +161,7 @@ export default function App() {
           {step.kind === 'profile' && <Profile step={step} profile={biz.profile} save={saveProfile} ctx={ctx} />}
           {(step.kind === 'doc' || step.kind === 'calendar') && <GenerateStep step={step} {...ctx} />}
           {step.kind === 'tracker' && <Tracker step={step} {...ctx} />}
+          {step.kind === 'brain' && <Brain ctx={ctx} />}
         </StepBoundary>
       </main>
       {step.kind !== 'profile' && (
@@ -191,6 +195,11 @@ export default function App() {
         </div>
         <nav aria-label="Workshop steps">
           <a href="#guide" className={'start-here' + (route === 'guide' ? ' active' : '')} aria-current={route === 'guide' ? 'page' : undefined}>Start here</a>
+          <a href="#brain" className={'start-here brain-link' + (route === 'brain' ? ' active' : '') + (isDone('brain') ? ' done' : '')} aria-current={route === 'brain' ? 'page' : undefined}>
+            <span>Business Brain</span>
+            <small>{isDone('brain') ? '✓' : `${BRAIN_SECTIONS.filter(s => s.required && sectionProgress(biz.brain, biz.profile, s).ready).length}/${BRAIN_SECTIONS.filter(s => s.required).length}`}</small>
+            {workingOn === BRAIN_STEP.title && <span className="working" title={`${agentName} is working on this`} />}
+          </a>
           <ol className="steps">
             {PHASES.map(p => (
               <li key={p.name} className="phase">

@@ -11,8 +11,20 @@ export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
 const send = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const readJson = async req => req.body ?? JSON.parse(await new Promise(r => { let b = ''; req.on('data', c => b += c); req.on('end', () => r(b || '{}')); }));
-const BIZ_FIELDS = { 'profile.json': 'profile', 'inputs.json': 'inputs', 'tracker.json': 'tracker', 'sprint.json': 'sprint', 'calendar.json': 'calendar' };
+const BIZ_FIELDS = { 'brain.json': 'brain', 'profile.json': 'profile', 'inputs.json': 'inputs', 'tracker.json': 'tracker', 'sprint.json': 'sprint', 'calendar.json': 'calendar' };
 const ENV_KEYS = { DEVIN_API_KEY: 'devin_api_key', DEVIN_ORG_ID: 'devin_org_id', HEYGEN_API_KEY: 'heygen_api_key' };
+// Meta's remote MCP servers. Devin is the MCP client, so users add these in their own Devin
+// org (Customize → MCPs); the toggle here only tells Devin it may use them.
+export const INTEGRATIONS = {
+  meta_ads: { name: 'Meta Ads (Facebook + Instagram)', url: 'https://mcp.facebook.com/ads', why: 'Lets Devin read your ad performance and draft paused ads and campaigns.',
+    prompt: 'The owner connected the Meta Ads MCP server (https://mcp.facebook.com/ads) in Devin. Use its tools to read their ad accounts, campaign performance and audiences when it helps. Never publish, activate or spend: create any new campaign, ad set or ad as PAUSED, and tell the owner exactly what to review and switch on.' },
+  meta_social: { name: 'Meta Social Technologies (developers)', url: 'https://mcp.facebook.com/devtools', why: 'For owners who build their own Meta app — webhooks, app review, API health.',
+    prompt: 'The owner connected the Meta Social Technologies MCP server (https://mcp.facebook.com/devtools) in Devin. Use it read-only to check their Meta app setup (webhooks, app status) when relevant; don’t change configuration without asking.' },
+};
+export function integrationNotes(on) {
+  const lines = Object.entries(INTEGRATIONS).filter(([id]) => on?.[id]).map(([, i]) => i.prompt);
+  return lines.length ? `Connected tools:\n- ${lines.join('\n- ')}` : null;
+}
 const SNAP_ALLOWED = [...BUSINESS_DOCS.map(d => `${d}.md`), 'calendar.json'];
 
 async function settings(uid) {
@@ -83,6 +95,7 @@ export default async function handler(req, res) {
       const s = await settings(uid);
       return send(res, 200, { hosted: true, items: [
         { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: !!(s.devin_api_key && s.devin_org_id), key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
+        ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, toggle: true, ok: !!s.integrations?.[id] })),
         { id: 'heygen', group: 'optional', name: 'HeyGen API key', why: 'Imports your HeyGen videos and makes new ones from your avatars.', ok: !!s.heygen_api_key, key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
       ] });
     }
@@ -95,12 +108,25 @@ export default async function handler(req, res) {
       return send(res, 200, { ok: true });
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/setup/integration') {
+      const { id, on } = await readJson(req);
+      if (!INTEGRATIONS[id]) return send(res, 400, { error: 'unknown integration' });
+      const s = await settings(uid);
+      await db.from('user_settings').upsert({ user_id: uid, integrations: { ...(s.integrations || {}), [id]: !!on }, updated_at: new Date().toISOString() });
+      return send(res, 200, { ok: true });
+    }
+
     // ---- business state ----
     if (req.method === 'GET' && url.pathname === '/api/business') return send(res, 200, await businessState(uid));
     if (req.method === 'PUT' && parts[0] === 'api' && parts[1] === 'business' && BIZ_FIELDS[parts[2]]) {
       const biz = await activeBusiness(uid);
       const data = await readJson(req);
       const col = BIZ_FIELDS[parts[2]];
+      if (col === 'brain') {
+        if (!data || typeof data !== 'object' || Array.isArray(data) || JSON.stringify(data).length > 200000) return send(res, 400, { error: 'bad brain' });
+        await db.from('businesses').update({ brain: data, brain_updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
+        return send(res, 200, { ok: true });
+      }
       const fields = { updated_at: new Date().toISOString(), [col]: col === 'calendar' ? cleanCalendar(data).items : data };
       if (col === 'calendar') fields.calendar_issues = cleanCalendar(data).issues;
       await db.from('businesses').update(fields).eq('user_id', uid).eq('id', biz.id);
@@ -228,7 +254,7 @@ export default async function handler(req, res) {
           const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
           const b2 = { ...biz, calendar: biz.calendar };
           const ctx = buildContext(b2, docMap);
-          const extra = scope !== 'business' ? `This conversation is about the promo video project '${scope}'.` : null;
+          const extra = [scope !== 'business' ? `This conversation is about the promo video project '${scope}'.` : null, integrationNotes((await settings(uid)).integrations)].filter(Boolean).join('\n\n') || null;
           let skill = null;
           if (snap === 'offer.md') try { skill = fs.readFileSync(path.join(process.cwd(), '.devin/skills/grand-slam-offer/SKILL.md'), 'utf8'); } catch {}
           const s = await client.createSession({ prompt: sessionPrompt(ctx, text.trim(), { skill, extra }), title: `${biz.name || biz.profile?.name || 'Studio'} · Studio`, schema: STRUCTURED_SCHEMA, tags: ['studio'] });
