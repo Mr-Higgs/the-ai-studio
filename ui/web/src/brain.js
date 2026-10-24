@@ -170,19 +170,45 @@ export function sectionProgress(brain, profile, section) {
 // Basics → Offer costs → Capacity and goals is the required first pass.
 export const brainReady = (brain, profile) => BRAIN_SECTIONS.filter(s => s.required).every(s => sectionProgress(brain, profile, s).ready);
 
+// Saved Brains come from the browser: keep only known questions/fields, string values and known tags.
+const TAG_IDS = Object.keys(TAGS);
+const QIDS = new Set(BRAIN_SECTIONS.flatMap(s => s.questions.map(q => q.id)));
+const obj = x => (x && typeof x === 'object' && !Array.isArray(x) ? x : null);
+function cleanAnswer(raw) {
+  const a = obj(raw);
+  if (!a) return null;
+  const v = Array.isArray(a.v) ? a.v.filter(x => typeof x === 'string').slice(0, 20).map(x => x.slice(0, 200))
+    : typeof a.v === 'number' && Number.isFinite(a.v) ? String(a.v)
+    : typeof a.v === 'string' ? a.v.slice(0, 4000) : '';
+  const s = TAG_IDS.includes(a.s) ? a.s : '';
+  if (blank(v) && !s) return null;
+  return s ? { v, s } : { v };
+}
+export function cleanBrain(raw) {
+  const b = obj(raw) || {};
+  const answers = {};
+  for (const [k, a] of Object.entries(obj(b.answers) || {})) if (QIDS.has(k)) { const c = cleanAnswer(a); if (c) answers[k] = c; }
+  const items = (Array.isArray(b.items) ? b.items : []).slice(0, 20)
+    .map(it => Object.fromEntries(ITEM_FIELDS.map(f => [f.id, cleanAnswer(obj(it)?.[f.id])]).filter(([, a]) => a)))
+    .filter(it => Object.keys(it).length).slice(0, MAX_ITEMS);
+  return { answers, items };
+}
+
 const round = (n, d = 2) => (n == null ? null : Math.round(n * 10 ** d) / 10 ** d);
 
 // Deterministic numbers the app shows and hands to Devin, so it never has to guess them.
-export function brainMath(brain) {
+export function brainMath(raw) {
+  const brain = cleanBrain(raw);
   const A = id => num(brain?.answers?.[id]?.v);
   const rate = A('rate');
   const discount = Math.min(Math.max(A('discount') ?? 0, 0), 100);
   const weeks = A('weeks');
   const overhead = A('overhead');
   const included = brain?.answers?.overheadIncluded?.v || '';
-  const overheadShare = overhead != null && weeks != null && included !== 'Yes' ? overhead * (weeks / (52 / 12)) : 0;
+  // Unknown campaign length with real overhead = unknown fixed costs, not $0.
+  const overheadShare = !overhead || included === 'Yes' ? 0 : weeks == null ? null : overhead * (weeks / (52 / 12));
   const campaignSpend = A('campaignSpend') ?? 0;
-  const fixed = overheadShare + campaignSpend;
+  const fixed = overheadShare == null ? null : overheadShare + campaignSpend;
   const profitTarget = A('profitTarget') ?? 0;
   const free = A('weekly') != null ? Math.max(0, A('weekly') - (A('committed') ?? 0)) : null;
   const capacity = free != null && weeks != null ? free * weeks : null;
@@ -206,8 +232,11 @@ export function brainMath(brain) {
     };
     const full = at(price), disc = discount ? at(price * (1 - discount / 100)) : null;
     const per = (disc || full).earnings;
-    const need = goal => (per > 0 ? Math.ceil(goal / per) : null);
-    const breakEven = need(fixed), forTarget = need(fixed + profitTarget);
+    // Blank costs aren't $0: earnings become an upper bound and the sales counts are withheld.
+    const gaps = ITEM_FIELDS.filter(x => ['materials', 'hours', 'other'].includes(x.id) && num(it?.[x.id]?.v) == null).map(x => x.label);
+    if (f('hours') > 0 && rate == null) gaps.push('Hourly labor cost');
+    const need = goal => (per > 0 && goal != null && !gaps.length ? Math.ceil(goal / per) : null);
+    const breakEven = need(fixed), forTarget = need(fixed == null ? null : fixed + profitTarget);
     const hoursFor = n => (n == null ? null : round(n * f('hours'), 1));
     const estimated = ITEM_FIELDS.filter(x => it?.[x.id]?.s && it[x.id].s !== 'known').map(x => x.label);
     return {
@@ -218,9 +247,10 @@ export function brainMath(brain) {
       cashForTarget: forTarget != null ? round(forTarget * (purchases + losses)) : null,
       belowMin: minEarn != null && per < minEarn,
       notProfitable: per <= 0,
-      estimated,
+      estimated, gaps,
     };
   });
+  for (const it of items) if (it.gaps.length) missing.push(`${it.name}: ${it.gaps.join(', ')}`);
   if (!items.length) missing.push('Price and costs for at least one product or service');
   const ltv = A('ltv'), cac = A('cac');
   return {
@@ -236,7 +266,8 @@ const show = v => (Array.isArray(v) ? v.join(', ') : String(v ?? '').trim());
 const tagOf = a => (a?.s ? ` [${a.s}]` : '');
 
 // The Brain as Devin reads it: every answer with its tag, then the app's numbers.
-export function brainContext(brain, profile) {
+export function brainContext(raw, profile) {
+  const brain = cleanBrain(raw);
   const hasAny = BRAIN_SECTIONS.some(s => s.questions.some(q => !q.profile && isAnswered(brain?.answers?.[q.id]))) || (brain?.items || []).length;
   if (!hasAny) return '';
   const out = ['## Business Brain',
@@ -252,12 +283,15 @@ export function brainContext(brain, profile) {
   const m = brainMath(brain);
   const calc = ['### App-calculated numbers (use these; don’t recompute them differently)'];
   if (m.rate != null) calc.push(`- Labor is costed at ${money(m.rate)}/hour.`);
-  calc.push(`- Fixed costs to recover this campaign: ${money(m.fixed)} (${money(m.overheadShare)} share of overhead + ${money(m.campaignSpend)} campaign costs).`);
+  calc.push(m.fixed == null
+    ? `- Fixed costs to recover this campaign: UNKNOWN — monthly overhead is entered but the campaign length isn’t, so break-even can’t be calculated yet (plus ${money(m.campaignSpend)} campaign costs).`
+    : `- Fixed costs to recover this campaign: ${money(m.fixed)} (${money(m.overheadShare)} share of overhead + ${money(m.campaignSpend)} campaign costs).`);
   if (m.capacity != null) calc.push(`- Free capacity: ${m.free}/week × ${m.weeks} weeks = ${m.capacity} sales/appointments.`);
   for (const it of m.items) {
     calc.push(`- ${it.name}${it.unit ? ` (per ${it.unit})` : ''}: price ${money(it.price)}; cash left after purchases ${money(it.cashLeft)}; labor allowance ${money(it.labor)}; earnings after labor ${money(it.earnings)}.`
       + (it.discounted ? ` At the max ${m.discount}% discount: price ${money(it.discounted.price)}, earnings after labor ${money(it.discounted.earnings)}.` : '')
-      + (it.notProfitable ? ' NOT PROFITABLE at this price once labor is paid.' : ` Break-even: ${it.breakEven} sales; for the profit target: ${it.forTarget} sales (${it.hoursTarget ?? '?'} labor hours)${it.fits == null ? '' : it.fits ? ', fits capacity' : ', MORE THAN CAPACITY'}.`)
+      + (it.gaps.length ? ` INCOMPLETE — blank: ${it.gaps.join(', ')}. The earnings above count those as $0, so they are an upper bound; don’t call this offer profitable until they’re filled in.` : '')
+      + (it.notProfitable ? ' NOT PROFITABLE at this price once labor is paid.' : ` Break-even: ${it.breakEven ?? 'not calculated yet'} sales; for the profit target: ${it.forTarget ?? 'not calculated yet'} sales${it.hoursTarget != null ? ` (${it.hoursTarget} labor hours)` : ''}${it.fits == null ? '' : it.fits ? ', fits capacity' : ', MORE THAN CAPACITY'}.`)
       + (it.belowMin ? ` Below the owner’s minimum earnings per sale (${money(m.minEarn)}).` : '')
       + (it.estimated.length ? ` Based on estimates for: ${it.estimated.join(', ')}.` : ''));
   }

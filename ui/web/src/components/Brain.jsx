@@ -1,13 +1,14 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { put, toast } from '../api.js';
-import { BRAIN_SECTIONS, BRAIN_STEP, ITEM_FIELDS, MAX_ITEMS, TAGS, answerOf, brainMath, brainReady, brainReviewPrompt, sectionProgress } from '../brain.js';
+import { BRAIN_SECTIONS, BRAIN_STEP, ITEM_FIELDS, MAX_ITEMS, TAGS, answerOf, brainMath, brainReady, brainReviewPrompt, cleanBrain, sectionProgress } from '../brain.js';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 const BrainGraph = lazy(() => import('./BrainGraph.jsx')); // canvas + d3 only load on this page
 
 const money = n => (n == null ? '—' : `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })}`);
-const clean = b => ({ answers: b?.answers || {}, items: b?.items?.length ? b.items : [{}] });
+const clean = b => { const c = cleanBrain(b); return { answers: c.answers, items: c.items.length ? c.items : [{}] }; };
+const same = (a, b) => JSON.stringify(cleanBrain(a)) === JSON.stringify(cleanBrain(b));
 
 function Tag({ id, value, onChange }) {
   return (
@@ -62,13 +63,14 @@ function Numbers({ m }) {
             <dt>Your pay for the work</dt><dd>{money(it.labor)}<small>{m.rate == null ? 'add your hourly rate' : `at ${money(m.rate)}/hour`}</small></dd>
             <dt>Earnings per sale</dt><dd className={it.earnings > 0 ? 'ok' : 'bad'}>{money(it.earnings)}<small>after paying yourself</small></dd>
             {it.discounted && <><dt>At your {m.discount}% max discount</dt><dd className={it.discounted.earnings > 0 ? 'ok' : 'bad'}>{money(it.discounted.earnings)}<small>price {money(it.discounted.price)}</small></dd></>}
-            <dt>Sales to break even</dt><dd>{it.breakEven ?? '—'}<small>{m.fixed ? `covers ${money(m.fixed)} of campaign + overhead costs` : 'no fixed costs entered'}{it.hoursBreakEven != null && ` · ${it.hoursBreakEven} h of work`}</small></dd>
+            <dt>Sales to break even</dt><dd>{it.breakEven ?? '—'}<small>{m.fixed == null ? 'needs the campaign length to include your overhead' : m.fixed ? `covers ${money(m.fixed)} of campaign + overhead costs` : 'no fixed costs entered'}{it.hoursBreakEven != null && ` · ${it.hoursBreakEven} h of work`}</small></dd>
             {m.profitTarget > 0 && <><dt>Sales for your {money(m.profitTarget)} profit goal</dt><dd>{it.forTarget ?? '—'}<small>{it.hoursTarget != null && `${it.hoursTarget} h of work`}{it.cashForTarget != null && ` · ${money(it.cashForTarget)} in purchases`}</small></dd></>}
           </dl>
           <ul className="flags">
             {it.notProfitable && <li className="bad">At this price you lose money on every sale once you’re paid for your time.</li>}
             {it.belowMin && <li className="bad">Below your {money(m.minEarn)} minimum earnings per sale.</li>}
             {it.fits === false && <li className="bad">Your goal needs {it.forTarget} sales but you have room for about {m.capacity} this campaign.</li>}
+            {it.gaps.length > 0 && <li className="bad">Blank: {it.gaps.join(', ')}. They count as $0 here, so earnings are a best case and sales targets wait until they’re filled in.</li>}
             {it.fits === true && <li className="ok">Fits your free capacity ({m.capacity} over the campaign).</li>}
             {m.upfront != null && it.cashForTarget != null && it.cashForTarget > m.upfront && <li className="bad">Needs {money(it.cashForTarget)} in purchases; you can spend {money(m.upfront)} upfront — consider deposits.</li>}
           </ul>
@@ -94,12 +96,35 @@ export default function Brain({ ctx }) {
   const [profile, setProfile] = useState(() => biz.profile || {});
   const [open, setOpen] = useState(() => new Set([BRAIN_SECTIONS.find(s => s.required && !sectionProgress(biz.brain, biz.profile, s).ready)?.id || 'basics']));
   const [saving, setSaving] = useState(false);
-  const dirtyBrain = JSON.stringify(brain) !== JSON.stringify(clean(biz.brain));
+  const dirtyBrain = !same(brain, biz.brain);
   const dirtyProfile = JSON.stringify(profile) !== JSON.stringify(biz.profile || {});
   const dirty = dirtyBrain || dirtyProfile;
   const m = useMemo(() => brainMath(brain), [brain]);
   const ready = brainReady(brain, profile);
   const doc = biz.docs.brain;
+
+  // Autosave shortly after edits and when leaving the page via the nav (hash changes don't fire beforeunload).
+  const latest = useRef(null);
+  latest.current = { brain, profile, dirtyBrain, dirtyProfile };
+  const queue = useRef(Promise.resolve(true));
+  const save = () => (queue.current = queue.current.then(async () => {
+    const cur = latest.current;
+    if (!cur.dirtyBrain && !cur.dirtyProfile) return true;
+    setSaving(true);
+    try {
+      if (cur.dirtyProfile) await put('/api/business/profile.json', cur.profile);
+      if (cur.dirtyBrain) await put('/api/business/brain.json', cleanBrain(cur.brain));
+      await refresh();
+      return true;
+    } catch (e) { toast(`Couldn’t save your Business Brain: ${e.message}`); return false; }
+    finally { setSaving(false); }
+  }));
+  useEffect(() => {
+    if (!dirty) return;
+    const t = setTimeout(save, 1200);
+    return () => clearTimeout(t);
+  }, [brain, profile]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { save(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!dirty) return;
@@ -115,16 +140,6 @@ export default function Brain({ ctx }) {
     if (Object.keys(keep).length) setBrain(b => ({ ...b, answers: { ...b.answers, [q.id]: { ...b.answers[q.id], ...keep } } }));
   };
   const setItem = (i, f, patch) => setBrain(b => ({ ...b, items: b.items.map((it, j) => (j === i ? { ...it, [f]: { ...it[f], ...patch } } : it)) }));
-  const save = async () => {
-    setSaving(true);
-    try {
-      if (dirtyProfile) await put('/api/business/profile.json', profile);
-      if (dirtyBrain) await put('/api/business/brain.json', brain);
-      await refresh();
-      return true;
-    } catch (e) { toast(`Couldn’t save your Business Brain: ${e.message}`); return false; }
-    finally { setSaving(false); }
-  };
   const review = async () => { if (dirty && !(await save())) return; generate(BRAIN_STEP, brainReviewPrompt(brain, profile), doc ? BRAIN_STEP.file : undefined); };
   const toggle = (id, on) => setOpen(s => { const n = new Set(s); (on ?? !n.has(id)) ? n.add(id) : n.delete(id); return n; });
   const reveal = (id, q) => {
@@ -138,7 +153,7 @@ export default function Brain({ ctx }) {
       <header className="step-head">
         <h1>{BRAIN_STEP.title}</h1>
         <p>{BRAIN_STEP.blurb}</p>
-        <p className="hint">Tag each answer <strong>Known</strong>, <strong>Estimate</strong> or <strong>Help me work this out</strong> — Devin treats estimates as estimates and never invents reviews or numbers. Start with the sections marked required.</p>
+        <p className="hint">Tag each answer <strong>Known</strong>, <strong>Estimate</strong> or <strong>Help me work this out</strong> — Devin treats estimates as estimates and never invents reviews or numbers. Start with the sections marked required. Changes save as you go.</p>
       </header>
 
       <Suspense fallback={<div className="brain-graph placeholder">Loading the map…</div>}>
