@@ -15,7 +15,7 @@
 //    prompt  (answers, step) => the message sent to Devin
 // ============================================================================
 
-const rules = file => `Write for a busy, non-technical owner: plain words, short sections, concrete examples and real numbers, nothing generic. If something critical is missing, ask me at most 3 short questions in chat and wait for my answers; otherwise go straight to writing. Save the result as Markdown to business/${file} (overwrite it if it exists). Then reply with a 3-line summary of what you made.`;
+const rules = file => `Write for a busy, non-technical owner: plain words, short sections, concrete examples and real numbers, nothing generic. If something critical is missing, ask me at most 3 short questions in chat and wait for my answers; otherwise go straight to writing. Return the finished document as ${file} in the structured output (see the output instructions). Then reply with a 3-line summary of what you made.`;
 
 const answers = (inputs, fields) => fields
   .map(f => {
@@ -86,7 +86,7 @@ export function setSprint(id) {
   SPRINT = v;
   const offerLower = v.offerTitle.toLowerCase();
 
-CONTEXT = `We're in the "${v.name}" workshop, ${v.campaign} for my small business. First read business/profile.json and every file that exists in business/ (earlier steps), so your work builds on what's already decided. If business/profile.json doesn't exist, ask me 3 quick questions about the business (what I sell, to whom, where) before anything else. Steps can be done in any order: if an earlier step's file is missing, make sensible assumptions, label them "(assumed)", and keep going.`;
+CONTEXT = `We're in the "${v.name}" workshop, ${v.campaign} for my small business. My business profile and everything from earlier steps are included above — build on what's already decided. If the profile is empty, ask me 3 quick questions about the business (what I sell, to whom, where) before anything else. Steps can be done in any order: if an earlier step is missing above, make sensible assumptions, label them "(assumed)", and keep going.`;
 
 STEPS = [
   {
@@ -176,7 +176,7 @@ ${rules('research.md')}`,
     ],
     prompt: (i, s) => `${CONTEXT}
 
-Create my ${v.adj}sales and marketing strategy, built around the offer in business/offer.md and the customer language, questions and communities in business/research.md.
+Create my ${v.adj}sales and marketing strategy, built around the offer above and the customer language, questions and communities in the customer research above.
 
 ${answers(i, s.inputs)}
 
@@ -200,7 +200,7 @@ ${rules('strategy.md')}`,
     ],
     prompt: (i, s) => `${CONTEXT}
 
-Write my ready-to-use ${v.adj}promotional content, following business/strategy.md, selling the offer in business/offer.md, and answering the questions and objections in business/research.md in customers' own words.
+Write my ready-to-use ${v.adj}promotional content, following my strategy above, selling the offer above, and answering the questions and objections in my customer research above in customers' own words.
 
 ${answers(i, s.inputs)}
 
@@ -234,13 +234,13 @@ ${rules('content.md')}`,
     ],
     prompt: (i, s) => `${CONTEXT}
 
-Build my ${v.adj}content calendar from business/strategy.md and business/content.md (reuse that copy; write new copy only where gaps exist).
+Build my ${v.adj}content calendar from my strategy and content kit above (reuse that copy; write new copy only where gaps exist).
 
 ${answers(i, s.inputs)}
 
-Save it as JSON (not Markdown) to business/calendar.json: an array sorted by date, where each item is exactly
-{"date": "YYYY-MM-DD", "channel": "Instagram", "format": "Reel | Post | Story | Email | Ad | Other", "title": "short label", "copy": "the full ready-to-post text", "cta": "the call-to-action", "status": "planned", "video": "projects/<name>/raw/<file>.mp4"}. The "video" field is optional: when a promo video exists under projects/*/raw/, attach it to the posts it fits.
-Line the dates up with the campaign phases and ${v.calendarDates}. After saving, check the file parses as valid JSON. If something critical is missing, ask me at most 3 short questions first. Then reply with a 3-line summary.`,
+Return it as calendar.json in the structured output (the JSON array itself): an array sorted by date, where each item is exactly
+{"date": "YYYY-MM-DD", "channel": "Instagram", "format": "Reel | Post | Story | Email | Ad | Other", "title": "short label", "copy": "the full ready-to-post text", "cta": "the call-to-action", "status": "planned"}.
+Line the dates up with the campaign phases and ${v.calendarDates}. If something critical is missing, ask me at most 3 short questions first. Then reply with a 3-line summary.`,
   },
   {
     id: 'visibility', kind: 'doc', title: 'Get found', file: 'visibility.md', uses: ['profile', 'research'],
@@ -258,7 +258,7 @@ Line the dates up with the campaign phases and ${v.calendarDates}. After saving,
     ],
     prompt: (i, s) => `${CONTEXT}
 
-Create my online visibility plan for ${v.planFor}. If I gave a website, fetch it and review it. Use the questions customers ask in business/research.md for the FAQ.
+Create my online visibility plan for ${v.planFor}. If I gave a website, fetch it and review it. Use the questions customers ask in my customer research above for the FAQ.
 
 ${answers(i, s.inputs)}
 
@@ -285,7 +285,7 @@ Find the best automation opportunities for my business ${v.season}.
 
 ${answers(i, s.inputs)}
 
-Give me the 5 highest-value automations ranked by hours saved vs. effort to set up. For each: what it does, which of my existing tools can do it (prefer free tiers and what I already pay for), step-by-step setup, and any ready-to-use text it needs (auto-replies, follow-up emails, FAQ answers, booking confirmations — write them). Include one AI-assisted workflow I can run myself each week using Devin. If LinkedIn is one of my channels, make "LinkedIn autopilot" one of the 5: Studio auto-posts the LinkedIn items I approve from business/calendar.json (the LinkedIn autopilot panel under this step), so say which posts to approve first and the best posting times for my audience.
+Give me the 5 highest-value automations ranked by hours saved vs. effort to set up. For each: what it does, which of my existing tools can do it (prefer free tiers and what I already pay for), step-by-step setup, and any ready-to-use text it needs (auto-replies, follow-up emails, FAQ answers, booking confirmations — write them). Include one AI-assisted workflow I can run myself each week using Devin. If LinkedIn is one of my channels, suggest the best posting times for my audience.
 
 ${rules('automation.md')}`,
   },
@@ -315,11 +315,11 @@ ${rules('automation.md')}`,
     ],
     prompt: (i, s) => `${CONTEXT}
 
-Pull everything in business/ into my action plan for after the workshop.
+Pull everything from the steps above into my action plan for after the workshop.
 
 ${answers(i, s.inputs)}
 
-Include: a launch checklist for the next 7 days (each item under 1 hour, in order); a weekly routine that fits my hours (create, post, follow up, review numbers — using business/calendar.json and business/tracker.json); the 3 numbers to review every week and what to change if each is low; a mid-campaign check-in on a specific date; and ${v.after}.
+Include: a launch checklist for the next 7 days (each item under 1 hour, in order); a weekly routine that fits my hours (create, post, follow up, review numbers — using my calendar and tracker above); the 3 numbers to review every week and what to change if each is low; a mid-campaign check-in on a specific date; and ${v.after}.
 
 ${rules('action-plan.md')}`,
   },
@@ -346,81 +346,19 @@ AGENDA = [
 
 TRACKER_INSIGHTS = `${CONTEXT}
 
-Read business/tracker.json (my leads and sales) and business/strategy.md. Tell me in chat (don't write a file): what's converting and what isn't, by source and stage; which leads to follow up with today and a suggested message for each; and one change to make this week. Keep it short.`;
+Using my tracker and strategy above, Tell me in chat (don't write a file): what's converting and what isn't, by source and stage; which leads to follow up with today and a suggested message for each; and one change to make this week. Keep it short.`;
 }
 setSprint('holiday');
 
 // Shown at the top of Setup. FACILITATOR: replace with your sign-up link and how to redeem
 // the promo code you hand out. `link` is optional; leave it '' to hide the button.
 export const SETUP_ACCOUNT = {
-  text: 'Create your Devin account before the workshop and redeem the promo code you were given. Then install the Devin CLI below and sign in with that account.',
-  link: '',
-  linkLabel: 'Create your Devin account',
+  text: 'Studio runs Devin on your own Devin account and your own usage. In Devin, open Settings → Devin API: copy the Organization ID shown at the top, then create a key (Personal access token, or a Service user with the Member role) — it starts with cog_. Paste both below.',
+  link: 'https://app.devin.ai/settings',
+  linkLabel: 'Open Devin settings',
 };
 
-// Same spot in hosted mode: no CLI to install — the server signs each user into their own Devin account.
-export const SETUP_ACCOUNT_HOSTED = {
-  text: 'Studio runs Devin on your own Devin account. Click Sign in to Devin, log in on the page that opens, copy the code it shows you, and paste it back here. Do this once; you can sign out any time.',
-};
 
-// Shown on Setup under "What Devin can connect to": the tools already connected
-// (from the server) plus three plain-language cards for adding more.
-// Each step is { text, code? } — code is a copyable command line under the sentence.
-export const SETUP_INTEGRATIONS = {
-  title: 'Add more',
-  intro: 'These are the extra tools Devin can use while it works on your campaign — things like your calendar, email or notes. Everything below is optional; the workshop works fine without any of it.',
-  howtos: [
-    {
-      id: 'marketplace',
-      title: 'Add a ready-made plugin',
-      steps: [
-        { text: 'Open Devin’s plugin marketplace in your browser:', code: 'https://app.devin.ai/customize' },
-        { text: 'Click Plugins → Add plugin → From repository, and pick the tool you want (Notion, Gmail, Calendly…).' },
-        { text: 'Or do it in Terminal — this example adds Notion:', code: 'devin plugins install CognitionAI/devin-marketplace#plugins/notion' },
-        { text: 'Then restart', code: 'npm run studio' },
-      ],
-      link: 'https://app.devin.ai/customize',
-      linkLabel: 'Open the marketplace',
-    },
-    {
-      id: 'mcp',
-      title: 'Connect a tool with an MCP address',
-      steps: [
-        { text: 'Some tools give you an “MCP server address” — a link that starts with https. Ask the tool’s website or support for it.' },
-        { text: 'Add it to this project with a name you pick (it’s saved in .devin/mcp_config.json here):', code: 'devin mcp add -s project <name> <https-url>' },
-        { text: 'If the tool asks you to sign in the first time Devin uses it:', code: 'devin mcp login <name>' },
-        { text: 'Then restart', code: 'npm run studio' },
-      ],
-      link: 'https://docs.devin.ai/cli/extensibility/mcp/configuration',
-      linkLabel: 'MCP setup guide',
-    },
-    {
-      id: 'linkedin',
-      title: 'Post to LinkedIn',
-      steps: [
-        { text: 'Create a free LinkedIn app (any name; it needs a LinkedIn Page, your business page is fine):', code: 'https://www.linkedin.com/developers/apps/new' },
-        { text: 'In the app’s Products tab, add “Sign In with LinkedIn using OpenID Connect” and “Share on LinkedIn”.' },
-        { text: 'Open the token generator, pick your app, tick openid, profile, email and w_member_social, and copy the token:', code: 'https://www.linkedin.com/developers/tools/oauth/token-generator' },
-        { text: 'Paste it into “LinkedIn access token” above. It lasts 60 days; repeat this step when Devin says it expired.' },
-        { text: 'Then restart', code: 'npm run studio' },
-      ],
-      link: 'https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin',
-      linkLabel: 'LinkedIn sharing docs',
-    },
-    {
-      id: 'own-plugin',
-      title: 'Build your own plugin',
-      steps: [
-        { text: 'A plugin is just a folder. Make one called my-plugin with this file inside — it only needs { "name": "my-plugin" }:', code: 'my-plugin/.devin-plugin/plugin.json' },
-        { text: 'Add a skill — a Markdown file that teaches Devin what to do:', code: 'my-plugin/skills/<skill-name>/SKILL.md' },
-        { text: 'Optionally add a my-plugin/.mcp.json file for MCP servers, then install it:', code: 'devin plugins install --local ./my-plugin' },
-        { text: 'Then restart', code: 'npm run studio' },
-      ],
-      link: 'https://docs.devin.ai/cli/extensibility/plugins/overview',
-      linkLabel: 'Plugin guide',
-    },
-  ],
-};
 
 // The one bold thing on screen: days until the season peaks (holiday) or the 30-day sprint ends (growth).
 export function countdown(sprint, now = new Date()) {

@@ -14,7 +14,7 @@ export default function VideoStudio({ step, projects, ctx }) {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   // Projects can arrive after mount, so fall back to the latest one with a video.
-  const project = projects.find(p => p.name === current) || projects.find(p => p.raw.length) || projects[0];
+  const project = projects.find(p => p.name === current) || projects.find(p => p.videos.length) || projects[0];
 
   const create = async e => {
     e.preventDefault();
@@ -29,7 +29,7 @@ export default function VideoStudio({ step, projects, ctx }) {
           {projects.map(p => (
             <button key={p.name} className={'proj' + (p === project ? ' active' : '')} aria-pressed={p === project} onClick={() => setCurrent(p.name)}>
               <span>{p.name}</span>
-              <small>{p.raw.length} video{p.raw.length === 1 ? '' : 's'}</small>
+              <small>{p.videos.length} video{p.videos.length === 1 ? '' : 's'}</small>
             </button>
           ))}
           <form className="proj-new" onSubmit={create}>
@@ -41,11 +41,11 @@ export default function VideoStudio({ step, projects, ctx }) {
       </div>
     </>
   );
-  const nextBtn = projects.some(p => p.raw.length) && next && <div className="next"><button className="btn" onClick={() => go(next.id)}>Next: {next.title}</button></div>;
+  const nextBtn = projects.some(p => p.videos.length) && next && <div className="next"><button className="btn" onClick={() => go(next.id)}>Next: {next.title}</button></div>;
 
   return (
     <div className="video">
-      {project ? <ProjectWorkspace key={project.name} project={project} refresh={refresh} top={picker} bottom={nextBtn} hosted={ctx.hosted} /> : (
+      {project ? <ProjectWorkspace key={project.name} project={project} refresh={refresh} top={picker} bottom={nextBtn} /> : (
         <main className="main">
           {picker}
           <div className="placeholder"><p>Name your first video above. Each video gets its own folder and chat.</p></div>
@@ -56,10 +56,9 @@ export default function VideoStudio({ step, projects, ctx }) {
 }
 
 // One video project: its own agent session for the script + the chat column.
-function ProjectWorkspace({ project, refresh, top, bottom, hosted }) {
-  const agent = useAgent(`/api/projects/${enc(project.name)}`, refresh);
-  const agentName = AGENT_NAMES[project.agent] || 'Devin';
-  const switchAgent = async a => { try { await post(`/api/projects/${enc(project.name)}/agent`, { agent: a }); await refresh(); agent.restart(); } catch (e) { toast(e.message); } };
+function ProjectWorkspace({ project, refresh, top, bottom }) {
+  const agent = useAgent(`/api/agent/${enc(project.name)}`, refresh);
+  const agentName = 'Devin';
   const started = agent.items.some(i => i.kind === 'user');
   const lastAgent = [...agent.items].reverse().find(i => i.kind === 'agent')?.text || '';
   return (
@@ -73,12 +72,6 @@ function ProjectWorkspace({ project, refresh, top, bottom, hosted }) {
       <ChatGrip />
       <div className="side-head">
         <span>{agentName} · {project.name}</span>
-        {!hosted && (
-          <select aria-label="Assistant for this video" value={project.agent} onChange={e => switchAgent(e.target.value)} disabled={agent.busy}>
-            <option value="devin">Devin</option>
-            <option value="claude">Claude Code</option>
-          </select>
-        )}
       </div>
       <Chat
         agent={agent}
@@ -92,8 +85,8 @@ function ProjectWorkspace({ project, refresh, top, bottom, hosted }) {
 }
 
 function Project({ project, refresh, agent, agentName, lastAgent }) {
-  const videos = project.raw.filter(f => /\.(mp4|mov|webm)$/i.test(f));
-  const scriptPrompt = `Write a HeyGen presenter script for a ${SPRINT.adj}promo video for project "${project.name}", selling the offer in business/offer.md (if it exists; otherwise ask me what to promote). 60–90 words, spoken-word style, hook in the first sentence, end on the call-to-action. Give me the script in chat (don't write a file), then one line on which avatar look and aspect ratio to pick.`;
+  const videos = project.videos;
+  const scriptPrompt = `Write a HeyGen presenter script for a ${SPRINT.adj}promo video for project "${project.name}", selling the offer above (if there is none, ask me what to promote). 60–90 words, spoken-word style, hook in the first sentence, end on the call-to-action. Give me the script in chat (don't write a file), then one line on which avatar look and aspect ratio to pick.`;
   return (
     <>
       <section className="panel">
@@ -106,15 +99,12 @@ function Project({ project, refresh, agent, agentName, lastAgent }) {
 
       <section className="panel">
         <h2>Your videos</h2>
-        {videos.length ? videos.map(f => {
-          const src = `/projects/${enc(project.name)}/raw/${enc(f)}`;
-          return (
-            <figure key={f} className="render">
-              <video controls preload="metadata" src={src} />
-              <figcaption><span>{f}</span><a className="btn ghost" href={src} download={f}>Download</a></figcaption>
-            </figure>
-          );
-        }) : <p className="hint">Videos you import from HeyGen show up here.</p>}
+        {videos.length ? videos.map(v => (
+          <figure key={v.file} className="render">
+            <video controls preload="metadata" src={v.url} />
+            <figcaption><span>{v.file}</span><a className="btn ghost" href={v.url} download={v.file}>Download</a></figcaption>
+          </figure>
+        )) : <p className="hint">Videos you import from HeyGen show up here.</p>}
       </section>
     </>
   );
@@ -140,7 +130,7 @@ function HeyGenImport({ project, refresh, close }) {
   const [next, setNext] = useState(null);
   const [busy, setBusy] = useState({});
   const [error, setError] = useState('');
-  const imported = id => project.raw.includes(`heygen-${id}.mp4`);
+  const imported = id => project.videos.some(v => v.file === `heygen-${id}.mp4`);
 
   const load = async token => {
     setError('');

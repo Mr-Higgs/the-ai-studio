@@ -4,20 +4,22 @@
   "version": "0.1.0",
   "description": "Templated agentic campaign studio: Devin writes, HeyGen presents",
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"
   },
   "scripts": {
-    "studio": "vite build ui/web --logLevel warn && node ui/server.mjs",
     "dev": "vite ui/web",
-    "test": "node --test ui/server.test.mjs mcp/linkedin.test.mjs",
+    "test": "node --test api/*.test.js",
     "build": "vite build ui/web",
-    "start": "node ui/server.mjs"
+    "start": "node ui/server.mjs",
+    "dev:api": "node dev/server.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",
     "vite": "^8.3.4"
-  }
+  },
+  "type": "module"
 }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { post } from '../api.js';
+import { supabase } from '../supabase.js';
 import { SPRINTS } from '../steps.js';
 
-// Hosted mode gate: one card, "Sign in" or "Create account" (invite code required there).
+// Hosted gate: one card, "Sign in" or "Create account" (invite code required there).
 export default function Login({ onDone }) {
   const [mode, setMode] = useState('in');
   const [email, setEmail] = useState('');
@@ -14,7 +15,9 @@ export default function Login({ onDone }) {
     e.preventDefault();
     setState('busy');
     try {
-      await post(mode === 'in' ? '/api/auth/login' : '/api/auth/register', { email, password, ...(mode === 'up' && { invite }) });
+      if (mode === 'up') await post('/api/auth/register', { email, password, invite });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Wrong email or password.' : error.message);
       onDone();
     } catch (err) { setState(err.message); }
   };

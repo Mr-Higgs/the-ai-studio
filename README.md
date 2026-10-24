@@ -13,58 +13,30 @@ By the end you'll have:
 | Customer conversations | What customers say on Reddit and forums, in their words, plus community-friendly growth plays |
 | Strategy & messaging | Where to show up, what to say, calls-to-action that convert |
 | Content kit | Ready-to-post social captions, emails and ads |
-| Promo videos | Scripts for your HeyGen avatar, finished videos pulled into the campaign |
+| Promo videos | A HeyGen avatar script written for you, the video pulled into your campaign |
 | Campaign calendar | A 30–60 day calendar you tick off as you post |
 | Get found | Search, Google Maps and AI-assistant visibility fixes |
 | Automate it | The repetitive tasks to hand off, with setup steps |
 | Lead tracker | Leads, customers, win rate and revenue in one place |
 | Action plan | Your launch checklist and weekly routine |
 
-## Before the workshop
+## Using Studio
 
-Do this at home the day before. It takes about 20 minutes. On a **Mac**, run commands in
-**Terminal**. On **Windows**, run them in **PowerShell**, not Command Prompt.
+Studio is hosted — your facilitator gives you a web address and an invite code.
 
-<!-- FACILITATOR: add the Devin sign-up link and how to redeem the promo code here,
-     and in SETUP_ACCOUNT in ui/web/src/steps.js (shown on the in-app Setup page). -->
-**1. Create your Devin account** and redeem the promo code you were given.
-
-**2. Install Node.js** (version 20 or newer).
-- Mac: download the LTS installer from [nodejs.org](https://nodejs.org), or `brew install node`
-- Windows: `winget install OpenJS.NodeJS.LTS`
-- Check: `node -v`
-
-**3. Install git.**
-- Mac: run `git --version`. If git is missing, macOS offers to install it. Click Install.
-- Windows: `winget install Git.Git`
-
-**4. Install the Devin CLI.**
-- Mac: `curl -fsSL https://cli.devin.ai/install.sh | bash`
-- Windows: `irm https://static.devin.ai/cli/setup.ps1 | iex`
-- **Close the window and open a new one**, then check: `devin --version`
-
-**5. Sign in** with the account from step 1: `devin auth login`
-- Check: `devin auth status` should say **Logged in**.
-
-**6. Get the workshop files.**
-```bash
-git clone <workshop repo URL>
-cd studio
-npm install
-```
-
-**7. Promo videos only (optional).** Videos are made in [HeyGen](https://www.heygen.com) with your own avatar — nothing to install. Add `HEYGEN_API_KEY` in Setup if you want to import or generate videos from inside Studio.
-
-**If something goes wrong**
-- *"command not found"* right after installing: open a new Terminal or PowerShell window.
-- *Windows: "irm is not recognized"*: you're in Command Prompt or Git Bash. Open PowerShell.
-- *On a work laptop with a proxy or firewall*: installs may be blocked. Ask your IT team, or bring a personal laptop.
-- The app's **Setup** page (bottom of the sidebar) checks all of this and shows the exact command for your computer.
+1. Open the address and **Create account** with your email, a password and the invite code.
+2. Go to **Setup** and paste your **Devin API key** (`cog_…`) and **Organization ID**
+   from Devin → Settings → Devin API (create a Personal access token, or a Service user
+   with the Member role). This runs the assistant on your own Devin account and usage.
+3. Optional: paste your **HeyGen API key** to make/import avatar videos in the Promo
+   videos step.
+4. Open **Start here** and follow the steps — each one is written for you by Devin, and
+   everything is saved to your account.
 
 ## Start
 
 ```bash
-npm run studio
+npm run dev:api   # or see DEPLOY.md for the hosted deployment
 ```
 
 Open http://localhost:4321. **Start here** explains the day and its agenda, then sends you to your first step. Steps work in any order: start with a promo video if that's what you've got. Each step says what it builds on, and flags when an earlier step has changed. If something isn't installed,
@@ -95,7 +67,7 @@ Everything participants see and everything Devin is asked to do is in **`ui/web/
 - `VIDEO_FORMATS`: the aspect-ratio labels in the avatar form.
 - `TRACKER_INSIGHTS`: what "Ask Devin what to do next" sends.
 
-Restart `npm run studio` after editing. The Start here page text is in `ui/web/src/components/Guide.jsx`.
+Restart `npm run dev:api` after editing. The Start here page text is in `ui/web/src/components/Guide.jsx`.
 
 ## Hosted version
 
@@ -105,5 +77,5 @@ and HeyGen accounts. See `DEPLOY.md` for how to run it.
 
 ## For facilitators
 
-- Hot reload while editing the UI: `node ui/server.mjs` in one terminal and `npm run dev` in another, then open http://localhost:5173.
+- Hosting and local development: `DEPLOY.md`.
 - Architecture and file contracts: `CLAUDE.md`.

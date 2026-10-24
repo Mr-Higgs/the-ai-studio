@@ -5,7 +5,6 @@ import { api, post, toast } from '../api.js';
 
 const STATUS = { pending: '○', in_progress: '◐', completed: '✓', failed: '✕' };
 // Machine-wide grants and bypass mode don't belong behind a one-click button.
-const HIDDEN_OPTIONS = ['allow_always_global', 'switch_bypass'];
 
 export default function Chat({ agent, agentName, placeholder = 'Reply to ' + agentName, empty }) {
   const [text, setText] = useState('');
@@ -59,9 +58,7 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
           onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) submit(e); }}
         />
-        {agent.busy
-          ? <button type="button" className="btn" onClick={agent.cancel}>Stop</button>
-          : <button className="btn primary" disabled={!text.trim()}>Send</button>}
+        <button className="btn primary" disabled={!text.trim() || agent.busy}>Send</button>
       </form>
     </div>
   );
@@ -82,22 +79,6 @@ function Item({ item, agent, agentName, items }) {
     case 'plan': return (
       <ol className="plan">{item.entries.map((e, i) => <li key={i} className={e.status}>{e.content}</li>)}</ol>
     );
-    case 'perm': {
-      const tc = item.toolCall;
-      const known = items.find(x => x.kind === 'tool' && x.id === tc.toolCallId);
-      const cmd = tc.rawInput?.command || tc._meta?.['cognition.ai/editableCommand']; // Devin puts the command in _meta
-      return (
-        <div className="perm" role="group" aria-label="Permission request">
-          <p>{cmd ? `${agentName} needs your OK to run this:` : `${agentName} needs your OK: ${tc.title || known?.title || 'use a tool'}`}</p>
-          {cmd && <pre>{cmd}</pre>}
-          <div className="perm-btns">
-            {item.options.filter(o => !HIDDEN_OPTIONS.includes(o.optionId)).map(o => (
-              <button key={o.optionId} className={'btn' + (o.kind === 'allow_once' ? ' primary' : '')} onClick={() => agent.answer(item.id, o.optionId)}>{o.name}</button>
-            ))}
-          </div>
-        </div>
-      );
-    }
   }
   return null;
 }
