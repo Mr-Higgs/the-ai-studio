@@ -5,6 +5,7 @@ import { admin, userFromReq } from './_lib/supabase.js';
 import { enc, dec } from './_lib/secrets.js';
 import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusiness, snapshot, exportMarkdown, cleanCalendar, BUSINESS_DOCS } from './_lib/business.js';
 import { devinCreds, devinClient } from './_lib/devin.js';
+import { brainContext, cleanBrain } from '../ui/web/src/brain.js';
 import { buildContext, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
@@ -124,7 +125,7 @@ export default async function handler(req, res) {
       const col = BIZ_FIELDS[parts[2]];
       if (col === 'brain') {
         if (!data || typeof data !== 'object' || Array.isArray(data) || JSON.stringify(data).length > 200000) return send(res, 400, { error: 'bad brain' });
-        await db.from('businesses').update({ brain: data, brain_updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
+        await db.from('businesses').update({ brain: cleanBrain(data), brain_updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
         return send(res, 200, { ok: true });
       }
       const fields = { updated_at: new Date().toISOString(), [col]: col === 'calendar' ? cleanCalendar(data).items : data };
@@ -260,7 +261,10 @@ export default async function handler(req, res) {
           const s = await client.createSession({ prompt: sessionPrompt(ctx, text.trim(), { skill, extra }), title: `${biz.name || biz.profile?.name || 'Studio'} · Studio`, schema: STRUCTURED_SCHEMA, tags: ['studio'] });
           await agentUpsert(uid, biz.id, scope, { devin_session_id: s.session_id, devin_status: 'working', last_prompt_at: new Date().toISOString() });
         } else {
-          await client.sendMessage(row.devin_session_id, text.trim());
+          // A live session only saw the Brain as it was when it started; resend it when it has changed since.
+          const changed = biz.brain_updated_at && Date.parse(biz.brain_updated_at) > Date.parse(row.last_prompt_at || 0) && snap !== 'brain.md';
+          const fresh = changed ? brainContext(biz.brain, biz.profile) : '';
+          await client.sendMessage(row.devin_session_id, fresh ? `My Business Brain changed since my last message. Use these figures from now on, replacing any earlier ones:\n\n${fresh}\n\n---\n\n${text.trim()}` : text.trim());
           await agentUpsert(uid, biz.id, scope, { devin_status: 'working', last_prompt_at: new Date().toISOString() });
         }
         return send(res, 202, { ok: true });

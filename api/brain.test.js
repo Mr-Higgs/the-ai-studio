@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { brainContext, brainMath, brainReady } from '../ui/web/src/brain.js';
+import { brainContext, brainMath, brainReady, cleanBrain } from '../ui/web/src/brain.js';
 import { buildContext, GROUNDING } from './_lib/prompts.js';
 import { integrationNotes } from './index.js';
 
@@ -60,4 +60,33 @@ test('integrationNotes only mentions connected Meta servers', () => {
   assert.match(n, /mcp\.facebook\.com\/ads/);
   assert.match(n, /PAUSED/);
   assert.doesNotMatch(n, /devtools/);
+});
+
+test('blank item costs are gaps, not $0', () => {
+  const m = brainMath({ answers: { rate: a('20'), weeks: a('4') }, items: [{ name: a('Box'), price: a('40') }] });
+  const it = m.items[0];
+  assert.deepEqual(it.gaps, ['Materials per sale ($)', 'Labor per sale (hours)', 'Other costs per sale ($)']);
+  assert.equal(it.breakEven, null);
+  assert.equal(it.fits, null);
+  assert.ok(m.missing.some(x => x.startsWith('Box:')));
+  assert.match(brainContext({ answers: { rate: a('20') }, items: [{ name: a('Box'), price: a('40') }] }, {}), /INCOMPLETE/);
+  const zeros = brainMath({ answers: { rate: a('20') }, items: [{ price: a('40'), materials: a('0'), hours: a('0'), other: a('0') }] });
+  assert.deepEqual(zeros.items[0].gaps, []);
+});
+
+test('overhead without campaign length leaves fixed costs unknown', () => {
+  const m = brainMath({ answers: { overhead: a('500') }, items: [{ price: a('40'), materials: a('10'), hours: a('0'), other: a('0') }] });
+  assert.equal(m.overheadShare, null);
+  assert.equal(m.fixed, null);
+  assert.equal(m.items[0].breakEven, null);
+  assert.match(brainContext({ answers: { overhead: a('500') } }, {}), /UNKNOWN/);
+  assert.equal(brainMath({ answers: { overhead: a('500'), overheadIncluded: a('Yes') } }).fixed, 0);
+});
+
+test('cleanBrain drops malformed data instead of breaking reads', () => {
+  const bad = { answers: { rate: 'x', weeks: { v: { evil: 1 }, s: 'nope' }, bogus: a('1'), dates: a(['a', 2, 'b']) }, items: [null, 5, { price: { v: 12 } }, {}, {}] };
+  assert.deepEqual(cleanBrain(bad), { answers: { dates: { v: ['a', 'b'], s: 'known' } }, items: [{ price: { v: '12' } }] });
+  assert.deepEqual(cleanBrain('junk'), { answers: {}, items: [] });
+  assert.doesNotThrow(() => brainContext({ answers: 7, items: 'x' }, null));
+  assert.doesNotThrow(() => brainMath(null));
 });
