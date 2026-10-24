@@ -530,3 +530,4 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .brain-review { margin-top: 24px; }
 .integration { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .integration ol { margin: 6px 0; padding-left: 18px; font-size: 14px; }
+.brain-unpin { position: absolute; top: 8px; right: 8px; font-size: 12px; }
