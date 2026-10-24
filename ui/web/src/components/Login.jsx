@@ -3,19 +3,18 @@ import { post } from '../api.js';
 import { supabase } from '../supabase.js';
 import { SPRINTS } from '../steps.js';
 
-// Hosted gate: one card, "Sign in" or "Create account" (invite code required there).
+// Hosted gate: one card, "Sign in" or "Create account".
 export default function Login({ onDone }) {
   const [mode, setMode] = useState('in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [invite, setInvite] = useState('');
   const [state, setState] = useState(''); // '' | 'busy' | error text
 
   const submit = async e => {
     e.preventDefault();
     setState('busy');
     try {
-      if (mode === 'up') await post('/api/auth/register', { email, password, invite });
+      if (mode === 'up') await post('/api/auth/register', { email, password });
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Wrong email or password.' : error.message);
       onDone();
@@ -40,12 +39,6 @@ export default function Login({ onDone }) {
           <label htmlFor="login-pass">Password</label>
           <input id="login-pass" type="password" autoComplete={mode === 'in' ? 'current-password' : 'new-password'} required minLength={8} value={password} onChange={e => setPassword(e.target.value)} />
         </div>
-        {mode === 'up' && (
-          <div className="field">
-            <label htmlFor="login-invite">Invite code</label>
-            <input id="login-invite" required value={invite} onChange={e => setInvite(e.target.value)} />
-          </div>
-        )}
         {state && state !== 'busy' && <p className="msg err" role="alert">{state}</p>}
         <button className="btn primary" disabled={state === 'busy'}>{state === 'busy' ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}</button>
       </form>

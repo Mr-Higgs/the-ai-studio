@@ -15,7 +15,7 @@ to install.
 2. Run `supabase/migrations/0001_init.sql` on it (`supabase link --project-ref <ref>` then
    `supabase db push`, or paste the file into the SQL editor).
 3. In **Authentication → Providers → Email**, turn OFF "Allow new users to sign up" — Studio
-   creates accounts itself, gated by the invite code.
+   creates accounts itself through its API (anyone with the address can create one).
 
 ## 3. Vercel
 
@@ -27,7 +27,6 @@ to install.
    | `NEXT_PUBLIC_SUPABASE_URL` | Project URL from step 2 |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key |
    | `SUPABASE_SERVICE_KEY` | service_role key — keep it secret; the API uses it to read/write users' rows |
-   | `STUDIO_INVITE_CODE` | The code you'll hand out |
    | `STUDIO_SECRET_KEY` | 64 hex chars; generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` — it encrypts users' API keys at rest |
    | `DEVIN_API_KEY`, `DEVIN_ORG_ID` | Optional shared fallback credentials |
    | `DEVIN_MAX_ACU` | Optional per-session ACU cap |
@@ -35,7 +34,7 @@ to install.
 
 ## 4. Participant flow
 
-Create account (email + password + invite code) → **Setup** → paste **Devin API key**
+Create account (email + password) → **Setup** → paste **Devin API key**
 (`cog_…`) and **Organization ID** from Devin → Settings → Devin API → done. HeyGen key
 optional (imports/avatar videos). The first account created is just a normal user —
 there's no admin UI in this version.
@@ -57,7 +56,7 @@ npm run dev:api & npm run dev      # vite on :5173 proxying /api → :4321
 ```
 
 `.env` needs `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_KEY`, plus `STUDIO_INVITE_CODE` and `STUDIO_SECRET_KEY` for auth to work.
+`SUPABASE_SERVICE_KEY`, plus `STUDIO_SECRET_KEY` for saved API keys to work.
 
 ## 7. Updating
 

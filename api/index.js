@@ -69,9 +69,8 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && url.pathname === '/api/health' && !/^Bearer /.test(req.headers.authorization || ''))
       return send(res, 200, { hosted: true, items: [] });
     if (req.method === 'POST' && url.pathname === '/api/auth/register') {
-      if (!process.env.STUDIO_INVITE_CODE) return send(res, 403, { error: 'Registration is closed.' });
-      const { email, password, invite } = await readJson(req);
-      if (invite !== process.env.STUDIO_INVITE_CODE) return send(res, 403, { error: 'Wrong invite code.' });
+      const { email, password } = await readJson(req);
+      if (String(password || '').length < 8) return send(res, 400, { error: 'Password needs at least 8 characters.' });
       const { error } = await admin().auth.admin.createUser({ email: String(email || '').trim().toLowerCase(), password, email_confirm: true });
       if (error) return send(res, /already|exists/i.test(error.message) ? 409 : 400, { error: error.message });
       return send(res, 200, { ok: true });

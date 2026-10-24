@@ -32,8 +32,7 @@ output and never say "saved to business/…". Per-step prompt text lives in
 
 ## Env vars
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
-(service role), `STUDIO_INVITE_CODE` (registration gate; unset = closed),
-`STUDIO_SECRET_KEY` (64 hex, key encryption), optional `DEVIN_API_KEY` + `DEVIN_ORG_ID`
+(service role), `STUDIO_SECRET_KEY` (64 hex, key encryption), optional `DEVIN_API_KEY` + `DEVIN_ORG_ID`
 (shared fallback), `DEVIN_MAX_ACU`, `PORT` (dev only).
 
 ## Hard rules

@@ -22,9 +22,9 @@ By the end you'll have:
 
 ## Using Studio
 
-Studio is hosted — your facilitator gives you a web address and an invite code.
+Studio is hosted — your facilitator gives you a web address.
 
-1. Open the address and **Create account** with your email, a password and the invite code.
+1. Open the address and **Create account** with your email and a password.
 2. Go to **Setup** and paste your **Devin API key** (`cog_…`) and **Organization ID**
    from Devin → Settings → Devin API (create a Personal access token, or a Service user
    with the Member role). This runs the assistant on your own Devin account and usage.
