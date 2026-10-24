@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { put, toast } from '../api.js';
-import { BRAIN_SECTIONS, BRAIN_STEP, ITEM_FIELDS, MAX_ITEMS, TAGS, answerOf, brainMath, brainReady, brainReviewPrompt, cleanBrain, sectionProgress } from '../brain.js';
+import { BRAIN_SECTIONS, BRAIN_STEP, ITEM_FIELDS, MAX_ITEMS, TAGS, answerOf, brainMath, brainReady, brainReviewPrompt, cleanBrain, profileWithBrain, sectionProgress } from '../brain.js';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -50,6 +50,26 @@ function Field({ id, q, a, set, hint }) {
   );
 }
 
+// Whole-business view from the profile's time, monthly cost and customer answers. Also shown on the profile step.
+export function BusinessNumbers({ m }) {
+  const rows = [
+    m.goalRate != null && ['Your pay goal, per hour', money(m.goalRate), `${money(m.payGoal)}/year at ${m.hoursWeek} h/week${m.rate != null && m.rate < m.goalRate ? ` — more than the ${money(m.rate)}/hour you price your time at` : ''}`, m.rate != null && m.rate < m.goalRate ? 'bad' : ''],
+    m.monthCosts != null && ['Monthly break-even', money(m.monthCosts), 'sales that cover staff, materials and running costs', ''],
+    m.monthForGoal != null && ['Monthly sales to also pay you', money(m.monthForGoal), 'break-even + your pay goal ÷ 12', ''],
+    m.monthLeft != null && ['Left for you in a typical month', money(m.monthLeft), m.earnedRate != null ? `about ${money(m.earnedRate)}/hour for your hours` : 'add your weekly hours to see it per hour', m.monthLeft > 0 && !(m.goalRate != null && m.earnedRate < m.goalRate) ? 'ok' : 'bad'],
+    m.ltv != null && ['Customer lifetime value', money(m.ltv), m.ltvCalculated ? 'average sale × purchases a year × years' : 'your figure', ''],
+    m.ltvCac != null && ['Lifetime value ÷ cost to win a customer', `${m.ltvCac}×`, '3× or more is healthy', m.ltvCac >= 3 ? 'ok' : 'bad'],
+  ].filter(Boolean);
+  if (!rows.length) return null;
+  return (
+    <div className="num-card">
+      <h3>Your business</h3>
+      <dl>{rows.map(([t, v, note, cls]) => <div key={t} className="num-row"><dt>{t}</dt><dd className={cls}>{v}<small>{note}</small></dd></div>)}</dl>
+      {m.goalRate != null && m.earnedRate != null && m.earnedRate < m.goalRate && <ul className="flags"><li className="bad">A typical month pays you {money(m.earnedRate)}/hour, below your {money(m.goalRate)}/hour goal.</li></ul>}
+    </div>
+  );
+}
+
 function Numbers({ m }) {
   return (
     <section className="brain-numbers" aria-label="Your numbers">
@@ -64,10 +84,12 @@ function Numbers({ m }) {
             <dt>Earnings per sale</dt><dd className={it.earnings > 0 ? 'ok' : 'bad'}>{money(it.earnings)}<small>after paying yourself</small></dd>
             {it.discounted && <><dt>At your {m.discount}% max discount</dt><dd className={it.discounted.earnings > 0 ? 'ok' : 'bad'}>{money(it.discounted.earnings)}<small>price {money(it.discounted.price)}</small></dd></>}
             <dt>Sales to break even</dt><dd>{it.breakEven ?? '—'}<small>{m.fixed == null ? 'needs the campaign length to include your overhead' : m.fixed ? `covers ${money(m.fixed)} of campaign + overhead costs` : 'no fixed costs entered'}{it.hoursBreakEven != null && ` · ${it.hoursBreakEven} h of work`}</small></dd>
+            {it.firstSale != null && <><dt>First sale to a new customer</dt><dd className={it.firstSale > 0 ? 'ok' : 'bad'}>{money(it.firstSale)}<small>after the {money(m.cac)} it costs to win them</small></dd></>}
             {m.profitTarget > 0 && <><dt>Sales for your {money(m.profitTarget)} profit goal</dt><dd>{it.forTarget ?? '—'}<small>{it.hoursTarget != null && `${it.hoursTarget} h of work`}{it.cashForTarget != null && ` · ${money(it.cashForTarget)} in purchases`}</small></dd></>}
           </dl>
           <ul className="flags">
             {it.notProfitable && <li className="bad">At this price you lose money on every sale once you’re paid for your time.</li>}
+            {it.firstSaleLoses && <li className="bad">After the {money(m.cac)} it costs to win a new customer, their first sale loses money — this only pays off if they come back.</li>}
             {it.belowMin && <li className="bad">Below your {money(m.minEarn)} minimum earnings per sale.</li>}
             {it.fits === false && <li className="bad">Your goal needs {it.forTarget} sales but you have room for about {m.capacity} this campaign.</li>}
             {it.gaps.length > 0 && <li className="bad">Blank: {it.gaps.join(', ')}. They count as $0 here, so earnings are a best case and sales targets wait until they’re filled in.</li>}
@@ -82,9 +104,9 @@ function Numbers({ m }) {
           <dt>Free capacity</dt><dd>{m.free == null ? '—' : `${m.free}/week`}<small>{m.capacity != null && `${m.capacity} over ${m.weeks} weeks`}</small></dd>
           <dt>Overhead share</dt><dd>{money(m.overheadShare)}</dd>
           <dt>Campaign costs</dt><dd>{money(m.campaignSpend)}</dd>
-          {m.ltvCac != null && <><dt>Lifetime value ÷ cost to win a customer</dt><dd className={m.ltvCac >= 3 ? 'ok' : 'bad'}>{m.ltvCac}×<small>3× or more is healthy</small></dd></>}
         </dl>
       </div>
+      <BusinessNumbers m={m} />
       {m.missing.length > 0 && <p className="stale">Missing, so these numbers are provisional: {m.missing.join('; ')}.</p>}
     </section>
   );
@@ -93,13 +115,13 @@ function Numbers({ m }) {
 export default function Brain({ ctx }) {
   const { biz, agent, workingOn, generate, refresh, go, byId, isDone } = ctx;
   const [brain, setBrain] = useState(() => clean(biz.brain));
-  const [profile, setProfile] = useState(() => biz.profile || {});
+  const [profile, setProfile] = useState(() => profileWithBrain(biz.profile, biz.brain));
   const [open, setOpen] = useState(() => new Set([BRAIN_SECTIONS.find(s => s.required && !sectionProgress(biz.brain, biz.profile, s).ready)?.id || 'basics']));
   const [saving, setSaving] = useState(false);
   const dirtyBrain = !same(brain, biz.brain);
   const dirtyProfile = JSON.stringify(profile) !== JSON.stringify(biz.profile || {});
   const dirty = dirtyBrain || dirtyProfile;
-  const m = useMemo(() => brainMath(brain), [brain]);
+  const m = useMemo(() => brainMath(brain, profile), [brain, profile]);
   const ready = brainReady(brain, profile);
   const doc = biz.docs.brain;
 

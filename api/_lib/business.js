@@ -1,5 +1,5 @@
 import { admin } from './supabase.js';
-import { brainContext } from '../../ui/web/src/brain.js';
+import { PROFILE_LABELS, brainContext } from '../../ui/web/src/brain.js';
 
 export const BUSINESS_DOCS = ['brain', 'offer', 'research', 'strategy', 'content', 'visibility', 'automation', 'action-plan'];
 
@@ -73,7 +73,7 @@ export async function snapshot(uid, bizId, kind, content) {
 export async function exportMarkdown(uid) {
   const b = await businessState(uid);
   const out = [`# ${b.sprint?.name || 'Holiday Growth Sprint'} — ${b.profile?.name || 'my business'}`, `_Exported ${new Date().toLocaleString()}_`];
-  if (b.profile) out.push('## Business profile', ...Object.entries(b.profile).filter(([, v]) => typeof v === 'string' && v).map(([k, v]) => `- **${k}:** ${v}`));
+  if (b.profile) out.push('## Business profile', ...Object.entries(b.profile).filter(([, v]) => typeof v === 'string' && v).map(([k, v]) => `- **${PROFILE_LABELS[k] || k}:** ${v}`));
   const brain = brainContext(b.brain, b.profile);
   if (brain) out.push('\n---\n', brain);
   for (const id of BUSINESS_DOCS) if (b.docs[id]) out.push(`\n---\n`, b.docs[id].content.trim());

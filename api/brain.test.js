@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { brainContext, brainMath, brainReady, cleanBrain } from '../ui/web/src/brain.js';
+import { brainContext, brainMath, brainReady, cleanBrain, profileWithBrain } from '../ui/web/src/brain.js';
 import { buildContext, GROUNDING } from './_lib/prompts.js';
 import { integrationNotes } from './index.js';
 
@@ -89,4 +89,32 @@ test('cleanBrain drops malformed data instead of breaking reads', () => {
   assert.deepEqual(cleanBrain('junk'), { answers: {}, items: [] });
   assert.doesNotThrow(() => brainContext({ answers: 7, items: 'x' }, null));
   assert.doesNotThrow(() => brainMath(null));
+});
+
+test('profile time, monthly costs and customer numbers feed the math', () => {
+  const profile = { price: '$40', hoursWeek: '40', payGoal: '48000', rate: '20', revenueMonth: '6000', laborMonth: '0', materialsMonth: '1500', overhead: '500', cac: '30', buysPerYear: '3', years: '2' };
+  const m = brainMath({ items: [{ name: a('Box'), price: a('40'), materials: a('10'), hours: a('0.5'), other: a('2') }] }, profile);
+  assert.equal(m.rate, 20);                 // read from the profile now
+  assert.equal(m.goalRate, 25);             // 48000 / (40 × 48)
+  assert.equal(m.monthCosts, 2000);
+  assert.equal(m.monthLeft, 4000);
+  assert.equal(m.earnedRate, Math.round(4000 / (40 * 52 / 12) * 100) / 100);
+  assert.equal(m.monthForGoal, 6000);
+  assert.equal(m.ltv, 240);                 // $40 × 3 × 2
+  assert.equal(m.ltvCalculated, true);
+  assert.equal(m.ltvCac, 8);
+  assert.equal(m.items[0].earnings, 18);    // 40 - 12 - 10
+  assert.equal(m.items[0].firstSale, -12);  // minus $30 CAC
+  assert.equal(m.items[0].firstSaleLoses, true);
+  const c = brainContext({}, profile);
+  assert.match(c, /works out to \$25\/hour — more than the \$20\/hour labor allowance/);
+  assert.match(c, /Monthly break-even is \$2,000/);
+  assert.match(c, /LTV:CAC = 8/);
+});
+
+test('blank monthly costs stay unknown; old Brain answers carry into the profile', () => {
+  assert.equal(brainMath({}, { revenueMonth: '6000', materialsMonth: '1500', overhead: '500' }).monthCosts, null);
+  assert.equal(brainMath({ answers: { rate: a('22'), ltv: a('300') } }, {}).rate, 22);
+  assert.equal(brainMath({ answers: { rate: a('22') } }, { rate: '' }).rate, null);
+  assert.deepEqual(profileWithBrain({ name: 'J' }, { answers: { rate: a('22'), cac: a('') } }), { name: 'J', rate: '22' });
 });
