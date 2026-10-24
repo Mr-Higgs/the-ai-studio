@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { post } from '../api.js';
 import { supabase } from '../supabase.js';
 import { SPRINTS } from '../steps.js';
 
@@ -14,9 +13,15 @@ export default function Login({ onDone }) {
     e.preventDefault();
     setState('busy');
     try {
-      if (mode === 'up') await post('/api/auth/register', { email, password });
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Wrong email or password.' : error.message);
+      if (mode === 'up') {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw new Error(error.message);
+        // Supabase returns no session when email confirmation is on; the user signs in after clicking the link.
+        if (!data.session) { setState('Check your email for a confirmation link, then sign in.'); return; }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Wrong email or password.' : error.message);
+      }
       onDone();
     } catch (err) { setState(err.message); }
   };
@@ -39,7 +44,7 @@ export default function Login({ onDone }) {
           <label htmlFor="login-pass">Password</label>
           <input id="login-pass" type="password" autoComplete={mode === 'in' ? 'current-password' : 'new-password'} required minLength={8} value={password} onChange={e => setPassword(e.target.value)} />
         </div>
-        {state && state !== 'busy' && <p className="msg err" role="alert">{state}</p>}
+        {state && state !== 'busy' && <p className={state.startsWith('Check your email') ? 'msg' : 'msg err'} role="alert">{state}</p>}
         <button className="btn primary" disabled={state === 'busy'}>{state === 'busy' ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}</button>
       </form>
     </main>

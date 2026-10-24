@@ -14,8 +14,10 @@ to install.
    The reference deployment uses project `owoaljgzwrecwcnkmxle`, already migrated.
 2. Run `supabase/migrations/0001_init.sql` on it (`supabase link --project-ref <ref>` then
    `supabase db push`, or paste the file into the SQL editor).
-3. In **Authentication → Providers → Email**, turn OFF "Allow new users to sign up" — Studio
-   creates accounts itself through its API (anyone with the address can create one).
+3. In **Authentication → Providers → Email**: keep "Allow new users to sign up" ON (sign-up
+   happens through Supabase Auth directly). Turn OFF "Confirm email" if you want participants
+   signed in immediately; leave it on and they get a confirmation link first. Under
+   **Authentication → URL Configuration**, set the Site URL to your Vercel address.
 
 ## 3. Vercel
 
