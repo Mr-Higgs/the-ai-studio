@@ -5,7 +5,7 @@ import { admin, userFromReq } from './_lib/supabase.js';
 import { enc, dec } from './_lib/secrets.js';
 import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusiness, snapshot, exportMarkdown, cleanCalendar, BUSINESS_DOCS } from './_lib/business.js';
 import { devinCreds, devinClient } from './_lib/devin.js';
-import { brainContext, cleanBrain } from '../ui/web/src/brain.js';
+import { brainContext, cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
 import { buildContext, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
@@ -104,7 +104,21 @@ async function applyOutput(uid, biz, row, session) {
     await snapshot(uid, biz.id, 'calendar', JSON.stringify(biz.calendar));
     await db.from('businesses').update({ calendar: applied.calendar, calendar_issues: applied.issues, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
   }
-  return { applied: [...Object.keys(applied.docs), ...(applied.calendar ? ['calendar'] : [])], hash: applied.hash };
+  let profileNumbers = false;
+  if (applied.answers) {
+    const merged = mergeDevinAnswers(biz.profile || {}, cleanBrain(biz.brain), applied.answers);
+    if (merged.changed.length) {
+      const now = new Date().toISOString();
+      await db.from('businesses').update({
+        profile: merged.profile,
+        brain: cleanBrain(merged.brain),
+        brain_updated_at: now,
+        updated_at: now,
+      }).eq('user_id', uid).eq('id', biz.id);
+      profileNumbers = true;
+    }
+  }
+  return { applied: [...Object.keys(applied.docs), ...(applied.calendar ? ['calendar'] : []), ...(profileNumbers ? ['profile numbers'] : [])], hash: applied.hash };
 }
 
 export default async function handler(req, res) {
