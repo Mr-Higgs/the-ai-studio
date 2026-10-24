@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, post, toast, useAgent } from '../api.js';
-import { SPRINT, VIDEO_FORMATS, VIDEO_PRESETS } from '../steps.js';
+import { SPRINT, VIDEO_FORMATS } from '../steps.js';
 import { AGENT_NAMES, ChatGrip } from '../App.jsx';
 import Chat from './Chat.jsx';
 import { StepHead } from './GenerateStep.jsx';
@@ -9,12 +9,12 @@ const enc = encodeURIComponent;
 const slug = s => s.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 
 export default function VideoStudio({ step, projects, ctx }) {
-  const { refresh, next, go, biz } = ctx;
+  const { refresh, next, go } = ctx;
   const [current, setCurrent] = useState(null);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  // Projects can arrive after mount, so fall back to the latest one with a render.
-  const project = projects.find(p => p.name === current) || projects.find(p => p.out.length) || projects[0];
+  // Projects can arrive after mount, so fall back to the latest one with a video.
+  const project = projects.find(p => p.name === current) || projects.find(p => p.raw.length) || projects[0];
 
   const create = async e => {
     e.preventDefault();
@@ -24,139 +24,108 @@ export default function VideoStudio({ step, projects, ctx }) {
 
   const picker = (
     <>
-      {ctx.videoSetupMissing && <a className="banner" href="#setup">Promo videos need a few extra tools on your computer. Open setup to see what’s missing.</a>}
       <StepHead step={step} ctx={ctx} />
       <div className="video-projects">
           {projects.map(p => (
             <button key={p.name} className={'proj' + (p === project ? ' active' : '')} aria-pressed={p === project} onClick={() => setCurrent(p.name)}>
               <span>{p.name}</span>
-              <small>{p.out.length ? `${p.out.length} render${p.out.length > 1 ? 's' : ''}` : `${p.raw.length} clip${p.raw.length === 1 ? '' : 's'}`}</small>
+              <small>{p.raw.length} video{p.raw.length === 1 ? '' : 's'}</small>
             </button>
           ))}
           <form className="proj-new" onSubmit={create}>
             <label htmlFor="new-video" className="sr">New video name</label>
-            <input id="new-video" value={name} onChange={e => setName(e.target.value)} placeholder="Name a new video, e.g. gift-box-reel" />
+            <input id="new-video" value={name} onChange={e => setName(e.target.value)} placeholder="Name a new video, e.g. gift-box-promo" />
             <button className="btn primary" disabled={!slug(name)}>New video</button>
           </form>
           {error && <p className="msg err" role="alert">{error}</p>}
       </div>
     </>
   );
-  const nextBtn = projects.some(p => p.out.length) && next && <div className="next"><button className="btn" onClick={() => go(next.id)}>Next: {next.title}</button></div>;
+  const nextBtn = projects.some(p => p.raw.length) && next && <div className="next"><button className="btn" onClick={() => go(next.id)}>Next: {next.title}</button></div>;
 
   return (
     <div className="video">
-      {project ? <ProjectWorkspace key={project.name} project={project} refresh={refresh} top={picker} bottom={nextBtn} hasOffer={!!biz.docs.offer} /> : (
+      {project ? <ProjectWorkspace key={project.name} project={project} refresh={refresh} top={picker} bottom={nextBtn} hosted={ctx.hosted} /> : (
         <main className="main">
           {picker}
-          <div className="placeholder"><p>Name your first video above. Each video gets its own folder for footage and finished renders.</p></div>
+          <div className="placeholder"><p>Name your first video above. Each video gets its own folder and chat.</p></div>
         </main>
       )}
     </div>
   );
 }
 
-// One video project: its own agent session drives both the brief and the chat column.
-function ProjectWorkspace({ project, refresh, top, bottom, hasOffer }) {
+// One video project: its own agent session for the script + the chat column.
+function ProjectWorkspace({ project, refresh, top, bottom, hosted }) {
   const agent = useAgent(`/api/projects/${enc(project.name)}`, refresh);
   const agentName = AGENT_NAMES[project.agent] || 'Devin';
   const switchAgent = async a => { try { await post(`/api/projects/${enc(project.name)}/agent`, { agent: a }); await refresh(); agent.restart(); } catch (e) { toast(e.message); } };
   const started = agent.items.some(i => i.kind === 'user');
+  const lastAgent = [...agent.items].reverse().find(i => i.kind === 'agent')?.text || '';
   return (
     <>
     <main className="main">
       {top}
-      <Project project={project} refresh={refresh} agent={agent} started={started} hasOffer={hasOffer} />
+      <Project project={project} refresh={refresh} agent={agent} agentName={agentName} lastAgent={lastAgent} />
       {bottom}
     </main>
     <aside className="side" aria-label={`Chat with ${agentName} about ${project.name}`}>
       <ChatGrip />
       <div className="side-head">
         <span>{agentName} · {project.name}</span>
-        <select aria-label="Assistant for this video" value={project.agent} onChange={e => switchAgent(e.target.value)} disabled={agent.busy}>
-          <option value="devin">Devin</option>
-          <option value="claude">Claude Code</option>
-        </select>
+        {!hosted && (
+          <select aria-label="Assistant for this video" value={project.agent} onChange={e => switchAgent(e.target.value)} disabled={agent.busy}>
+            <option value="devin">Devin</option>
+            <option value="claude">Claude Code</option>
+          </select>
+        )}
       </div>
       <Chat
         agent={agent}
         agentName={agentName}
-        placeholder={started ? `Reply to ${agentName} — “looks good, go ahead”` : 'Or describe the edit here'}
-        empty={<><strong>Add footage, fill in the brief, start the edit.</strong><p>{agentName} looks at your clips, proposes a plan and waits for your OK before cutting anything.</p></>}
+        placeholder={started ? `Reply to ${agentName}` : 'Or describe the video you want'}
+        empty={<><strong>Write the script, then make it in HeyGen.</strong><p>{agentName} drafts a presenter script from your offer; you make the video in HeyGen and import it back here.</p></>}
       />
     </aside>
     </>
   );
 }
 
-function Project({ project, refresh, agent, started, hasOffer }) {
-  const [uploads, setUploads] = useState([]);
-  const [over, setOver] = useState(false);
-  const input = useRef();
-
-  const upload = files => Promise.all(files.map(f => new Promise(done => {
-    const key = f.name + Date.now();
-    setUploads(u => [...u, { key, name: f.name, progress: 0 }]);
-    const x = new XMLHttpRequest();
-    x.open('PUT', `/api/projects/${enc(project.name)}/raw/${enc(f.name.replace(/[/\\]/g, '_'))}`);
-    x.upload.onprogress = e => setUploads(u => u.map(v => (v.key === key ? { ...v, progress: e.loaded / e.total } : v)));
-    x.onloadend = () => {
-      setUploads(u => (x.status === 201 ? u.filter(v => v.key !== key) : u.map(v => (v.key === key ? { ...v, failed: true } : v))));
-      done();
-    };
-    x.send(f);
-  }))).then(refresh);
-
+function Project({ project, refresh, agent, agentName, lastAgent }) {
+  const videos = project.raw.filter(f => /\.(mp4|mov|webm)$/i.test(f));
+  const scriptPrompt = `Write a HeyGen presenter script for a ${SPRINT.adj}promo video for project "${project.name}", selling the offer in business/offer.md (if it exists; otherwise ask me what to promote). 60–90 words, spoken-word style, hook in the first sentence, end on the call-to-action. Give me the script in chat (don't write a file), then one line on which avatar look and aspect ratio to pick.`;
   return (
     <>
       <section className="panel">
-        <h2>Footage</h2>
-        <div
-          className={'drop' + (over ? ' over' : '')}
-          role="button" tabIndex={0} aria-label="Add footage"
-          onClick={() => input.current.click()}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.current.click(); } }}
-          onDragOver={e => { e.preventDefault(); setOver(true); }}
-          onDragLeave={() => setOver(false)}
-          onDrop={e => { e.preventDefault(); setOver(false); upload([...e.dataTransfer.files]); }}
-        >
-          <strong>Drop video, photos or audio here</strong>
-          <span>or click to choose files from your computer</span>
-          <input ref={input} type="file" multiple accept="video/*,audio/*,image/*" hidden onChange={e => upload([...e.target.files])} />
+        <h2>Make it in HeyGen</h2>
+        <div className="actions">
+          <button className="btn primary" onClick={() => agent.send(scriptPrompt)} disabled={agent.busy}>Write the script with {agentName}</button>
         </div>
-        {(project.raw.length > 0 || uploads.length > 0) && (
-          <ul className="files">
-            {project.raw.map(f => <li key={f}><span>{f}</span></li>)}
-            {uploads.map(u => <li key={u.key}><span>{u.name}</span>{u.failed ? <span className="err">Upload failed</span> : <progress max={1} value={u.progress} />}</li>)}
-          </ul>
-        )}
-        <HeyGen project={project} refresh={refresh} />
+        <HeyGen project={project} refresh={refresh} lastAgent={lastAgent} />
       </section>
 
-      {!started && <Brief project={project} agent={agent} hasOffer={hasOffer} />}
-
       <section className="panel">
-        <h2>Finished videos</h2>
-        {project.out.length ? project.out.map(f => {
-          const src = `/projects/${enc(project.name)}/out/${enc(f)}`;
+        <h2>Your videos</h2>
+        {videos.length ? videos.map(f => {
+          const src = `/projects/${enc(project.name)}/raw/${enc(f)}`;
           return (
             <figure key={f} className="render">
               <video controls preload="metadata" src={src} />
               <figcaption><span>{f}</span><a className="btn ghost" href={src} download={f}>Download</a></figcaption>
             </figure>
           );
-        }) : <p className="hint">Your edited video shows up here when it’s ready.</p>}
+        }) : <p className="hint">Videos you import from HeyGen show up here.</p>}
       </section>
     </>
   );
 }
 
 // HeyGen, from the user's own account: import finished videos, or make a new one from an avatar.
-function HeyGen({ project, refresh }) {
+function HeyGen({ project, refresh, lastAgent }) {
   const [mode, setMode] = useState(null);
   const close = () => setMode(null);
   if (mode === 'import') return <HeyGenImport project={project} refresh={refresh} close={close} />;
-  if (mode === 'make') return <HeyGenMake project={project} refresh={refresh} close={close} />;
+  if (mode === 'make') return <HeyGenMake project={project} refresh={refresh} close={close} lastAgent={lastAgent} />;
   return (
     <div className="actions">
       <button className="btn ghost" onClick={() => setMode('import')}>Import from HeyGen</button>
@@ -216,12 +185,13 @@ function HeyGenImport({ project, refresh, close }) {
 
 const SHAPES = { vertical: '9:16', square: '1:1', wide: '16:9' };
 
-// Pick one of the user's avatars, write a script; HeyGen renders it and we import the MP4 into raw/.
+// Pick one of the user's avatars, paste the script; HeyGen renders it and we import the MP4 into raw/.
 // ponytail: the browser polls; if the tab closes, the video still finishes and shows under "Import from HeyGen".
-function HeyGenMake({ project, refresh, close }) {
+function HeyGenMake({ project, refresh, close, lastAgent }) {
   const [avatars, setAvatars] = useState(null);
   const [pick, setPick] = useState('');
-  const [script, setScript] = useState('');
+  // If Devin just wrote a script in chat, prefill it so the user doesn't have to copy/paste.
+  const [script, setScript] = useState(() => lastAgent || '');
   const [shape, setShape] = useState('vertical');
   const [status, setStatus] = useState(''); // '', 'starting', 'rendering', 'importing'
   const [error, setError] = useState('');
@@ -286,71 +256,7 @@ function HeyGenMake({ project, refresh, close }) {
         </button>}
         <button type="button" className="btn ghost" onClick={close}>{working ? 'Hide' : 'Close'}</button>
       </div>
-      <p className="hint">{status === 'rendering' ? 'Usually 1–5 minutes. Keep this page open; it lands in your footage when done.' : 'Uses HeyGen credits from your account. Uses the avatar’s own voice.'}</p>
+      <p className="hint">{status === 'rendering' ? 'Usually 1–5 minutes. Keep this page open; it lands under Your videos when done.' : 'Uses HeyGen credits from your account. Uses the avatar’s own voice.'}</p>
     </form>
-  );
-}
-
-function Brief({ project, agent, hasOffer }) {
-  const [b, setB] = useState({ preset: '', what: '', length: '', format: 'vertical', subs: true, title: true, audio: true, presenter: false });
-  const set = (k, v) => setB(x => ({ ...x, [k]: v }));
-  const pick = p => setB(x => ({ ...x, preset: p.id, what: p.what, length: p.length, format: p.format }));
-
-  const start = () => {
-    const include = [
-      b.subs ? 'burned-in subtitles (most people watch muted)' : 'no subtitles',
-      b.title ? 'a title card and an end card with the offer and call-to-action (HyperFrames)' : 'no title or end card',
-      b.audio ? 'clean up and level the audio' : 'leave the audio as-is',
-      b.presenter ? 'an AI presenter: use the HeyGen clip(s) already in raw/ (heygen-*.mp4); only generate a new one with HeyGen if none are there' : 'no AI presenter (skip HeyGen)',
-    ];
-    agent.send(`Edit the footage in projects/${project.name}/raw/ into a ${SPRINT.adj}promo video, following the pipeline in CLAUDE.md (video-use for the cut; HyperFrames for title/end cards; HeyGen only if a presenter is requested).
-
-For context, read business/profile.json and business/offer.md if they exist: use the business name, the ${SPRINT.offerTitle.toLowerCase()}, the price and the call-to-action from there in any on-screen text, and match the brand voice.
-
-Brief:
-- What: ${b.what.trim() || '(not given — infer from the footage)'}
-- Target length: ${b.length.trim() || 'whatever serves the material'}
-- Format: ${VIDEO_FORMATS[b.format]}
-- Include: ${include.join('; ')}
-
-Record this brief in projects/${project.name}/project.md. Look at the material, then propose your edit plan in plain English — written for a small business owner, not an editor — and wait for my approval before cutting anything. Put the final render in projects/${project.name}/out/.`);
-  };
-
-  return (
-    <section className="panel brief">
-      <h2>Brief</h2>
-      <p className="hint brief-offer">{hasOffer
-        ? <>Using your offer from <a href="#offer">{SPRINT.offerTitle} ✓</a> for on-screen text and the call-to-action.</>
-        : <>No <a href="#offer">{SPRINT.offerTitle.toLowerCase()}</a> yet, so on-screen text stays generic. You can come back and re-cut later.</>}</p>
-      <div className="presets" role="group" aria-label="Start from a preset">
-        {VIDEO_PRESETS.map(p => <button key={p.id} type="button" className={'chip-btn' + (b.preset === p.id ? ' active' : '')} aria-pressed={b.preset === p.id} onClick={() => pick(p)}>{p.label}</button>)}
-      </div>
-      <div className="fields">
-        <div className="field full">
-          <label htmlFor="v-what">What should this video do?</label>
-          <textarea id="v-what" rows={3} value={b.what} onChange={e => set('what', e.target.value)} placeholder="Pick a preset above or describe it in your own words" />
-        </div>
-        <div className="field">
-          <label htmlFor="v-len">Length</label>
-          <input id="v-len" value={b.length} onChange={e => set('length', e.target.value)} placeholder="e.g. 15–30s" />
-        </div>
-        <div className="field">
-          <label htmlFor="v-fmt">Where it’ll be posted</label>
-          <select id="v-fmt" value={b.format} onChange={e => set('format', e.target.value)}>
-            {Object.entries(VIDEO_FORMATS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-        </div>
-        <fieldset className="field checks">
-          <legend>Include</legend>
-          {[['subs', 'Subtitles'], ['title', 'Title and end card'], ['audio', 'Clean up audio'], ['presenter', 'AI presenter (HeyGen)']].map(([k, l]) => (
-            <label key={k} className="chip"><input type="checkbox" checked={b[k]} onChange={e => set(k, e.target.checked)} /><span>{l}</span></label>
-          ))}
-        </fieldset>
-      </div>
-      <div className="actions">
-        <button className="btn primary" onClick={start} disabled={!project.raw.length && !b.presenter}>Start the edit</button>
-        {!project.raw.length && !b.presenter && <span className="hint">Add footage first, or tick AI presenter.</span>}
-      </div>
-    </section>
   );
 }

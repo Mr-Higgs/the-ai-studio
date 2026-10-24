@@ -4,9 +4,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
-const ENV = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.env');
+// .env lives next to the caller's cwd: repo root locally, the user's workspace root in hosted mode.
+const ENV = path.join(process.cwd(), '.env');
 const token = () => {
   let env = ''; try { env = fs.readFileSync(ENV, 'utf8'); } catch {}
   const t = process.env.LINKEDIN_ACCESS_TOKEN || /^LINKEDIN_ACCESS_TOKEN=(.+)$/m.exec(env)?.[1].trim();
@@ -16,25 +17,26 @@ const token = () => {
 // LinkedIn versions are monthly and sunset after ~1 year; two months back is always live.
 const version = (d = new Date()) => { d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 2)); return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}`; };
 
-async function li(url, init = {}) {
-  const r = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token()}`, ...init.headers } });
+async function li(url, init = {}, tok) {
+  const r = await fetch(url, { ...init, headers: { Authorization: `Bearer ${tok || token()}`, ...init.headers } });
   if (r.status === 401) throw new Error('LinkedIn rejected the token (expired after 60 days?). Generate a new one and paste it in Setup.');
   if (!r.ok) throw new Error(`LinkedIn ${r.status}: ${(await r.text()).slice(0, 500)}`);
   return r;
 }
-export const whoami = async () => (await li('https://api.linkedin.com/v2/userinfo')).json();
+export const whoami = async tok => (await li('https://api.linkedin.com/v2/userinfo', {}, tok)).json();
 
-// Publishes a public text post and returns its URL. Shared with Studio's autopilot (ui/server.mjs).
-export async function postToLinkedIn(text) {
+// Publishes a public text post and returns its URL. Shared with Studio's autopilot (ui/server.mjs),
+// which passes the calling user's token explicitly in hosted mode.
+export async function postToLinkedIn(text, tok) {
   if (typeof text !== 'string' || !text.trim() || text.length > 3000) throw new Error('text must be 1-3000 characters.');
-  const { sub } = await whoami();
+  const { sub } = await whoami(tok);
   const r = await li('https://api.linkedin.com/rest/posts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'LinkedIn-Version': version(), 'X-Restli-Protocol-Version': '2.0.0' },
     body: JSON.stringify({ author: `urn:li:person:${sub}`, commentary: text, visibility: 'PUBLIC',
       distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },
       lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false }),
-  });
+  }, tok);
   return `https://www.linkedin.com/feed/update/${r.headers.get('x-restli-id')}/`;
 }
 

@@ -13,7 +13,7 @@ By the end you'll have:
 | Customer conversations | What customers say on Reddit and forums, in their words, plus community-friendly growth plays |
 | Strategy & messaging | Where to show up, what to say, calls-to-action that convert |
 | Content kit | Ready-to-post social captions, emails and ads |
-| Promo videos | Raw phone footage edited into a polished promo |
+| Promo videos | Scripts for your HeyGen avatar, finished videos pulled into the campaign |
 | Campaign calendar | A 30–60 day calendar you tick off as you post |
 | Get found | Search, Google Maps and AI-assistant visibility fixes |
 | Automate it | The repetitive tasks to hand off, with setup steps |
@@ -53,12 +53,7 @@ cd studio
 npm install
 ```
 
-**7. Promo videos only (optional).** Skip this if you won't edit video. Every other step works without it.
-- Mac: `brew install ffmpeg uv` (no Homebrew? Install it from [brew.sh](https://brew.sh) first) — the Homebrew/apt/Gyan builds include libass, which subtitle burning needs; if Setup says "no libass", run the reinstall command it shows.
-- Windows: `winget install Gyan.FFmpeg astral-sh.uv`
-- Both: `git clone https://github.com/browser-use/video-use .claude/skills/video-use`
-- ElevenLabs key for transcription: `cp .env.example .env` (Windows: `copy .env.example .env`), then paste your key into `.env`.
-- Video editing is tested on Mac; on Windows it may need help from the facilitator.
+**7. Promo videos only (optional).** Videos are made in [HeyGen](https://www.heygen.com) with your own avatar — nothing to install. Add `HEYGEN_API_KEY` in Setup if you want to import or generate videos from inside Studio.
 
 **If something goes wrong**
 - *"command not found"* right after installing: open a new Terminal or PowerShell window.
@@ -97,10 +92,16 @@ Everything participants see and everything Devin is asked to do is in **`ui/web/
 - `AGENDA`: the full-day schedule on the Start here page.
 - `SETUP_ACCOUNT` and `SETUP_INTEGRATIONS`: the Devin account note and the "add more tools"
   how-to cards on the Setup page.
-- `VIDEO_PRESETS` and `VIDEO_FORMATS`: the promo video briefs.
+- `VIDEO_FORMATS`: the aspect-ratio labels in the avatar form.
 - `TRACKER_INSIGHTS`: what "Ask Devin what to do next" sends.
 
 Restart `npm run studio` after editing. The Start here page text is in `ui/web/src/components/Guide.jsx`.
+
+## Hosted version
+
+Studio also runs as a multi-user hosted app (`STUDIO_HOSTED=1`): per-user accounts,
+workspaces and Devin sign-in, so participants only need a browser and their own Devin
+and HeyGen accounts. See `DEPLOY.md` for how to run it.
 
 ## For facilitators
 

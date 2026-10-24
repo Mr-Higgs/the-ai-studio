@@ -475,3 +475,12 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .confirm::backdrop { background: rgb(0 0 0 / .45); }
 .confirm p { margin: 0 0 18px; font-size: 15px; line-height: 1.5; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Hosted sign-in */
+.login { min-height: 100dvh; display: grid; place-items: center; background: var(--paper); }
+.login-card { width: min(360px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 14px; padding: 28px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+.login-card .brand { margin-bottom: 4px; }
+.tabs { display: flex; border-bottom: 1px solid var(--line); }
+.tabs button { flex: 1; background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
+.tabs button.active { color: var(--ink); border-bottom-color: var(--primary); }
+.agent-pick .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

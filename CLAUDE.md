@@ -1,15 +1,11 @@
-# Studio — agentic video pipeline
+# Studio — agentic campaign workshop
 
-Templated workflow. Raw files in, finished MP4 out. Three tools, the agent routes
+Templated workflow. Answers in, finished campaign out. Two tools, the agent routes
 between them from their skills — this file is the whole "workflow", there is no glue code.
 
 ## Tools (each wired in differently)
-- **HeyGen** — Claude Code MCP + skills plugin (`mcp__plugin_heygen_heygen__*`). Generates
-  presenter / avatar / voiceover clips.
-- **video-use** — skill at `.claude/skills/video-use/` (Python/uv). Trims fillers & silence,
-  color-grades, burns subtitles, composites the final render. Needs `ELEVENLABS_API_KEY` in `.env`.
-- **HyperFrames** — plugin (`hyperframes:*`), npm dep `hyperframes`. HTML/CSS/JS → deterministic MP4
-  for title cards, lower-thirds, animated overlays.
+- **HeyGen** — Studio calls the API directly (`HEYGEN_API_KEY` in `.env`). Makes avatar
+  presenter videos; finished MP4s are imported into `projects/<name>/raw/heygen-<id>.mp4`.
 - **LinkedIn** — project MCP in `.devin/mcp_config.json`: `linkedin` (`mcp/linkedin.mjs`, stdlib stdio server,
   `LINKEDIN_ACCESS_TOKEN` in `.env`) posts as the user, only text they approved; `microsoft-learn` searches LinkedIn API docs.
 
@@ -38,7 +34,9 @@ shared across businesses. Files in `business/`:
   (`research.md`) is Reddit research via the agent's built-in web search/fetch only — no
   scraping, no Reddit API (closed to self-service; marketing use is commercial).
 - Steps work in any order: `uses` in steps.js drives the "Builds on" and "out of date" notices.
-- Promo videos are regular `projects/<name>/` jobs (pipeline below); briefs pull the offer from `business/offer.md`.
+- Promo videos: Studio writes the script, the video is made in HeyGen (avatar + script +
+  aspect in the UI), the MP4 is imported to `projects/<name>/raw/` and attached to
+  calendar items via the optional `"video"` field.
 
 Setup checks (and the per-OS install commands) are `setupItems()`/`health()` in `ui/server.mjs`;
 the Devin account / promo-code text is `SETUP_ACCOUNT` in `ui/web/src/steps.js`. Mac + Windows supported.
@@ -48,23 +46,32 @@ Setup also lists Devin MCP servers (`devin mcp list`) and plugins (CLI plugin ca
 Agent state: one session for the business (`business/.session`), one per video project
 (`projects/<name>/.session`); `.agent` stores the chosen agent. All gitignored.
 
-## Pipeline
-Start a job: `cp -r projects/_template projects/<name>`.
+## Hosted mode
+`STUDIO_HOSTED=1` turns single-user Studio into a multi-tenant app: email+password
+accounts (scrypt, invite code required), cookie sessions, and a per-user workspace at
+`DATA_DIR/users/<uid>` — agent `cwd`, `business/`, `projects/`, `.env` and `home/` (the
+devin process HOME) all live there; `CLAUDE.md`, `mcp/` and `.devin/{config,mcp_config,skills}`
+are symlinked back to the repo. Devin sign-in goes through `/api/setup/devin/login` →
+`/code`: the server relays `devin auth login --force-manual-token-flow` inside a `script`
+pty (needs `\r` to submit; plain pipes fail) and stores credentials in the user's `home/`.
+Env vars: `STUDIO_HOSTED`, `DATA_DIR`, `STUDIO_PUBLIC_URL` (enables the Host check +
+Secure cookies), `STUDIO_INVITE_CODE` (unset = registration closed), `STUDIO_ISOLATE`
+(=1 + root → per-user `studio-<uid>` OS users, chowned writes, uid/gid spawns),
+`STUDIO_SANDBOX` (=1 → `devin --sandbox acp`), `STUDIO_IDLE_MIN`, `STUDIO_QUOTA_MB`, `PORT`.
 
-0. **HeyGen (optional)** — if the request needs a presenter/avatar/voiceover, generate it and
-   save the clip into `projects/<name>/raw/`. Skip if the user supplied all footage.
-   Videos the user made in their own HeyGen account are imported in the UI (Footage → Import
-   from HeyGen, `HEYGEN_API_KEY` in `.env`, saved from Setup) and land as `raw/heygen-<id>.mp4`. Use those first.
-   Footage → "Make an avatar video" renders a script on one of the user's own avatars and imports
-   the result the same way. Keys are saved from the Setup page into `.env`.
-1. **video-use** — edit everything in `projects/<name>/raw/`: cut fillers/silence, grade, subtitle.
-   Session state → `projects/<name>/project.md`. Edited cut → `projects/<name>/out/`.
-2. **HyperFrames** — build title cards / overlays as HTML in `projects/<name>/compositions/`;
-   `npx hyperframes preview` then `render`. Output → `projects/<name>/out/`.
-3. **Composite** — video-use's render step ffmpeg-assembles edited cut + rendered animations
-   into the final MP4 in `projects/<name>/out/`.
+## Pipeline (per video project)
+Start a job: `cp -r projects/_template projects/<name>` (the UI's New video does this).
+
+1. **Script** — the agent writes a HeyGen presenter script from `business/offer.md`
+   ("Write the script" button); the user pastes it into the avatar form.
+2. **HeyGen** — "Make an avatar video" renders it (`POST /api/projects/<name>/heygen/generate`,
+   polled until completed, then auto-imported). Videos the user made in their own HeyGen
+   account are imported via "Import from HeyGen". Either way the MP4 lands in
+   `projects/<name>/raw/heygen-<id>.mp4` — that IS the deliverable.
+3. **Place it** — the agent attaches the video to calendar items with the optional
+   `"video": "projects/<name>/raw/<file>.mp4"` field in `business/calendar.json`;
+   the UI renders it as a "▶ video" link.
 
 ## Hard rules
-- Renders go to `projects/<name>/out/` only — never the repo root.
+- Project files go under `projects/<name>/` only — never the repo root.
 - One project = one folder under `projects/`.
-- Don't edit anything in `.claude/skills/video-use/` (it's an upstream clone).

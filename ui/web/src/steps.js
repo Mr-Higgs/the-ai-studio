@@ -78,7 +78,7 @@ export const SPRINTS = {
 
 // ponytail: module-level sprint; fine because one business is on screen at a time. Importers see
 // the rebuilt values through ES live bindings.
-export let SPRINT, STEPS, PROFILE_STEP, AGENDA, TRACKER_INSIGHTS, VIDEO_PRESETS;
+export let SPRINT, STEPS, PROFILE_STEP, AGENDA, TRACKER_INSIGHTS;
 let CONTEXT;
 export function setSprint(id) {
   const v = SPRINTS[id] || SPRINTS.holiday;
@@ -210,12 +210,12 @@ ${rules('content.md')}`,
   },
   {
     id: 'video', kind: 'video', title: 'Promo videos', uses: ['offer'],
-    blurb: `Drop in raw phone or screen footage. Devin cuts it into a polished ${v.adj}promo, sized for the channel.`,
+    blurb: 'Write the script here, make the video in HeyGen with your avatar, and bring it back into your campaign.',
     guide: {
-      time: '60 min',
-      why: 'Short video is the highest-reach format on every platform right now, and phone footage is enough.',
-      done: ['At least one finished video in the right shape for where you’ll post it', 'Opens with a hook in the first 2 seconds', 'Ends on your offer and call-to-action'],
-      tips: ['Film 2–3 minutes more than you need — Devin cuts the fumbles.', 'Read Devin’s plan before saying “go”; ask for changes in plain words.', 'Works before the Offer step too — Devin just keeps on-screen text generic.', 'Made an avatar video in HeyGen? Use “Import from HeyGen” under Footage to pull it straight in.'],
+      time: '45 min',
+      why: 'Short video is the highest-reach format on every platform right now, and an avatar presenter is enough.',
+      done: ['A 60–90 word script with a hook and a call-to-action', 'One avatar video made in HeyGen and imported here', 'Picked the right shape for where you’ll post it'],
+      tips: ['Click “Write the script” and let Devin draft it from your offer.', 'Paste the script into “Make an avatar video”, pick an avatar and a shape.', 'Already made videos in HeyGen? Use “Import from HeyGen” to pull them in.'],
     },
   },
   {
@@ -239,7 +239,7 @@ Build my ${v.adj}content calendar from business/strategy.md and business/content
 ${answers(i, s.inputs)}
 
 Save it as JSON (not Markdown) to business/calendar.json: an array sorted by date, where each item is exactly
-{"date": "YYYY-MM-DD", "channel": "Instagram", "format": "Reel | Post | Story | Email | Ad | Other", "title": "short label", "copy": "the full ready-to-post text", "cta": "the call-to-action", "status": "planned"}.
+{"date": "YYYY-MM-DD", "channel": "Instagram", "format": "Reel | Post | Story | Email | Ad | Other", "title": "short label", "copy": "the full ready-to-post text", "cta": "the call-to-action", "status": "planned", "video": "projects/<name>/raw/<file>.mp4"}. The "video" field is optional: when a promo video exists under projects/*/raw/, attach it to the posts it fits.
 Line the dates up with the campaign phases and ${v.calendarDates}. After saving, check the file parses as valid JSON. If something critical is missing, ask me at most 3 short questions first. Then reply with a 3-line summary.`,
   },
   {
@@ -336,7 +336,7 @@ AGENDA = [
   { time: '45 min', what: 'Strategy & messaging', step: 'strategy' },
   { time: '45 min', what: 'Lunch' },
   { time: '45 min', what: 'Content kit', step: 'content' },
-  { time: '60 min', what: 'Promo videos', step: 'video' },
+  { time: '45 min', what: 'Promo videos', step: 'video' },
   { time: '15 min', what: 'Break' },
   { time: '30 min', what: 'Campaign calendar', step: 'calendar' },
   { time: '45 min', what: 'Get found + Automate it', step: 'visibility' },
@@ -347,14 +347,6 @@ AGENDA = [
 TRACKER_INSIGHTS = `${CONTEXT}
 
 Read business/tracker.json (my leads and sales) and business/strategy.md. Tell me in chat (don't write a file): what's converting and what isn't, by source and stage; which leads to follow up with today and a suggested message for each; and one change to make this week. Keep it short.`;
-
-// Video presets: sensible starting briefs for a small business promo.
-VIDEO_PRESETS = [
-  { id: 'offer', label: v.offerTitle, what: `A short, punchy promo for our ${offerLower}. Hook in the first 2 seconds, show the product, end on the offer and call-to-action.`, length: '15–30s', format: 'vertical' },
-  { id: 'spotlight', label: 'Product spotlight', what: `Show one product up close: what it is, who it’s for, ${v.spotlight}. End with where to buy.`, length: '20–40s', format: 'vertical' },
-  { id: 'testimonial', label: 'Customer story', what: 'A happy customer in their own words. Keep their best lines, cut everything else, add their name on screen.', length: '30–60s', format: 'square' },
-  { id: 'bts', label: 'Behind the scenes', what: `${v.bts} Warm, human, quick cuts. End with the offer.`, length: '30–45s', format: 'vertical' },
-];
 }
 setSprint('holiday');
 
@@ -364,6 +356,11 @@ export const SETUP_ACCOUNT = {
   text: 'Create your Devin account before the workshop and redeem the promo code you were given. Then install the Devin CLI below and sign in with that account.',
   link: '',
   linkLabel: 'Create your Devin account',
+};
+
+// Same spot in hosted mode: no CLI to install — the server signs each user into their own Devin account.
+export const SETUP_ACCOUNT_HOSTED = {
+  text: 'Studio runs Devin on your own Devin account. Click Sign in to Devin, log in on the page that opens, copy the code it shows you, and paste it back here. Do this once; you can sign out any time.',
 };
 
 // Shown on Setup under "What Devin can connect to": the tools already connected
@@ -448,3 +445,4 @@ export const VIDEO_FORMATS = {
   square: 'Square 1:1 (feed posts)',
   wide: 'Wide 16:9 (YouTube, website, email)',
 };
+

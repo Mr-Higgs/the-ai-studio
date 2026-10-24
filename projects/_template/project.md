@@ -1,12 +1,10 @@
 # Project: <name>
 
-_video-use writes session memory here (takes, diarization, edit decisions). Leave empty at start._
-
 ## Brief
-<what this video is, target length, tone>
+<what this video is, tone, where it will be posted>
 
 ## Source
-- raw/ : <list clips as they land here>
+- raw/ : <imported HeyGen videos land here (heygen-<id>.mp4)>
 
-## Decisions
-<video-use appends its EDL reasoning during editing>
+## Script
+<the presenter script the agent wrote, once approved>

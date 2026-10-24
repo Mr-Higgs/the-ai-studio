@@ -8,6 +8,7 @@ import Profile from './components/Profile.jsx';
 import Tracker from './components/Tracker.jsx';
 import VideoStudio from './components/VideoStudio.jsx';
 import Setup from './components/Setup.jsx';
+import Login from './components/Login.jsx';
 
 export const AGENT_NAMES = { devin: 'Devin', claude: 'Claude' };
 
@@ -77,6 +78,7 @@ class StepBoundary extends Component {
 }
 
 export default function App() {
+  const [me, setMe] = useState(null); // { hosted, email?, admin? }
   const [biz, setBiz] = useState(null);
   const [projects, setProjects] = useState([]);
   const [health, setHealth] = useState(null);
@@ -88,11 +90,26 @@ export default function App() {
     api('/api/business').then(setBiz),
     api('/api/projects').then(r => setProjects(r.projects)),
   ]).catch(() => {}), []);
-  const agent = useAgent('/api/business', refresh);
+  const signedIn = me && (!me.hosted || me.email);
+  const agent = useAgent(signedIn ? '/api/business' : null, refresh);
 
-  useEffect(() => { refresh(); api('/api/health').then(setHealth).catch(() => {}); api('/api/integrations').then(setIntegrations).catch(() => {}); }, [refresh]);
+  useEffect(() => {
+    api('/api/auth/me').then(setMe).catch(() => setMe({ hosted: false }));
+    const unauth = () => setMe({ hosted: true });
+    addEventListener('unauth', unauth);
+    return () => removeEventListener('unauth', unauth);
+  }, []);
+  useEffect(() => {
+    if (!signedIn) return;
+    refresh();
+    api('/api/health').then(r => setHealth(r.items)).catch(() => {});
+    api('/api/integrations').then(setIntegrations).catch(() => {});
+  }, [refresh, signedIn]);
   useEffect(() => { if (!agent.busy) setWorkingOn(null); }, [agent.busy]);
 
+  const recheck = () => api('/api/health').then(r => setHealth(r.items)).then(() => api('/api/integrations?fresh=1').then(setIntegrations).catch(() => {}));
+  if (!me) return <div className="boot">Loading your workspace…</div>;
+  if (me.hosted && !me.email) return <Login onDone={() => api('/api/auth/me').then(setMe)} />;
   if (!biz) return <div className="boot">Loading your workspace…</div>;
 
   setSprint(biz.sprint?.id); // before anything reads STEPS
@@ -103,7 +120,7 @@ export default function App() {
     const s = byId[id];
     if (!s) return null;
     if (s.kind === 'doc') return biz.docs[s.file.replace('.md', '')]?.mtime ?? null;
-    if (s.kind === 'video') return projects.some(p => p.out.length) ? 0 : null;
+    if (s.kind === 'video') return projects.some(p => p.raw.length) ? 0 : null;
     return biz.profile?.name || s.kind !== 'profile' ? biz.mtimes[s.kind] ?? null : null;
   };
   const isDone = id => mtimeOf(id) != null && (id !== 'calendar' || !!biz.calendar?.length) && (id !== 'tracker' || !!biz.tracker?.length);
@@ -125,13 +142,13 @@ export default function App() {
     catch (e) { toast(e.message); }
   };
 
-  const ctx = { biz, agent, agentName, workingOn, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId, linkedinReady: !!health?.find(h => h.id === 'linkedin')?.ok };
+  const ctx = { biz, agent, agentName, workingOn, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId, hosted: !!me.hosted, linkedinReady: !!health?.find(h => h.id === 'linkedin')?.ok };
   const chatEmpty = <><strong>{agentName} is your campaign partner.</strong><p>Use the button on the left to write this step, then ask for changes here — “make it shorter”, “more playful”, “add a gift-card option”.</p></>;
 
   let page;
-  if (route === 'setup') page = <main className="main wide"><Setup health={health} integrations={integrations} agentName={agentName} recheck={() => api('/api/health').then(setHealth).then(() => api('/api/integrations?fresh=1').then(setIntegrations).catch(() => {}))} /></main>;
+  if (route === 'setup') page = <main className="main wide"><Setup health={health} integrations={integrations} agentName={agentName} hosted={!!me.hosted} recheck={recheck} /></main>;
   else if (route === 'guide' || !step) page = <main className="main wide"><Guide ctx={ctx} agentName={agentName} /></main>;
-  else if (step.kind === 'video') page = <StepBoundary key="video"><VideoStudio step={step} projects={projects} ctx={{ ...ctx, videoSetupMissing: missing('video') }} /></StepBoundary>;
+  else if (step.kind === 'video') page = <StepBoundary key="video"><VideoStudio step={step} projects={projects} ctx={ctx} /></StepBoundary>;
   else page = (
     <>
       <main className="main">
@@ -197,17 +214,25 @@ export default function App() {
         <div className="rail-foot">
           <a className="setup-link" href="/api/business/export.md" download>Download my sprint</a>
           <a href="#setup" className={'setup-link' + (route === 'setup' ? ' active' : '')}>
-            <span className={'dot ' + (!health ? '' : !setupOk ? 'bad' : missing('video') ? 'warn' : 'ok')} />
+            <span className={'dot ' + (!health ? '' : !setupOk ? 'bad' : 'ok')} />
             {setupOk === false ? 'Finish setup' : 'Setup'}
             {setupOk !== false && integCount > 0 && <small>{integCount} integration{integCount === 1 ? '' : 's'}</small>}
           </a>
-          <label className="agent-pick">
-            <span>Assistant</span>
-            <select value={biz.agent} onChange={e => switchAgent(e.target.value)} disabled={agent.busy}>
-              <option value="devin">Devin</option>
-              <option value="claude">Claude Code</option>
-            </select>
-          </label>
+          {!me.hosted && (
+            <label className="agent-pick">
+              <span>Assistant</span>
+              <select value={biz.agent} onChange={e => switchAgent(e.target.value)} disabled={agent.busy}>
+                <option value="devin">Devin</option>
+                <option value="claude">Claude Code</option>
+              </select>
+            </label>
+          )}
+          {me.hosted && (
+            <div className="agent-pick">
+              <span className="who" title={me.email}>{me.email}</span>
+              <button className="btn ghost" onClick={() => post('/api/auth/logout').finally(() => location.reload())}>Sign out</button>
+            </div>
+          )}
           <ThemePick />
         </div>
       </aside>

@@ -5,6 +5,19 @@
         - LTV of a customer, Breakeven analysis
         - Building a business "brain": 42 questions to answer
         - Include questions about their hourly rate and how much they value their time/labor
+              
+
+# Devin business brain 
+    - Add a brain section where the user can ask questions and get answers from Devin
+    - Devin should be a little more intuitive and context-aware of a user's business profile
+        - Operational efficiency
+        - Customer acquisition costs
+        - Customer lifetime value
+        - Breakeven analysis
+        - Hourly rate and time valuation
+
+        - Value proposition: Customer column 
+
 
 # Devin Responses
     - Some of the restraints weren't regarded and therefore the responses weren't as accurate as they could have been

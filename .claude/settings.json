@@ -5,11 +5,6 @@
       "Write(projects/**)",
       "Edit(business/**)",
       "Write(business/**)",
-      "Bash(ffmpeg:*)",
-      "Bash(ffprobe:*)",
-      "Bash(uv run:*)",
-      "Bash(python3:*)",
-      "Bash(npx hyperframes:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(cp:*)"

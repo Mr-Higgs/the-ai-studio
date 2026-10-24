@@ -53,6 +53,9 @@ export default function Calendar({ items, refresh }) {
                 {open === i && (
                   <div className="cal-body">
                     <p>{item.copy}</p>
+                    {/^projects\/[a-z0-9-]+\/raw\/[^/]+\.mp4$/.test(item.video || '') && (
+                      <a className="btn ghost" href={`/${item.video}`} target="_blank" rel="noreferrer">▶ Watch the video</a>
+                    )}
                     {item.cta && <p className="cal-cta">Call to action: {item.cta}</p>}
                     {item.url && <p><a href={item.url} target="_blank" rel="noreferrer">View on LinkedIn ↗</a></p>}
                     <CopyButton text={item.copy + (item.cta ? `\n\n${item.cta}` : '')} />
