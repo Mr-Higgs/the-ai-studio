@@ -5,6 +5,7 @@ import { post } from '../api.js';
 const GROUPS = [
   ['required', 'Needed for everything'],
   ['optional', 'Optional extras'],
+  ['integrations', 'Integrations (through Devin)'],
 ];
 
 // API keys are pasted here and saved (encrypted) to the account; they never come back to the page.
@@ -28,6 +29,35 @@ function KeyInput({ item, recheck }) {
       {item.ok && <button type="button" className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>}
       {state && state !== 'saving' && <p className="msg err" role="alert">{state}</p>}
     </form>
+  );
+}
+
+// Meta's MCP servers plug into Devin, not Studio: the user adds them in their Devin org,
+// then flips this on so Devin's prompts know it may use them.
+function Integration({ item, recheck }) {
+  const [state, setState] = useState('');
+  const flip = async on => {
+    setState('saving');
+    try { await post('/api/setup/integration', { id: item.id, on }); await recheck(); setState(''); }
+    catch (err) { setState(err.message); }
+  };
+  return (
+    <div className="integration">
+      <details>
+        <summary>How to connect</summary>
+        <ol>
+          <li>In Devin, open <a href="https://app.devin.ai/settings/mcp-marketplace" target="_blank" rel="noreferrer">Settings → MCP servers</a> and add a remote (HTTP) server with this URL: <code>{item.url}</code></li>
+          <li>Sign in with the Facebook account that manages your business, and approve access.</li>
+          <li>Come back here and switch it on.</li>
+        </ol>
+        <p className="hint">Devin will only read your ads and create new ones <strong>paused</strong> — you review and switch them on in Meta. <a href="https://developers.facebook.com/documentation/mcp" target="_blank" rel="noreferrer">Meta’s guide</a></p>
+      </details>
+      <label className="chip">
+        <input type="checkbox" checked={item.ok} disabled={state === 'saving'} onChange={e => flip(e.target.checked)} />
+        Connected in Devin
+      </label>
+      {state && state !== 'saving' && <p className="msg err" role="alert">{state}</p>}
+    </div>
   );
 }
 
@@ -89,9 +119,10 @@ export default function Setup({ health, recheck }) {
           <ul className="health">
             {health?.filter(h => h.group === g).map(h => (
               <li key={h.id} className={h.ok ? 'ok' : 'bad'}>
-                <span className={'dot ' + (h.ok ? 'ok' : g === 'required' ? 'bad' : 'warn')} />
+                <span className={'dot ' + (h.ok ? 'ok' : g === 'required' ? 'bad' : g === 'integrations' ? '' : 'warn')} />
                 <span className="health-name">{h.name}<small>{h.why}</small></span>
-                {h.id === 'devin' ? <DevinKeys item={h} recheck={recheck} />
+                {h.toggle ? <Integration item={h} recheck={recheck} />
+                  : h.id === 'devin' ? <DevinKeys item={h} recheck={recheck} />
                   : h.key ? <KeyInput item={h} recheck={recheck} />
                   : h.ok ? <span className="hint">Ready</span> : null}
               </li>

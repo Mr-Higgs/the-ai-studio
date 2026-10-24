@@ -110,7 +110,7 @@ STEPS = [
     ],
   },
   {
-    id: 'offer', kind: 'doc', title: v.offerTitle, file: 'offer.md', uses: ['profile'],
+    id: 'offer', kind: 'doc', title: v.offerTitle, file: 'offer.md', uses: ['brain', 'profile'],
     blurb: 'One offer so clear and valuable that the right customer feels silly saying no — and a sharp picture of who that customer is.',
     guide: {
       time: '60 min',
@@ -161,7 +161,7 @@ The document must include: (1) where these customers talk — each community wit
 ${rules('research.md')}`,
   },
   {
-    id: 'strategy', kind: 'doc', title: 'Strategy & messaging', file: 'strategy.md', uses: ['offer', 'research'],
+    id: 'strategy', kind: 'doc', title: 'Strategy & messaging', file: 'strategy.md', uses: ['brain', 'offer', 'research'],
     blurb: 'Where to show up, what to say, and the calls-to-action that turn attention into inquiries and sales.',
     guide: {
       time: '45 min',
@@ -185,7 +185,7 @@ Include: the 2–3 channels to focus on (and what to ignore) given my time and b
 ${rules('strategy.md')}`,
   },
   {
-    id: 'content', kind: 'doc', title: 'Content kit', file: 'content.md', uses: ['offer', 'research', 'strategy'],
+    id: 'content', kind: 'doc', title: 'Content kit', file: 'content.md', uses: ['brain', 'offer', 'research', 'strategy'],
     blurb: 'Ready-to-post captions, emails and ads written in your voice, for the channels in your strategy.',
     guide: {
       time: '45 min',
@@ -219,7 +219,7 @@ ${rules('content.md')}`,
     },
   },
   {
-    id: 'calendar', kind: 'calendar', title: 'Campaign calendar', file: 'calendar.json', uses: ['strategy', 'content'],
+    id: 'calendar', kind: 'calendar', title: 'Campaign calendar', file: 'calendar.json', uses: ['brain', 'strategy', 'content'],
     blurb: 'Every post and email on a date, so the campaign runs itself. Tick things off as they go out.',
     guide: {
       time: '30 min',
@@ -267,7 +267,7 @@ Cover: Google Business Profile fixes and 4 ${v.adj}posts for it; the 10 search p
 ${rules('visibility.md')}`,
   },
   {
-    id: 'automation', kind: 'doc', title: 'Automate it', file: 'automation.md', uses: ['profile', 'strategy'],
+    id: 'automation', kind: 'doc', title: 'Automate it', file: 'automation.md', uses: ['brain', 'profile', 'strategy'],
     blurb: 'Hand repetitive work — replies, follow-ups, reminders, posting — to tools and AI, so you can sell.',
     guide: {
       time: '20 min',

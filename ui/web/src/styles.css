@@ -484,3 +484,49 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .tabs button { flex: 1; background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
 .tabs button.active { color: var(--ink); border-bottom-color: var(--primary); }
 .agent-pick .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Business Brain ---- */
+.brain-link { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.brain-link small { margin-left: auto; color: var(--rail-muted); font-weight: 400; }
+.brain-link.done small { color: var(--ok); }
+.brain-graph { position: relative; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); overflow: hidden; min-height: 420px; margin: 16px 0; }
+.brain-graph.placeholder { display: grid; place-items: center; color: var(--muted); }
+.brain-legend { position: absolute; left: 10px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); pointer-events: none; }
+.brain-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.brain-sections { display: grid; gap: 10px; }
+.brain-section { border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); padding: 0 16px; }
+.brain-section[open] { padding-bottom: 16px; }
+.brain-section > summary { display: flex; align-items: center; gap: 10px; padding: 12px 0; cursor: pointer; }
+.brain-section > summary small { margin-left: auto; color: var(--muted); }
+.brain-section.ready > summary small { color: var(--ok); }
+.brain-title { font-weight: 600; }
+.brain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px 18px; margin-top: 8px; }
+.brain-q { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.brain-q.wide { grid-column: 1 / -1; }
+.brain-q > label { font-size: 14px; font-weight: 500; }
+.brain-q .req { color: var(--bad); }
+.brain-q input:not([type=checkbox]), .brain-q select, .brain-q textarea { width: 100%; }
+.brain-q .checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.brain-item { border: 1px dashed var(--line); border-radius: var(--r-sm); padding: 10px 14px 14px; margin: 8px 0 12px; }
+.brain-item legend { font-weight: 600; padding: 0 6px; }
+.tag-pick { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-pick button { font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.tag-pick button[aria-checked=true].tag-known { background: var(--ok); border-color: var(--ok); color: #fff; }
+.tag-pick button[aria-checked=true].tag-estimate { background: #e0a43a; border-color: #e0a43a; color: #fff; }
+.tag-pick button[aria-checked=true].tag-help { background: var(--bad); border-color: var(--bad); color: #fff; }
+.chip.tag-estimate { margin-left: 8px; font-size: 12px; color: #a26b0e; border-color: #e0a43a; }
+.brain-numbers { margin-top: 24px; display: grid; gap: 12px; }
+.brain-numbers h2 small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.num-card { border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); padding: 12px 16px; }
+.num-card h3 { margin: 0 0 8px; font-size: 15px; }
+.num-card dl { display: grid; grid-template-columns: minmax(160px, max-content) 1fr; gap: 6px 16px; margin: 0; }
+.num-card dt { color: var(--muted); }
+.num-card dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.num-card dd small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.num-card .ok, .flags .ok { color: var(--ok); }
+.num-card .bad, .flags .bad { color: var(--bad); }
+.flags { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
+.actions.sticky { position: sticky; bottom: 0; background: var(--paper); padding: 12px 0; border-top: 1px solid var(--line); margin-top: 16px; z-index: 2; align-items: center; }
+.brain-review { margin-top: 24px; }
+.integration { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.integration ol { margin: 6px 0; padding-left: 18px; font-size: 14px; }
