@@ -44,6 +44,11 @@ async function agentUpsert(uid, bizId, scope, fields) {
   await admin().from('agent_sessions').upsert({ user_id: uid, business_id: bizId, scope, ...fields }, { onConflict: 'business_id,scope' });
 }
 
+// v3 status: new | claimed | running | resuming | suspended | exit | error; while running,
+// status_detail says whether Devin is working or waiting on the user.
+export const isBusy = s => ['new', 'claimed', 'resuming'].includes(s.status)
+  || (s.status === 'running' && (!s.status_detail || s.status_detail === 'working'));
+
 // Apply Devin's structured output to docs/calendar when its hash changed.
 async function applyOutput(uid, biz, row, session) {
   const so = session.structured_output;
@@ -237,7 +242,7 @@ export default async function handler(req, res) {
 
       if (req.method === 'GET' && action === 'poll') {
         if (!row?.devin_session_id) return send(res, 200, { messages: [], busy: false });
-        const [s, msgs] = await Promise.all([client.getSession(row.devin_session_id), client.getMessages(row.devin_session_id, url.searchParams.get('cursor'))]);
+        const [s, msgs] = await Promise.all([client.getSession(row.devin_session_id), client.getMessages(row.devin_session_id)]);
         const status = s.status_enum || s.status;
         const cursor = url.searchParams.get('cursor');
         const items = (msgs.items || []).map(m => ({ id: m.event_id, kind: m.source === 'user' ? 'user' : 'agent', text: m.message, at: m.created_at }));
@@ -245,7 +250,7 @@ export default async function handler(req, res) {
         const messages = seen >= 0 ? items.slice(seen + 1) : items;
         const res2 = await applyOutput(uid, biz, row, s);
         if (res2) await agentUpsert(uid, biz.id, scope, { applied_hash: res2.hash });
-        const busy = status === 'working' || status === 'running';
+        const busy = isBusy(s);
         if (row.devin_status !== status) await agentUpsert(uid, biz.id, scope, { devin_status: status });
         const starting = busy && !items.some(m => m.kind === 'agent') && Date.now() - Date.parse(row.last_prompt_at || 0) < 180000;
         return send(res, 200, { messages, busy, starting, ...(res2?.applied?.length && { applied: res2.applied }) });

@@ -6,7 +6,7 @@ process.env.STUDIO_SECRET_KEY ||= 'a'.repeat(64);
 import { enc, dec } from './_lib/secrets.js';
 import { cleanCalendar } from './_lib/business.js';
 import { buildContext, applyStructuredOutput, sessionPrompt, hashOf, OUTPUT_CONTRACT } from './_lib/prompts.js';
-import { validProject } from './index.js';
+import { validProject, isBusy } from './index.js';
 
 test('secrets round-trip AES-256-GCM', () => {
   const blob = enc('cog_secret_key_123');
@@ -60,4 +60,12 @@ test('sessionPrompt bundles skill, context, contract, request', () => {
 test('project slugs', () => {
   for (const ok of ['demo', 'my-video-2']) assert.ok(validProject(ok), ok);
   for (const bad of ['', '_template', '../etc', 'A', 'a/b']) assert.ok(!validProject(bad), bad);
+});
+
+test('isBusy follows v3 status + status_detail', () => {
+  for (const status of ['new', 'claimed', 'resuming']) assert.equal(isBusy({ status }), true);
+  assert.equal(isBusy({ status: 'running', status_detail: 'working' }), true);
+  assert.equal(isBusy({ status: 'running', status_detail: 'waiting_for_user' }), false);
+  assert.equal(isBusy({ status: 'running', status_detail: 'finished' }), false);
+  for (const status of ['suspended', 'exit', 'error']) assert.equal(isBusy({ status }), false);
 });
