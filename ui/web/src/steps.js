@@ -15,6 +15,8 @@
 //    prompt  (answers, step) => the message sent to Devin
 // ============================================================================
 
+import { PROFILE_FIELDS } from './brain.js';
+
 const rules = file => `Write for a busy, non-technical owner: plain words, short sections, concrete examples and real numbers, nothing generic. If something critical is missing, ask me at most 3 short questions in chat and wait for my answers; otherwise go straight to writing. Return the finished document as ${file} in the structured output (see the output instructions). Then reply with a 3-line summary of what you made.`;
 
 const answers = (inputs, fields) => fields
@@ -91,23 +93,14 @@ CONTEXT = `We're in the "${v.name}" workshop, ${v.campaign} for my small busines
 STEPS = [
   {
     id: 'profile', kind: 'profile', title: 'Business profile',
-    blurb: 'The basics Devin uses for every step. Two minutes now saves you repeating yourself all day.',
+    blurb: 'The basics and the numbers Devin uses for every step: what you sell, what your time is worth, what it costs to run, and what a customer is worth.',
     guide: {
-      time: '15 min',
-      why: 'Every step reads this first. A specific profile is the difference between generic advice and a plan that sounds like your business.',
-      done: ['Business name and what you sell, in plain words', 'Who actually buys today — be specific', 'Average sale and any proof (reviews, numbers)'],
+      time: '20 min',
+      why: 'Every step reads this first. A specific profile is the difference between generic advice and a plan that sounds like your business — and your real costs and hours are what keep the offer profitable.',
+      done: ['Business name and what you sell, in plain words', 'Who actually buys today — be specific', 'Average sale and any proof (reviews, numbers)', 'Your hours and pay goal, a typical month’s costs, and what a customer is worth — rough is fine'],
       tips: ['Write like you’d explain it to a new employee, not a marketing brochure.', 'Real numbers beat adjectives: “4.9★ from 310 reviews” beats “highly rated”.'],
     },
-    inputs: [
-      { id: 'name', label: 'Business name', placeholder: 'e.g. Juniper & Wick Candle Co.' },
-      { id: 'location', label: 'Where you sell', placeholder: 'e.g. Austin, TX + ships nationwide' },
-      { id: 'sells', label: 'What you sell', type: 'textarea', placeholder: 'Products or services, in a sentence or two' },
-      { id: 'customers', label: 'Who buys from you today', type: 'textarea', placeholder: 'e.g. Women 30–55 buying gifts, local offices ordering client gifts' },
-      { id: 'price', label: 'Average sale', placeholder: 'e.g. $48' },
-      { id: 'website', label: 'Website', placeholder: 'https://…' },
-      { id: 'socials', label: 'Social handles', placeholder: 'e.g. @juniperwick on Instagram and TikTok' },
-      { id: 'proof', label: 'Reviews, awards or numbers you’re proud of', placeholder: 'e.g. 4.9★ on Etsy, 300+ reviews' },
-    ],
+    inputs: PROFILE_FIELDS,
   },
   {
     id: 'offer', kind: 'doc', title: v.offerTitle, file: 'offer.md', uses: ['brain', 'profile'],

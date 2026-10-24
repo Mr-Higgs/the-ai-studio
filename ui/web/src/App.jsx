@@ -145,7 +145,9 @@ export default function App() {
   const generate = (s, prompt, snapshot) => { setWorkingOn(s.title); agent.send(prompt, snapshot); };
 
   const ctx = { biz, agent, agentName, workingOn, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId };
-  const chatEmpty = <><strong>{agentName} is your campaign partner.</strong><p>Use the button on the left to write this step, then ask for changes here — “make it shorter”, “more playful”, “add a gift-card option”.</p></>;
+  const chatEmpty = step?.kind === 'profile'
+    ? <><strong>{agentName} can help with the numbers.</strong><p>Don’t know a figure? Mark it “Not sure”, then press “Work out … with {agentName}”. It walks you through each one and fills in the answers for you to check.</p></>
+    : <><strong>{agentName} is your campaign partner.</strong><p>Use the button on the left to write this step, then ask for changes here — “make it shorter”, “more playful”, “add a gift-card option”.</p></>;
 
   let page;
   if (route === 'setup') page = <main className="main wide"><Setup health={health} recheck={recheck} /></main>;
@@ -164,16 +166,14 @@ export default function App() {
           {step.kind === 'brain' && <Brain ctx={ctx} />}
         </StepBoundary>
       </main>
-      {step.kind !== 'profile' && (
-        <aside className="side" aria-label={`Chat with ${agentName}`}>
-          <ChatGrip />
-          <div className="side-head">
-            <span>{agentName}</span>
-            {agent.busy && <span className="side-status">{workingOn ? `Working on ${workingOn.toLowerCase()}` : 'Working'}</span>}
-          </div>
-          <Chat agent={agent} agentName={agentName} empty={chatEmpty} />
-        </aside>
-      )}
+      <aside className="side" aria-label={`Chat with ${agentName}`}>
+        <ChatGrip />
+        <div className="side-head">
+          <span>{agentName}</span>
+          {agent.busy && <span className="side-status">{workingOn ? `Working on ${workingOn.toLowerCase()}` : 'Working'}</span>}
+        </div>
+        <Chat agent={agent} agentName={agentName} empty={chatEmpty} />
+      </aside>
     </>
   );
 

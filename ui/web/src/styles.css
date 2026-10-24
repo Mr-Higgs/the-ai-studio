@@ -162,6 +162,15 @@ textarea { resize: vertical; line-height: 1.45; }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-top: 18px; }
 .hint { color: var(--muted); font-size: 13.5px; }
 .hint.ok { color: var(--ok); } .hint.err, .err { color: var(--bad); }
+.fields-head { grid-column: 1 / -1; margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+.fields-head h3 { margin: 0; font-size: 15px; }
+.fields-head p { margin: 4px 0 0; }
+.field .unsure { align-self: flex-start; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer; }
+.field .unsure[aria-pressed=true] { background: var(--bad); border-color: var(--bad); color: #fff; }
+.number-help { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--frost); }
+.number-help p { margin: 0; font-size: 14px; }
+.profile-numbers:not(:empty) { margin-top: 18px; }
+.num-row { display: contents; }
 .inputs-fold { margin-bottom: 22px; }
 .inputs-fold summary { cursor: pointer; color: var(--muted); font-size: 14px; margin-bottom: 10px; }
 .placeholder { border: 1.5px dashed var(--line); border-radius: var(--r); padding: 26px; margin-top: 22px; color: var(--muted); }

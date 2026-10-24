@@ -67,9 +67,15 @@ export function BuildsOn({ step, ctx }) {
   );
 }
 
-export function Fields({ fields, values, onChange }) {
+export function Fields({ fields, values, onChange, after }) {
   const set = (id, v) => onChange({ ...values, [id]: v });
   return fields.map(f => {
+    if (f.heading) return (
+      <div key={'h-' + f.heading} className="fields-head">
+        <h3>{f.heading}</h3>
+        {f.blurb && <p className="hint">{f.blurb}</p>}
+      </div>
+    );
     const id = 'f-' + f.id, v = values[f.id];
     if (f.type === 'checks') return (
       <fieldset key={f.id} className="field checks">
@@ -91,7 +97,8 @@ export function Fields({ fields, values, onChange }) {
               <option value="">Choose…</option>
               {f.options.map(o => <option key={o}>{o}</option>)}
             </select>
-          ) : <input id={id} type={f.type || 'text'} value={v || ''} placeholder={f.placeholder} onChange={e => set(f.id, e.target.value)} />}
+          ) : <input id={id} type={f.type || 'text'} inputMode={f.num ? 'decimal' : undefined} value={v || ''} placeholder={f.placeholder} onChange={e => set(f.id, e.target.value)} />}
+        {after?.(f)}
       </div>
     );
   });

@@ -14,6 +14,37 @@ export const TAGS = {
   help: { label: 'Help me work this out', hint: 'I don’t know yet' },
 };
 
+// The Business profile step. `heading` rows split it into groups; `num` fields feed brainMath.
+// Brain questions with `profile: <id>` show and edit the same value, so it's only asked once.
+export const PROFILE_FIELDS = [
+  { id: 'name', label: 'Business name', placeholder: 'e.g. Juniper & Wick Candle Co.' },
+  { id: 'location', label: 'Where you sell', placeholder: 'e.g. Austin, TX + ships nationwide' },
+  { id: 'sells', label: 'What you sell', type: 'textarea', placeholder: 'Products or services, in a sentence or two' },
+  { id: 'customers', label: 'Who buys from you today', type: 'textarea', placeholder: 'e.g. Women 30–55 buying gifts, local offices ordering client gifts' },
+  { id: 'price', label: 'Average sale', placeholder: 'e.g. $48' },
+  { id: 'website', label: 'Website', placeholder: 'https://…' },
+  { id: 'socials', label: 'Social handles', placeholder: 'e.g. @juniperwick on Instagram and TikTok' },
+  { id: 'proof', label: 'Reviews, awards or numbers you’re proud of', placeholder: 'e.g. 4.9★ on Etsy, 300+ reviews' },
+  { heading: 'Your time and pay', blurb: 'So every offer pays you for your time, not just your costs. Rough numbers are fine.' },
+  { id: 'hoursWeek', label: 'Hours you work in the business each week', num: true, how: 'Count a normal week: making or serving, plus messages, admin, buying supplies and deliveries.', placeholder: 'e.g. 45 — include admin, messages, deliveries' },
+  { id: 'payGoal', label: 'What you want to take home from the business per year ($)', num: true, how: 'What you need for your personal bills and savings for a year, plus what would make the work worth it.', placeholder: 'e.g. 60000' },
+  { id: 'rate', label: 'What an hour of your time is worth ($/hour)', num: true, how: 'Start from your pay goal ÷ (hours a week × 48 weeks), then compare it with what you’d earn doing similar work for someone else.', placeholder: 'e.g. 30' },
+  { id: 'replaceRate', label: 'What you’d pay someone else to do your work ($/hour)', num: true, how: 'What local job ads or freelancers charge for the same kind of work.', placeholder: 'e.g. 22' },
+  { heading: 'Running costs in a typical month', blurb: 'Enter 0 for anything you don’t have — a blank means “don’t know yet”.' },
+  { id: 'revenueMonth', label: 'Sales ($)', num: true, how: 'Average of the last 3 months of sales from your bank, card reader or shop reports.', placeholder: 'e.g. 6000' },
+  { id: 'laborMonth', label: 'Staff and contractor pay — not your own ($)', num: true, how: 'Wages and contractor payments in a normal month; 0 if it’s just you.', placeholder: 'e.g. 0 if it’s just you' },
+  { id: 'materialsMonth', label: 'Materials, stock and supplies ($)', num: true, how: 'Supplier receipts or card statements for ingredients, stock, packaging and supplies, averaged over 3 months.', placeholder: 'e.g. 1800' },
+  { id: 'overhead', label: 'Other running costs — rent, software, insurance, utilities, fees ($)', num: true, how: 'Rent, software, insurance, phone, utilities, platform and card fees — a monthly average from bank statements.', placeholder: 'e.g. 450' },
+  { heading: 'Customers over time' },
+  { id: 'newMonth', label: 'New customers in a typical month', num: true, how: 'First-time buyers in a normal month — from order history, booking records, or a rough count.', placeholder: 'e.g. 25' },
+  { id: 'cac', label: 'What it costs to win one new customer — ads, samples, discounts (CAC, $)', num: true, how: 'Marketing spend over the last 1–3 months (ads, samples, giveaways, first-order discounts) ÷ new customers in that time.', placeholder: 'marketing spend ÷ new customers' },
+  { id: 'buysPerYear', label: 'How many times a customer buys from you per year', num: true, how: 'Look up a few regular customers in your order history and count their purchases in the last year.', placeholder: 'e.g. 3' },
+  { id: 'years', label: 'How many years a customer usually stays', num: true, how: 'How long your regulars have been buying from you; use 1 if most buy once.', placeholder: 'e.g. 2' },
+  { id: 'ltv', label: 'What a typical customer spends with you over time (lifetime value, $)', num: true, how: 'Average sale × purchases a year × years they stay.', placeholder: 'leave blank and the app works it out' },
+];
+export const PROFILE_LABELS = Object.fromEntries(PROFILE_FIELDS.filter(f => f.id).map(f => [f.id, f.label]));
+const profileHow = id => PROFILE_FIELDS.find(f => f.id === id)?.how;
+
 // Offer costs: one row per product/service the owner might promote (max 2).
 export const MAX_ITEMS = 2;
 export const ITEM_FIELDS = [
@@ -56,7 +87,10 @@ export const BRAIN_SECTIONS = [
     id: 'costs', title: 'Prices and costs', required: true, items: true,
     blurb: 'Fill this in for one or two products or services you’d promote this campaign — not your whole catalog.',
     questions: [
-      { id: 'rate', label: 'Hourly labor cost ($/hour) — your own pay allowance, or blended with staff', num: true, key: true, placeholder: 'e.g. 25' },
+      { id: 'rate', profile: 'rate', label: 'Hourly labor cost ($/hour) — your own pay allowance, or blended with staff', num: true, how: profileHow('rate'), key: true, placeholder: 'e.g. 25' },
+      { id: 'hoursWeek', profile: 'hoursWeek', label: 'Hours you work in the business each week', num: true, how: profileHow('hoursWeek') },
+      { id: 'payGoal', profile: 'payGoal', label: 'What you want to take home from the business per year ($)', num: true, how: profileHow('payGoal') },
+      { id: 'replaceRate', profile: 'replaceRate', label: 'What you’d pay someone else to do your work ($/hour)', num: true, how: profileHow('replaceRate') },
       { id: 'batch', label: 'For batches: what a whole batch costs, how long it takes, and how many sellable units it makes', type: 'textarea' },
       { id: 'package', label: 'For packages: what exactly is included, and where an extra charge begins', type: 'textarea' },
       { id: 'mixed', label: 'For mixed businesses: product and service costs, separately', type: 'textarea' },
@@ -66,7 +100,10 @@ export const BRAIN_SECTIONS = [
     id: 'expenses', title: 'Operating expenses and owner earnings',
     questions: [
       { id: 'recurring', label: 'Recurring expenses that keep the business running (rent, insurance, software, utilities, equipment, marketing, admin)', type: 'textarea' },
-      { id: 'overhead', label: 'Those recurring expenses, per month ($)', num: true },
+      { id: 'overhead', profile: 'overhead', label: 'Those recurring expenses, per month ($)', num: true, how: profileHow('overhead') },
+      { id: 'revenueMonth', profile: 'revenueMonth', label: 'Sales in a typical month ($)', num: true, how: profileHow('revenueMonth') },
+      { id: 'laborMonth', profile: 'laborMonth', label: 'Staff and contractor pay per month, not your own ($)', num: true, how: profileHow('laborMonth') },
+      { id: 'materialsMonth', profile: 'materialsMonth', label: 'Materials, stock and supplies per month ($)', num: true, how: profileHow('materialsMonth') },
       { id: 'overheadIncluded', label: 'Are those already counted in your per-sale costs above?', type: 'select', options: ['No', 'Partly', 'Yes'] },
       { id: 'coverSales', label: 'How many sales or billable hours normally cover those expenses?' },
       { id: 'campaignCosts', label: 'Extra costs this campaign creates (samples, ads, seasonal help, photography, subscriptions)', type: 'textarea' },
@@ -108,8 +145,11 @@ export const BRAIN_SECTIONS = [
       { id: 'website', profile: 'website', label: 'Website', placeholder: 'https://…' },
       { id: 'socials', profile: 'socials', label: 'Social accounts, business listings, opted-in email list' },
       { id: 'budget', label: 'Marketing budget and weekly time you can commit' },
-      { id: 'cac', label: 'What it costs you to win one new customer today (CAC, $)', num: true, placeholder: 'ad spend ÷ new customers, if you know it' },
-      { id: 'ltv', label: 'What a typical customer spends with you over time (lifetime value, $)', num: true },
+      { id: 'newMonth', profile: 'newMonth', label: 'New customers in a typical month', num: true, how: profileHow('newMonth') },
+      { id: 'cac', profile: 'cac', label: 'What it costs you to win one new customer today (CAC, $)', num: true, how: profileHow('cac'), placeholder: 'ad spend ÷ new customers, if you know it' },
+      { id: 'buysPerYear', profile: 'buysPerYear', label: 'How many times a customer buys from you per year', num: true, how: profileHow('buysPerYear') },
+      { id: 'years', profile: 'years', label: 'How many years a customer usually stays', num: true, how: profileHow('years') },
+      { id: 'ltv', profile: 'ltv', label: 'What a typical customer spends with you over time (lifetime value, $)', num: true, how: profileHow('ltv'), placeholder: 'leave blank and the app works it out' },
       { id: 'assets', label: 'Photos, footage, logo, testimonials or previous content you have', type: 'textarea' },
       { id: 'voice', label: 'How the business should sound — and words or promises to avoid', type: 'textarea' },
       { id: 'camera', label: 'Comfortable on camera, with an avatar, or recording your voice?', type: 'checks', options: ['On camera', 'Avatar', 'Voice only', 'None of these'] },
@@ -149,9 +189,16 @@ export const num = v => {
 const blank = v => v == null || (Array.isArray(v) ? !v.length : !String(v).trim());
 
 // The stored { v, s } for a question, with profile-backed values read from the profile.
+// A profile field never set falls back to an older Brain answer (rate, cac, ltv used to live there).
 export function answerOf(brain, profile, q) {
   const a = brain?.answers?.[q.id] || {};
-  return q.profile ? { ...a, v: profile?.[q.profile] ?? '' } : a;
+  return q.profile ? { ...a, v: profile?.[q.profile] ?? a.v ?? '' } : a;
+}
+const SHARED = BRAIN_SECTIONS.flatMap(s => s.questions).filter(q => q.profile);
+export function profileWithBrain(profile, brain) {
+  const out = { ...(profile || {}) };
+  for (const q of SHARED) if (out[q.profile] === undefined && !blank(brain?.answers?.[q.id]?.v)) out[q.profile] = brain.answers[q.id].v;
+  return out;
 }
 export const isAnswered = a => !!a && (!blank(a.v) || a.s === 'help');
 
@@ -197,9 +244,81 @@ export function cleanBrain(raw) {
 const round = (n, d = 2) => (n == null ? null : Math.round(n * 10 ** d) / 10 ** d);
 
 // Deterministic numbers the app shows and hands to Devin, so it never has to guess them.
-export function brainMath(raw) {
+const QBY = Object.fromEntries(BRAIN_SECTIONS.flatMap(s => s.questions).map(q => [q.id, q]));
+const WORK_WEEKS = 48; // a year with ~4 weeks off
+
+const PROFILE_NUMS = new Map(PROFILE_FIELDS.filter(f => f.id && f.num).map(f => [f.id, f]));
+// "Sales ($)" only makes sense under its heading, so prompts get "Running costs in a typical month — Sales ($)".
+const PROFILE_FULL = {};
+{ let h = null; for (const f of PROFILE_FIELDS) { if (f.heading) h = f.heading; else PROFILE_FULL[f.id] = h ? `${h} — ${f.label}` : f.label; } }
+const ANSWER_IDS = new Set([...Object.keys(QBY), ...PROFILE_NUMS.keys()]);
+
+export function answersFromDevin(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const answers = {};
+  for (const [id, value] of Object.entries(raw)) {
+    if (!ANSWER_IDS.has(id) || Object.keys(answers).length >= 60) continue;
+    if (typeof value !== 'string' && !(typeof value === 'number' && Number.isFinite(value))) continue;
+    const v = String(value).trim().slice(0, 200);
+    if (v) answers[id] = v;
+  }
+  return Object.keys(answers).length ? answers : null;
+}
+
+export function mergeDevinAnswers(profile, brain, answers) {
+  const nextProfile = { ...(profile || {}) };
+  const nextBrain = { ...(brain || {}), answers: { ...(brain?.answers || {}) } };
+  const changed = [];
+  for (const [id, v] of Object.entries(answers || {})) {
+    const q = QBY[id];
+    const pkey = q?.profile ?? PROFILE_NUMS.get(id)?.id;
+    if (!q && !pkey) continue;
+    const current = q ? answerOf(brain, profile, q) : { v: profile?.[pkey] };
+    if (!blank(current.v) && current.s !== 'help') continue;
+    if (pkey) nextProfile[pkey] = v;
+    else nextBrain.answers[id] = { ...(nextBrain.answers[id] || {}), v };
+    if (q) nextBrain.answers[id] = { ...(nextBrain.answers[id] || {}), s: 'estimate' };
+    changed.push(id);
+  }
+  return { profile: nextProfile, brain: nextBrain, changed };
+}
+
+export function helpPrompt(profile, brain, ids) {
+  const promptIds = [...new Set((Array.isArray(ids) ? ids : []).filter(id => ANSWER_IDS.has(id)))];
+  const getAnswer = id => {
+    const q = QBY[id];
+    return q ? answerOf(brain, profile, q) : { v: profile?.[id] };
+  };
+  const numberLines = promptIds.map(id => {
+    const q = QBY[id];
+    const field = PROFILE_NUMS.get(id);
+    const answer = getAnswer(id);
+    const value = blank(answer.v) ? (answer.s === 'help' ? 'not sure' : 'blank')
+      : answer.s === 'help' ? `not sure (I put ${answer.v})` : String(answer.v);
+    return `- ${id} — ${field ? PROFILE_FULL[id] : q?.label} — ${field?.how || q?.how || 'ask me'} — ${value}`;
+  });
+  const filled = [];
+  if (!promptIds.includes('price') && !blank(profile?.price)) filled.push(`- Average sale: ${profile.price}`);
+  for (const field of PROFILE_FIELDS.filter(f => f.id && f.num && !promptIds.includes(f.id))) {
+    const answer = getAnswer(field.id);
+    if (!blank(answer.v)) filled.push(`- ${PROFILE_FULL[field.id]}: ${answer.v}`);
+  }
+  return `Help me work out some numbers for my business — I don’t know them yet. Walk me through them one at a time, like a patient bookkeeper:
+- Ask at most 2 simple questions per number, about things I’m likely to know (last month’s spend, roughly how many customers), and tell me where to look (bank statement, Etsy/Square/Shopify reports, invoices, my calendar).
+- Do the math for me and show it in one line, e.g. “$300 ads ÷ 12 new customers = $25 per customer”.
+- If I can’t find a figure, help me make a reasonable estimate from what I do know, and call it an estimate. Mention a typical range for businesses like mine only if you say where it comes from, and only as a starting point I agree to.
+- Confirm each number with me before moving to the next.
+- As soon as I confirm a number, add it to the structured output as answers.json: {"<id>": "<value>"} using the ids below (just the number — no $ or units). Never fill in a number I haven’t confirmed.
+When we’re done, sum up the numbers in 3 lines and say which are estimates.
+
+The numbers to work out (id — question — how to work it out — what I have now):
+${numberLines.join('\n')}
+${filled.length ? `\nAlready filled in (use these in the math):\n${filled.join('\n')}` : ''}`;
+}
+
+export function brainMath(raw, profile) {
   const brain = cleanBrain(raw);
-  const A = id => num(brain?.answers?.[id]?.v);
+  const A = id => num(QBY[id] ? answerOf(brain, profile, QBY[id]).v : brain?.answers?.[id]?.v);
   const rate = A('rate');
   const discount = Math.min(Math.max(A('discount') ?? 0, 0), 100);
   const weeks = A('weeks');
@@ -220,6 +339,7 @@ export function brainMath(raw) {
   if (overhead == null) missing.push('Monthly recurring expenses');
   if (included === 'Partly') missing.push('Which recurring expenses are already in per-sale costs (answered “Partly”)');
 
+  const cac = A('cac');
   const items = (brain?.items || []).filter(it => num(it?.price?.v) != null).map(it => {
     const f = id => num(it?.[id]?.v) ?? 0;
     const price = f('price');
@@ -246,17 +366,33 @@ export function brainMath(raw) {
       fits: capacity != null && forTarget != null ? forTarget <= capacity : null,
       cashForTarget: forTarget != null ? round(forTarget * (purchases + losses)) : null,
       belowMin: minEarn != null && per < minEarn,
+      firstSale: cac != null ? round(per - cac) : null,
+      firstSaleLoses: cac != null && per - cac <= 0,
       notProfitable: per <= 0,
       estimated, gaps,
     };
   });
   for (const it of items) if (it.gaps.length) missing.push(`${it.name}: ${it.gaps.join(', ')}`);
   if (!items.length) missing.push('Price and costs for at least one product or service');
-  const ltv = A('ltv'), cac = A('cac');
+  // Time: the pay goal as an hourly rate, and what a typical month actually pays per hour worked.
+  const hoursWeek = A('hoursWeek'), payGoal = A('payGoal');
+  const goalRate = payGoal != null && hoursWeek ? round(payGoal / (hoursWeek * WORK_WEEKS)) : null;
+  const monthParts = [A('laborMonth'), A('materialsMonth'), overhead];
+  const monthCosts = monthParts.some(x => x == null) ? null : round(monthParts.reduce((t, x) => t + x, 0));
+  const revenueMonth = A('revenueMonth');
+  const monthLeft = revenueMonth != null && monthCosts != null ? round(revenueMonth - monthCosts) : null;
+  const earnedRate = monthLeft != null && hoursWeek ? round(monthLeft / (hoursWeek * 52 / 12)) : null;
+  const monthForGoal = monthCosts != null && payGoal != null ? round(monthCosts + payGoal / 12) : null;
+  // Lifetime value: the owner's figure, else average sale × purchases a year × years.
+  const avgSale = num(profile?.price), buys = A('buysPerYear'), years = A('years');
+  const ltvCalc = avgSale != null && buys != null && years != null ? round(avgSale * buys * years) : null;
+  const ltv = A('ltv') ?? ltvCalc;
   return {
     rate, discount, weeks, overheadShare: round(overheadShare), campaignSpend: round(campaignSpend), fixed: round(fixed), profitTarget,
     free, capacity, upfront: A('upfront'), minEarn, items,
-    ltvCac: ltv != null && cac ? round(ltv / cac, 1) : null, ltv, cac,
+    hoursWeek, payGoal, goalRate, replaceRate: A('replaceRate'),
+    revenueMonth, monthCosts, monthLeft, earnedRate, monthForGoal, newMonth: A('newMonth'),
+    ltvCac: ltv != null && cac ? round(ltv / cac, 1) : null, ltv, ltvCalculated: A('ltv') == null && ltvCalc != null, cac,
     missing,
   };
 }
@@ -268,7 +404,7 @@ const tagOf = a => (a?.s ? ` [${a.s}]` : '');
 // The Brain as Devin reads it: every answer with its tag, then the app's numbers.
 export function brainContext(raw, profile) {
   const brain = cleanBrain(raw);
-  const hasAny = BRAIN_SECTIONS.some(s => s.questions.some(q => !q.profile && isAnswered(brain?.answers?.[q.id]))) || (brain?.items || []).length;
+  const hasAny = BRAIN_SECTIONS.some(s => s.questions.some(q => (q.profile ? q.num && isAnswered(answerOf(brain, profile, q)) : isAnswered(brain?.answers?.[q.id])))) || (brain?.items || []).length;
   if (!hasAny) return '';
   const out = ['## Business Brain',
     'The owner’s own answers. Tags: [known] = confirmed fact; [estimate] = the owner’s estimate — say “estimated” whenever you rely on it; [help] = the owner doesn’t know — work it out with them, never present it as fact. Unanswered questions are missing, not zero.'];
@@ -280,9 +416,12 @@ export function brainContext(raw, profile) {
     });
     if (lines.length) out.push(`### ${s.title}`, ...lines);
   }
-  const m = brainMath(brain);
+  const m = brainMath(brain, profile);
   const calc = ['### App-calculated numbers (use these; don’t recompute them differently)'];
   if (m.rate != null) calc.push(`- Labor is costed at ${money(m.rate)}/hour.`);
+  if (m.goalRate != null) calc.push(`- The owner’s pay goal (${money(m.payGoal)}/year at ${m.hoursWeek} h/week, ${WORK_WEEKS} weeks) works out to ${money(m.goalRate)}/hour${m.rate != null && m.rate < m.goalRate ? ` — more than the ${money(m.rate)}/hour labor allowance, so offers priced on that allowance won’t reach the goal` : ''}.`);
+  if (m.monthLeft != null) calc.push(`- A typical month: ${money(m.revenueMonth)} sales − ${money(m.monthCosts)} running costs (staff, materials, other) = ${money(m.monthLeft)} left for the owner${m.earnedRate != null ? `, about ${money(m.earnedRate)}/hour for the hours worked` : ''}${m.monthForGoal != null ? `. Monthly break-even is ${money(m.monthCosts)} in sales; ${money(m.monthForGoal)} also pays the owner’s goal` : ''} (at today’s cost level).`);
+  else if (m.monthCosts != null) calc.push(`- Running costs: ${money(m.monthCosts)} a month — the monthly break-even before the owner’s pay.`);
   calc.push(m.fixed == null
     ? `- Fixed costs to recover this campaign: UNKNOWN — monthly overhead is entered but the campaign length isn’t, so break-even can’t be calculated yet (plus ${money(m.campaignSpend)} campaign costs).`
     : `- Fixed costs to recover this campaign: ${money(m.fixed)} (${money(m.overheadShare)} share of overhead + ${money(m.campaignSpend)} campaign costs).`);
@@ -293,9 +432,10 @@ export function brainContext(raw, profile) {
       + (it.gaps.length ? ` INCOMPLETE — blank: ${it.gaps.join(', ')}. The earnings above count those as $0, so they are an upper bound; don’t call this offer profitable until they’re filled in.` : '')
       + (it.notProfitable ? ' NOT PROFITABLE at this price once labor is paid.' : ` Break-even: ${it.breakEven ?? 'not calculated yet'} sales; for the profit target: ${it.forTarget ?? 'not calculated yet'} sales${it.hoursTarget != null ? ` (${it.hoursTarget} labor hours)` : ''}${it.fits == null ? '' : it.fits ? ', fits capacity' : ', MORE THAN CAPACITY'}.`)
       + (it.belowMin ? ` Below the owner’s minimum earnings per sale (${money(m.minEarn)}).` : '')
+      + (it.firstSale != null ? ` A first sale to a NEW customer, after the ${money(m.cac)} it costs to win them: ${money(it.firstSale)}${it.firstSaleLoses ? ' — LOSES MONEY; it only pays off through repeat purchases' : ''}.` : '')
       + (it.estimated.length ? ` Based on estimates for: ${it.estimated.join(', ')}.` : ''));
   }
-  if (m.ltvCac != null) calc.push(`- Lifetime value ${money(m.ltv)} vs. acquisition cost ${money(m.cac)}: LTV:CAC = ${m.ltvCac}.`);
+  if (m.ltv != null || m.cac != null) calc.push(`- Lifetime value ${money(m.ltv)}${m.ltvCalculated ? ' (calculated: average sale × purchases a year × years)' : ''} vs. cost to win a customer (CAC) ${money(m.cac)}${m.ltvCac != null ? `: LTV:CAC = ${m.ltvCac}` : ''}. CAC is the everyday figure; if the campaign costs above already pay for the ads, don’t subtract both.`);
   if (m.missing.length) calc.push(`- Missing for a reliable profit estimate: ${m.missing.join('; ')}. Any offer is provisional until these are confirmed — say so.`);
   out.push(...calc);
   return out.join('\n');
