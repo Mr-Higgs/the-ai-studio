@@ -29,5 +29,15 @@ export const devinClient = creds => ({
     api(creds, '/sessions', { method: 'POST', body: JSON.stringify({ prompt, title, tags, structured_output_schema: schema, structured_output_required: true, ...(process.env.DEVIN_MAX_ACU && { max_acu_limit: Number(process.env.DEVIN_MAX_ACU) }) }) }),
   sendMessage: (id, text) => api(creds, `/sessions/${id}/messages`, { method: 'POST', body: JSON.stringify({ message: text }) }),
   getSession: id => api(creds, `/sessions/${id}`),
-  getMessages: (id, after) => api(creds, `/sessions/${id}/messages${after ? `?after=${encodeURIComponent(after)}` : ''}`),
+  // `after` is an opaque page cursor, not an event_id, so fetch every page and let the caller slice.
+  getMessages: async id => {
+    const items = [];
+    let after = null;
+    do {
+      const page = await api(creds, `/sessions/${id}/messages?${new URLSearchParams({ first: '200', ...(after && { after }) })}`);
+      items.push(...(page.items || []));
+      after = page.has_next_page ? page.end_cursor : null;
+    } while (after);
+    return { items };
+  },
 });

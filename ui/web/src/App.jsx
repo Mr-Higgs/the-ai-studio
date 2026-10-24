@@ -91,7 +91,7 @@ export default function App() {
     api('/api/projects').then(r => setProjects(r.projects)),
   ]).catch(() => {}), []);
   const signedIn = me && (!me.hosted || me.email);
-  const agent = useAgent(signedIn ? '/api/business' : null, refresh);
+  const agent = useAgent(signedIn ? '/api/agent/business' : null, refresh);
 
   useEffect(() => {
     const load = async () => {
