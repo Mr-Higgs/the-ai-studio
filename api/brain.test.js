@@ -166,7 +166,7 @@ test('helpPrompt describes ids, guidance, and current help-tagged values', () =>
     { answers: { rate: { v: '20', s: 'help' } } },
     ['rate', 'cac'],
   );
-  assert.match(prompt, /rate — Hourly labor cost/);
+  assert.match(prompt, /rate — Your time and pay — What an hour of your time is worth/);
   assert.match(prompt, /Start from your pay goal ÷ \(hours a week × 48 weeks\)/);
   assert.match(prompt, /not sure \(I put 20\)/);
   assert.match(prompt, /cac — What it costs you to win one new customer today \(CAC, \$\)/);

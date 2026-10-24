@@ -95,7 +95,7 @@ export default function Profile({ step, profile, save, ctx }) {
         )}
         <div className="profile-numbers"><BusinessNumbers m={m} /></div>
         <div className="actions">
-          <button className="btn primary" disabled={state === 'saving' || !dirty}>Save profile</button>
+          <button className="btn primary" disabled={!values.name?.trim() || state === 'saving' || !dirty}>Save profile</button>
           {state === 'saved' && <span className="hint ok">Saved. Devin will use this in every step.</span>}
           {state.startsWith('Couldn') && <span className="hint err">{state}</span>}
           {!values.name?.trim() && <span className="hint">Business name is the only required field.</span>}

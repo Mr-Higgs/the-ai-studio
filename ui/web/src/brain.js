@@ -248,6 +248,9 @@ const QBY = Object.fromEntries(BRAIN_SECTIONS.flatMap(s => s.questions).map(q =>
 const WORK_WEEKS = 48; // a year with ~4 weeks off
 
 const PROFILE_NUMS = new Map(PROFILE_FIELDS.filter(f => f.id && f.num).map(f => [f.id, f]));
+// "Sales ($)" only makes sense under its heading, so prompts get "Running costs in a typical month — Sales ($)".
+const PROFILE_FULL = {};
+{ let h = null; for (const f of PROFILE_FIELDS) { if (f.heading) h = f.heading; else PROFILE_FULL[f.id] = h ? `${h} — ${f.label}` : f.label; } }
 const ANSWER_IDS = new Set([...Object.keys(QBY), ...PROFILE_NUMS.keys()]);
 
 export function answersFromDevin(raw) {
@@ -292,13 +295,13 @@ export function helpPrompt(profile, brain, ids) {
     const answer = getAnswer(id);
     const value = blank(answer.v) ? (answer.s === 'help' ? 'not sure' : 'blank')
       : answer.s === 'help' ? `not sure (I put ${answer.v})` : String(answer.v);
-    return `- ${id} — ${q?.label || field?.label} — ${field?.how || 'ask me'} — ${value}`;
+    return `- ${id} — ${field ? PROFILE_FULL[id] : q?.label} — ${field?.how || q?.how || 'ask me'} — ${value}`;
   });
   const filled = [];
   if (!promptIds.includes('price') && !blank(profile?.price)) filled.push(`- Average sale: ${profile.price}`);
   for (const field of PROFILE_FIELDS.filter(f => f.id && f.num && !promptIds.includes(f.id))) {
     const answer = getAnswer(field.id);
-    if (!blank(answer.v)) filled.push(`- ${field.label}: ${answer.v}`);
+    if (!blank(answer.v)) filled.push(`- ${PROFILE_FULL[field.id]}: ${answer.v}`);
   }
   return `Help me work out some numbers for my business — I don’t know them yet. Walk me through them one at a time, like a patient bookkeeper:
 - Ask at most 2 simple questions per number, about things I’m likely to know (last month’s spend, roughly how many customers), and tell me where to look (bank statement, Etsy/Square/Shopify reports, invoices, my calendar).
