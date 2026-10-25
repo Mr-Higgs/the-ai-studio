@@ -142,7 +142,7 @@ export default function App() {
   const saveProfile = async profile => { await put('/api/business/profile.json', profile); await refresh(); };
   // Step answers live apart from the profile so saving them doesn't make every step look out of date.
   const saveInputs = (id, inputs) => put('/api/business/inputs.json', { ...biz.inputs, [id]: inputs }).then(refresh).catch(e => toast(`Couldn’t save your answers: ${e.message}`));
-  const generate = (s, prompt, snapshot) => { setWorkingOn(s.title); agent.send(prompt, snapshot); };
+  const generate = (s, prompt, snapshot) => { setWorkingOn(s.title); agent.send(prompt, snapshot, s.id); };
 
   const ctx = { biz, agent, agentName, workingOn, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId };
   const chatEmpty = step?.kind === 'profile'

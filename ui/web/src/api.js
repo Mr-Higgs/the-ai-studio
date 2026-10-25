@@ -112,10 +112,10 @@ export function useAgent(base, onDone) {
   return {
     ...state,
     base,
-    send: async (text, snapshot) => {
+    send: async (text, snapshot, step) => {
       dispatch({ type: 'user', text });
       dispatch({ type: 'status', busy: true });
-      try { await post(`${base}/prompt`, { text, snapshot }); } catch (e) { fail(e); }
+      try { await post(`${base}/prompt`, { text, snapshot, step }); } catch (e) { fail(e); }
     },
     restart: () => { post(`${base}/new`).catch(() => {}); cursor.current = ''; setGeneration(g => g + 1); },
   };

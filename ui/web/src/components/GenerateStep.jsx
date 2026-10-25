@@ -2,7 +2,9 @@ import { useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Calendar from './Calendar.jsx';
-import { STEPS, phaseOf } from '../steps.js';
+import { STEPS, phaseOf, targetSummary } from '../steps.js';
+import { growthTargets } from '../brain.js';
+import Experiments from './Experiments.jsx';
 
 export function StepHead({ step, ctx, children }) {
   return (
@@ -137,15 +139,18 @@ export default function GenerateStep({ step, ...ctx }) {
   const has = step.kind === 'calendar' ? !!biz.calendar?.length : !!doc;
   const mine = workingOn === step.title;
   const history = biz.history?.[step.file.replace(/\.(md|json)$/, '')];
+  const targetHints = biz.sprint?.id === 'growth' && step.id === 'strategy' ? growthTargets(biz.brain, biz.profile) : null;
+  const targetSummaryText = targetHints ? targetSummary(targetHints) : '';
 
   const run = () => {
     saveInputs(step.id, inputs);
-    generate(step, step.prompt(inputs, step), has ? step.file : undefined); // keep the old version before a rewrite
+    generate(step, step.prompt(inputs, step, biz), has ? step.file : undefined); // keep the old version before a rewrite
   };
 
   const form = (
     <div className="inputs">
       <div className="fields"><Fields fields={step.inputs} values={inputs} onChange={setInputs} /></div>
+      {targetHints && <p className="hint growth-target-hint">{targetSummaryText ? `App-calculated sprint targets: ${targetSummaryText}` : `App-calculated targets are incomplete. Missing: ${targetHints.missing.join(', ') || 'product costs and customer value'}.`}</p>}
       <div className="actions">
         <button className="btn primary" onClick={run} disabled={agent.busy}>
           {mine ? `${agentName} is writing…` : has ? `Rewrite with ${agentName}` : `Write it with ${agentName}`}
@@ -168,7 +173,7 @@ export default function GenerateStep({ step, ...ctx }) {
       {step.kind === 'calendar' && has && (
         <>
           <div className="doc-bar"><span>Saved to <code>business/calendar.json</code></span><History files={history} /></div>
-          <Calendar items={biz.calendar} refresh={refresh} />
+          <Calendar items={biz.calendar} experiments={biz.experiments || []} refresh={refresh} />
         </>
       )}
       {doc && (
@@ -180,6 +185,7 @@ export default function GenerateStep({ step, ...ctx }) {
           <div className="prose"><Markdown remarkPlugins={[remarkGfm]}>{doc.content}</Markdown></div>
         </article>
       )}
+      {step.id === 'strategy' && biz.experiments?.length > 0 && <Experiments experiments={biz.experiments} rows={biz.tracker || []} step={step} agent={agent} agentName={agentName} generate={generate} refresh={refresh} />}
       {!has && !mine && (
         <div className="placeholder">
           <p>Nothing here yet. Answer what you can above (blanks are fine) and {agentName} will write this step from your profile and everything you’ve made so far.</p>

@@ -15,7 +15,7 @@
 //    prompt  (answers, step) => the message sent to Devin
 // ============================================================================
 
-import { PROFILE_FIELDS } from './brain.js';
+import { PROFILE_FIELDS, growthTargets } from './brain.js';
 
 const rules = file => `Write for a busy, non-technical owner: plain words, short sections, concrete examples and real numbers, nothing generic. If something critical is missing, ask me at most 3 short questions in chat and wait for my answers; otherwise go straight to writing. Return the finished document as ${file} in the structured output (see the output instructions). Then reply with a 3-line summary of what you made.`;
 
@@ -26,6 +26,13 @@ const answers = (inputs, fields) => fields
     return shown ? `- ${f.label}: ${shown}` : null;
   })
   .filter(Boolean).join('\n') || '- (nothing extra — use the profile)';
+const dollars = value => `$${Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+export const targetSummary = targets => [
+  targets.breakEven != null && targets.item ? `break-even: ${targets.breakEven} sales of ${targets.item}` : null,
+  targets.forTarget != null && targets.item ? `${targets.forTarget} sales for the goal` : null,
+  targets.maxCac != null ? `max cost to win a customer: ${dollars(targets.maxCac)} (${targets.maxCacBasis === 'ltv' ? 'LTV ÷ 3' : 'discount-adjusted first-sale earnings'})` : null,
+  targets.budget != null ? `budget ${dollars(targets.budget)}` : null,
+].filter(Boolean).join('; ');
 
 // Rail / Start-here grouping, same for both sprints. Keep in STEPS order.
 export const PHASES = [
@@ -47,7 +54,7 @@ export const SPRINTS = {
     keywordsPh: 'e.g. candle gift ideas, gifts for coworkers under $50, best soy candles', whoPh: 'e.g. people buying gifts for mom, office managers', subsPh: 'e.g. r/GiftIdeas, r/candles, r/Austin',
     searchAngles: 'gift and holiday angles',
     goalLabel: 'Holiday goal', goalPh: 'e.g. 40 orders and $4,000 in sales by Dec 24', budgetLabel: 'Marketing budget for the season',
-    phases: 'warm-up, launch, push, last-chance', strategyExtra: '',
+    phases: 'warm-up, launch, push, last-chance', strategyExtra: '', calendarExperiment: '',
     contentWhy: 'Writing posts daily during the busiest season is how campaigns die. Write them all now, post them later.',
     calendarDone: 'Every piece on a date, lined up with Black Friday, Small Business Saturday, Cyber Monday and shipping cut-offs', calendarTip: 'Ask: “Move everything after Dec 15 one day earlier.”',
     calendarDates: 'real holiday dates (Black Friday, Small Business Saturday, Cyber Monday, shipping cut-offs, Dec 24)',
@@ -66,10 +73,11 @@ export const SPRINTS = {
     searchAngles: 'buying-intent and comparison angles ("best", "recommend", "alternative to")',
     goalLabel: '30-day goal', goalPh: 'e.g. 25 new customers and $2,500 in sales in 30 days', budgetLabel: 'Marketing budget for the sprint',
     phases: 'week 1 launch, weeks 2–3 run and measure, week 4 double down on what worked',
-    strategyExtra: ' Frame the plan as 3–5 growth experiments, each with a hypothesis, the cheapest way to test it, the number that means success, and a kill-or-scale rule.',
+    strategyExtra: ' Also return experiments.json as an array of 3–5 experiments with exactly these fields: { id, name, hypothesis, channel, cost, spent, metric, target, maxCac, rule, status, verdict }. Use IDs e1 through e5 as applicable; cost is a numeric planned dollar amount, spent is null, metric is a short win measure, target is numeric, maxCac is numeric or null, status is "running", verdict is "", and rule clearly says when to kill or scale. Keep each test cheap enough to run in 30 days, each planned cost within my sprint budget, and total planned cost within that budget. If the app-calculated max cost per customer is supplied, no experiment maxCac may exceed it. Keep every existing strategy section and add a "Growth experiments" section listing every experiment with its hypothesis, channel, cost, target, maxCac and rule.',
     contentWhy: 'Writing posts daily while running the business is how sprints die. Write them all now, post them later.',
     calendarDone: 'Every piece on a date across the 30 days, with a weekly experiment review', calendarTip: 'Ask: “Move everything after week 2 one day earlier.”',
     calendarDates: 'a weekly experiment review every 7 days (add each review as an item with format "Other")',
+    calendarExperiment: ' For each item connected to a growth experiment, include "experiment": "<id>" using its experiments.json id.',
     visibilityWhy: 'People search “near me” and ask AI assistants for recommendations. If your listings are thin or inconsistent, you don’t get mentioned.',
     searchesPh: 'e.g. handmade candles Austin, soy candles near me', landing: 'offer landing section',
     automationWhy: 'In a 30-day sprint your time is the bottleneck. Every hour automated is an hour back for customers and experiments.',
@@ -80,7 +88,7 @@ export const SPRINTS = {
 
 // ponytail: module-level sprint; fine because one business is on screen at a time. Importers see
 // the rebuilt values through ES live bindings.
-export let SPRINT, STEPS, PROFILE_STEP, AGENDA, TRACKER_INSIGHTS;
+export let SPRINT, STEPS, PROFILE_STEP, AGENDA, TRACKER_INSIGHTS, SCORE_EXPERIMENTS;
 let CONTEXT;
 export function setSprint(id) {
   const v = SPRINTS[id] || SPRINTS.holiday;
@@ -118,7 +126,7 @@ STEPS = [
     ],
     prompt: (i, s) => `${CONTEXT}
 
-Build my ${offerLower} and target customer. Use the grand-slam-offer skill (.devin/skills/grand-slam-offer). Skip any interview questions the profile and the answers below already cover, and keep the interview to at most 2 short rounds.
+Build my ${offerLower} and target customer. Use the grand-slam-offer framework included in this message. Skip any interview questions the profile and the answers below already cover, and keep the interview to at most 2 short rounds.
 
 ${answers(i, s.inputs)}
 
@@ -167,15 +175,19 @@ ${rules('research.md')}`,
       { id: 'budget', label: v.budgetLabel, placeholder: 'e.g. $0, $200, $1,000' },
       { id: 'channels', label: 'Where you reach customers today', type: 'checks', options: ['Instagram', 'Facebook', 'TikTok', 'LinkedIn', 'Reddit', 'Email list', 'Google Business Profile', 'Website', 'In person / word of mouth'] },
     ],
-    prompt: (i, s) => `${CONTEXT}
+    prompt: (i, s, biz) => {
+      const targets = v.id === 'growth' ? growthTargets(biz?.brain, biz?.profile) : null;
+      const summary = targets ? targetSummary(targets) : '';
+      return `${CONTEXT}
 
 Create my ${v.adj}sales and marketing strategy, built around the offer above and the customer language, questions and communities in the customer research above.
 
 ${answers(i, s.inputs)}
 
-Include: the 2–3 channels to focus on (and what to ignore) given my time and budget; the campaign phases with dates (${v.phases}); the core message and 3 supporting messages, using customers' own words where possible; 5 calls-to-action rewritten for clarity, each matched to where it's used; how a stranger becomes a customer (the path from first touch to purchase); and how I'll know it's working (the 3 numbers to watch weekly).${v.strategyExtra}
+Include: the 2–3 channels to focus on (and what to ignore) given my time and budget; the campaign phases with dates (${v.phases}); the core message and 3 supporting messages, using customers' own words where possible; 5 calls-to-action rewritten for clarity, each matched to where it's used; how a stranger becomes a customer (the path from first touch to purchase); and how I'll know it's working (the 3 numbers to watch weekly).${v.strategyExtra}${summary ? `\n\nApp-calculated sprint targets: ${summary}` : ''}
 
-${rules('strategy.md')}`,
+${rules('strategy.md')}`;
+    },
   },
   {
     id: 'content', kind: 'doc', title: 'Content kit', file: 'content.md', uses: ['brain', 'offer', 'research', 'strategy'],
@@ -233,7 +245,7 @@ ${answers(i, s.inputs)}
 
 Return it as calendar.json in the structured output (the JSON array itself): an array sorted by date, where each item is exactly
 {"date": "YYYY-MM-DD", "channel": "Instagram", "format": "Reel | Post | Story | Email | Ad | Other", "title": "short label", "copy": "the full ready-to-post text", "cta": "the call-to-action", "status": "planned"}.
-Line the dates up with the campaign phases and ${v.calendarDates}. If something critical is missing, ask me at most 3 short questions first. Then reply with a 3-line summary.`,
+Line the dates up with the campaign phases and ${v.calendarDates}.${v.calendarExperiment} If something critical is missing, ask me at most 3 short questions first. Then reply with a 3-line summary.`,
   },
   {
     id: 'visibility', kind: 'doc', title: 'Get found', file: 'visibility.md', uses: ['profile', 'research'],
@@ -340,6 +352,9 @@ AGENDA = [
 TRACKER_INSIGHTS = `${CONTEXT}
 
 Using my tracker and strategy above, Tell me in chat (don't write a file): what's converting and what isn't, by source and stage; which leads to follow up with today and a suggested message for each; and one change to make this week. Keep it short.`;
+SCORE_EXPERIMENTS = `${CONTEXT}
+
+Score my growth experiments using my experiments and lead tracker above (each tracker row's "experiment" field is an experiment id). For each experiment: leads, customers won, revenue, and cost per customer (spent ÷ customers won; say "not enough data" when spent is blank or nothing is won). Compare with its target and maxCac, apply its kill-or-scale rule, and set status to "scale", "keep" or "kill" with a one-sentence verdict that cites the numbers. Return the full updated experiments.json (same ids and fields; only change status and verdict). Then reply in chat with the 3 things to do this week. Keep it short.`;
 }
 setSprint('holiday');
 
@@ -376,4 +391,3 @@ export const VIDEO_FORMATS = {
   square: 'Square 1:1 (feed posts)',
   wide: 'Wide 16:9 (YouTube, website, email)',
 };
-
