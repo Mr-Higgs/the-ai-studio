@@ -334,6 +334,7 @@ textarea { resize: vertical; line-height: 1.45; }
 .experiment-campaign { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; font-size: 13px; font-weight: 600; }
 .experiment-campaign select { min-width: 0; }
 .experiment-meta { margin: 0 0 12px; color: var(--accent); font-size: 13.5px; font-weight: 600; }
+.experiment-platforms { display: block; margin: -8px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .experiment-status { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--frost); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .experiment-status.status-scale { color: var(--ok); }
 .experiment-status.status-kill { color: var(--bad); }

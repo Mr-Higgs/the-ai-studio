@@ -4,6 +4,7 @@ import { SCORE_EXPERIMENTS } from '../steps.js';
 import { experimentStats } from '../experiments.js';
 
 const STATUSES = ['running', 'scale', 'keep', 'kill'];
+const PLATFORM_NAMES = { instagram: 'Instagram', facebook: 'Facebook', audience_network: 'Audience Network', messenger: 'Messenger' };
 const money = (value, currency = 'USD') => value == null || !Number.isFinite(Number(value))
   ? '—'
   : Number(value).toLocaleString([], { style: 'currency', currency, maximumFractionDigits: 2 });
@@ -88,6 +89,12 @@ export default function Experiments({ experiments = [], rows = [], step, agent, 
         {items.map(experiment => {
           const stats = experimentStats(experiment, rows);
           const linkedCampaign = campaigns.find(campaign => String(campaign.id) === experiment.campaignId);
+          const platformSummary = linkedCampaign
+            ? Object.entries(linkedCampaign.platforms || {})
+              .filter(([, values]) => Number(values.spend) > 0 || Number(values.leads) > 0)
+              .map(([platform, values]) => `${PLATFORM_NAMES[platform] || platform} ${money(values.spend, currency)} · ${values.leads} leads`)
+              .join(' · ')
+            : '';
           return (
             <article className="experiment-card" key={experiment.id}>
               <div className="experiment-title">
@@ -123,6 +130,7 @@ export default function Experiments({ experiments = [], rows = [], step, agent, 
                 </label>
               )}
               {linkedCampaign && <p className="experiment-meta">Meta: {money(linkedCampaign.spend, currency)} · {linkedCampaign.leads} leads · {linkedCampaign.clicks} clicks</p>}
+              {platformSummary && <small className="experiment-platforms">{platformSummary}</small>}
               <div className="experiment-controls">
                 <label>
                   Actual spend ({adInsights?.account?.currency ? currency : '$'})

@@ -29,6 +29,16 @@ test('syncAds follows pages, parses numbers, and counts only lead actions', asyn
           ],
           paging: { next: `${url.origin}${url.pathname}?after=campaigns&access_token=SECRET` },
         };
+    } else if (url.pathname.endsWith('/insights') && url.searchParams.get('breakdowns') === 'publisher_platform') {
+      body = page
+        ? { data: [{ campaign_id: '123', publisher_platform: 'facebook', spend: '45.40', impressions: '900', clicks: '20', actions: [{ action_type: 'lead', value: '4' }] }] }
+        : {
+          data: [{ campaign_id: '123', publisher_platform: 'instagram', spend: '80.00', impressions: '1200', clicks: '30', actions: [
+            { action_type: 'onsite_conversion.lead_grouped', value: '99' },
+            { action_type: 'lead', value: '7' },
+          ] }],
+          paging: { next: `${url.origin}${url.pathname}?after=platform2&breakdowns=publisher_platform&access_token=SECRET` },
+        };
     } else if (url.pathname.endsWith('/insights')) {
       body = page
         ? { data: [{ campaign_id: '789', campaign_name: 'Third', spend: '3.25', impressions: '8', clicks: '1', actions: [{ action_type: 'onsite_conversion.lead_grouped', value: '9' }] }] }
@@ -48,14 +58,19 @@ test('syncAds follows pages, parses numbers, and counts only lead actions', asyn
 
   assert.deepEqual(result.account, { id: 'act_123', name: 'Studio account', currency: 'USD' });
   assert.deepEqual(result.campaigns, [
-    { id: '123', name: 'First', status: 'ACTIVE', spend: 12.5, impressions: 20, clicks: 3, leads: 2 },
-    { id: '789', name: 'Third', status: 'PAUSED', spend: 3.25, impressions: 8, clicks: 1, leads: 0 },
-    { id: '456', name: 'No results', status: 'PAUSED', spend: 0, impressions: 0, clicks: 0, leads: 0 },
+    { id: '123', name: 'First', status: 'ACTIVE', spend: 12.5, impressions: 20, clicks: 3, leads: 2, platforms: {
+      instagram: { spend: 80, impressions: 1200, clicks: 30, leads: 7 },
+      facebook: { spend: 45.4, impressions: 900, clicks: 20, leads: 4 },
+    } },
+    { id: '789', name: 'Third', status: 'PAUSED', spend: 3.25, impressions: 8, clicks: 1, leads: 0, platforms: {} },
+    { id: '456', name: 'No results', status: 'PAUSED', spend: 0, impressions: 0, clicks: 0, leads: 0, platforms: {} },
   ]);
   assert.equal(Number.isNaN(Date.parse(result.syncedAt)), false);
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 7);
   assert.ok(calls.every(url => url.searchParams.get('access_token') === 'SECRET'));
-  assert.equal(calls.find(url => url.pathname.endsWith('/insights')).searchParams.get('date_preset'), 'maximum');
+  assert.ok(calls.some(url => url.searchParams.get('breakdowns') === 'publisher_platform'));
+  assert.equal(calls.find(url => url.pathname.endsWith('/insights') && !url.searchParams.get('breakdowns')).searchParams.get('date_preset'), 'maximum');
+  assert.equal(calls.find(url => url.searchParams.get('breakdowns') === 'publisher_platform').searchParams.get('date_preset'), 'maximum');
 });
 
 test('metaGet maps token and rate-limit errors to safe statuses', async () => {

@@ -60,15 +60,17 @@ const numeric = value => {
 };
 
 export async function syncAds({ token, accountId }, fetchImpl = fetch) {
-  const [accountData, campaignsData, insightsData] = await Promise.all([
+  const insightParams = {
+    level: 'campaign',
+    fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions',
+    date_preset: 'maximum',
+    limit: 100,
+  };
+  const [accountData, campaignsData, insightsData, platformInsightsData] = await Promise.all([
     metaGet(token, accountId, { fields: 'name,currency,account_status' }, fetchImpl),
     metaGet(token, `${accountId}/campaigns`, { fields: 'id,name,effective_status', limit: 100 }, fetchImpl),
-    metaGet(token, `${accountId}/insights`, {
-      level: 'campaign',
-      fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions',
-      date_preset: 'maximum',
-      limit: 100,
-    }, fetchImpl),
+    metaGet(token, `${accountId}/insights`, insightParams, fetchImpl),
+    metaGet(token, `${accountId}/insights`, { ...insightParams, breakdowns: 'publisher_platform' }, fetchImpl),
   ]);
   const insightById = new Map();
   for (const row of insightsData?.data || []) {
@@ -88,16 +90,39 @@ export async function syncAds({ token, accountId }, fetchImpl = fetch) {
       insightById.set(id, values);
     }
   }
+  const platformsByCampaign = new Map();
+  for (const row of platformInsightsData?.data || []) {
+    const id = String(row.campaign_id || '');
+    const platform = row.publisher_platform;
+    if (!id || typeof platform !== 'string' || !platform) continue;
+    let platforms = platformsByCampaign.get(id);
+    if (!platforms) platformsByCampaign.set(id, platforms = new Map());
+    const lead = (row.actions || []).find(action => action.action_type === 'lead');
+    const values = {
+      spend: numeric(row.spend),
+      impressions: numeric(row.impressions),
+      clicks: numeric(row.clicks),
+      leads: numeric(lead?.value),
+    };
+    const previous = platforms.get(platform);
+    if (previous) {
+      for (const key of Object.keys(values)) previous[key] += values[key];
+    } else {
+      platforms.set(platform, values);
+    }
+  }
   const campaigns = (campaignsData?.data || []).map(campaign => {
-    const insight = insightById.get(String(campaign.id)) || {};
+    const id = String(campaign.id);
+    const insight = insightById.get(id) || {};
     return {
-      id: String(campaign.id),
+      id,
       name: campaign.name || '',
       status: campaign.effective_status || '',
       spend: insight.spend || 0,
       impressions: insight.impressions || 0,
       clicks: insight.clicks || 0,
       leads: insight.leads || 0,
+      platforms: Object.fromEntries(platformsByCampaign.get(id) || []),
     };
   }).sort((a, b) => b.spend - a.spend).slice(0, 50);
   return {
