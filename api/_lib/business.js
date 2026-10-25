@@ -10,6 +10,34 @@ export function cleanCalendar(data) {
   return { items, issues: data.length - items.length };
 }
 
+const EXPERIMENT_STATUSES = ['running', 'scale', 'keep', 'kill'];
+const experimentText = value => typeof value === 'string' ? value.trim().slice(0, 500) : '';
+const experimentNumber = value => {
+  if (value == null || (typeof value === 'string' && !value.trim())) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+export function cleanExperiments(data) {
+  if (!Array.isArray(data)) return { items: null, issues: data == null ? 0 : 1 };
+  const valid = data.filter(item => item && typeof item === 'object' && !Array.isArray(item)
+    && typeof item.id === 'string' && item.id.trim() && typeof item.name === 'string' && item.name.trim());
+  const items = valid.slice(0, 8).map(item => ({
+    id: item.id.trim().slice(0, 80),
+    name: experimentText(item.name),
+    hypothesis: experimentText(item.hypothesis),
+    channel: experimentText(item.channel),
+    cost: experimentNumber(item.cost),
+    spent: experimentNumber(item.spent),
+    metric: experimentText(item.metric),
+    target: experimentNumber(item.target),
+    maxCac: experimentNumber(item.maxCac),
+    rule: experimentText(item.rule),
+    status: EXPERIMENT_STATUSES.includes(item.status) ? item.status : 'running',
+    verdict: experimentText(item.verdict),
+  }));
+  return { items, issues: data.length - items.length };
+}
+
 export async function activeBusiness(uid) {
   const db = admin();
   const { data: rows } = await db.from('businesses').select('*').eq('user_id', uid).eq('is_active', true).limit(1);
@@ -40,6 +68,7 @@ export async function businessState(uid) {
   const mt = f => (biz[f] ? Date.parse(biz.updated_at) : null);
   return {
     sprint: biz.sprint, profile: biz.profile, inputs: biz.inputs || {}, tracker: biz.tracker, brain: biz.brain || {},
+    experiments: cleanExperiments(biz.experiments).items || [],
     calendar: cal.items, calendarIssues: Math.max(cal.issues, biz.calendar_issues || 0), docs: docsOut, history,
     mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null },
     agent: 'devin', busy: (sess || []).some(s => s.devin_status === 'working'),
@@ -77,6 +106,7 @@ export async function exportMarkdown(uid) {
   const brain = brainContext(b.brain, b.profile);
   if (brain) out.push('\n---\n', brain);
   for (const id of BUSINESS_DOCS) if (b.docs[id]) out.push(`\n---\n`, b.docs[id].content.trim());
+  if (b.experiments?.length) out.push('\n---\n', '## Growth experiments', ...b.experiments.map(e => `- **${e.name}** · ${e.status}${e.target != null ? ` · target: ${e.target} ${e.metric}` : ''}${e.verdict ? ` — ${e.verdict}` : ''}`));
   if (b.calendar?.length) out.push('\n---\n', '## Campaign calendar', ...b.calendar.map(c => `- **${c.date}** · ${c.channel || ''} ${c.format || ''} · ${c.title}${c.status === 'posted' ? ' ✓' : ''}\n\n  ${(c.copy || '').replace(/\n/g, '\n  ')}${c.cta ? `\n\n  _CTA:_ ${c.cta}` : ''}`));
   return out.join('\n\n') + '\n';
 }

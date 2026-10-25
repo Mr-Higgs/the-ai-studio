@@ -10,7 +10,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 60,
-      "includeFiles": ".devin/skills/grand-slam-offer/SKILL.md"
+      "includeFiles": ".devin/skills/grand-slam-offer/**"
     }
   }
 }

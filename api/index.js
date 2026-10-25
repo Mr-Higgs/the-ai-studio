@@ -3,16 +3,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { admin, userFromReq } from './_lib/supabase.js';
 import { enc, dec } from './_lib/secrets.js';
-import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusiness, snapshot, exportMarkdown, cleanCalendar, BUSINESS_DOCS } from './_lib/business.js';
+import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusiness, snapshot, exportMarkdown, cleanCalendar, cleanExperiments, BUSINESS_DOCS } from './_lib/business.js';
 import { devinCreds, devinClient } from './_lib/devin.js';
-import { brainContext, cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
-import { buildContext, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
+import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
+import { contextParts, changedParts, partHashes, offerSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
 const send = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const readJson = async req => req.body ?? JSON.parse(await new Promise(r => { let b = ''; req.on('data', c => b += c); req.on('end', () => r(b || '{}')); }));
-const BIZ_FIELDS = { 'brain.json': 'brain', 'profile.json': 'profile', 'inputs.json': 'inputs', 'tracker.json': 'tracker', 'sprint.json': 'sprint', 'calendar.json': 'calendar' };
+const BIZ_FIELDS = { 'brain.json': 'brain', 'profile.json': 'profile', 'inputs.json': 'inputs', 'tracker.json': 'tracker', 'sprint.json': 'sprint', 'calendar.json': 'calendar', 'experiments.json': 'experiments' };
 const ENV_KEYS = { DEVIN_API_KEY: 'devin_api_key', DEVIN_ORG_ID: 'devin_org_id', HEYGEN_API_KEY: 'heygen_api_key' };
 // MCP servers Devin can use. Devin is the MCP client, so users add these in their own Devin
 // org (Customize → MCPs): Meta's as custom remote servers (`url`), the rest from Devin's
@@ -83,6 +83,15 @@ async function agentRow(uid, bizId, scope) {
 async function agentUpsert(uid, bizId, scope, fields) {
   await admin().from('agent_sessions').upsert({ user_id: uid, business_id: bizId, scope, ...fields }, { onConflict: 'business_id,scope' });
 }
+async function latestContext(uid, bizId) {
+  const db = admin();
+  const [{ data: biz }, { data: docs }] = await Promise.all([
+    db.from('businesses').select('*').eq('user_id', uid).eq('id', bizId).maybeSingle(),
+    db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', bizId),
+  ]);
+  const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
+  return { biz, parts: biz ? contextParts(biz, docMap) : [] };
+}
 
 // v3 status: new | claimed | running | resuming | suspended | exit | error; while running,
 // status_detail says whether Devin is working or waiting on the user.
@@ -104,6 +113,9 @@ async function applyOutput(uid, biz, row, session) {
     await snapshot(uid, biz.id, 'calendar', JSON.stringify(biz.calendar));
     await db.from('businesses').update({ calendar: applied.calendar, calendar_issues: applied.issues, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
   }
+  if (applied.experiments) {
+    await db.from('businesses').update({ experiments: applied.experiments, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
+  }
   let profileNumbers = false;
   if (applied.answers) {
     const merged = mergeDevinAnswers(biz.profile || {}, cleanBrain(biz.brain), applied.answers);
@@ -118,7 +130,7 @@ async function applyOutput(uid, biz, row, session) {
       profileNumbers = true;
     }
   }
-  return { applied: [...Object.keys(applied.docs), ...(applied.calendar ? ['calendar'] : []), ...(profileNumbers ? ['profile numbers'] : [])], hash: applied.hash };
+  return { applied: [...Object.keys(applied.docs), ...(applied.calendar ? ['calendar'] : []), ...(applied.experiments ? ['experiments'] : []), ...(profileNumbers ? ['profile numbers'] : [])], hash: applied.hash };
 }
 
 export default async function handler(req, res) {
@@ -197,6 +209,7 @@ export default async function handler(req, res) {
       }
       const fields = { updated_at: new Date().toISOString(), [col]: col === 'calendar' ? cleanCalendar(data).items : data };
       if (col === 'calendar') fields.calendar_issues = cleanCalendar(data).issues;
+      if (col === 'experiments') fields.experiments = cleanExperiments(data).items;
       await db.from('businesses').update(fields).eq('user_id', uid).eq('id', biz.id);
       return send(res, 200, { ok: true });
     }
@@ -305,8 +318,9 @@ export default async function handler(req, res) {
       const client = devinClient(creds);
 
       if (req.method === 'POST' && action === 'prompt') {
-        const { text, snapshot: snap } = await readJson(req);
+        const { text, snapshot: snap, step } = await readJson(req);
         if (!text?.trim()) return send(res, 400, { error: 'empty message' });
+        if (step != null && (typeof step !== 'string' || step.length > 40)) return send(res, 400, { error: 'bad step' });
         if (snap != null && (scope !== 'business' || !SNAP_ALLOWED.includes(snap))) return send(res, 400, { error: 'bad snapshot' });
         if (row?.devin_session_id) { // refresh status before deciding
           try { const s = await client.getSession(row.devin_session_id); row.devin_status = s.status_enum || s.status; } catch { row.devin_status = 'expired'; }
@@ -321,18 +335,23 @@ export default async function handler(req, res) {
           const { data: docs } = await db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id);
           const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
           const b2 = { ...biz, calendar: biz.calendar };
-          const ctx = buildContext(b2, docMap);
+          const parts = contextParts(b2, docMap);
+          const ctx = parts.map(part => part.text).join('\n\n');
           const extra = [scope !== 'business' ? `This conversation is about the promo video project '${scope}'.` : null, integrationNotes((await settings(uid)).integrations)].filter(Boolean).join('\n\n') || null;
           let skill = null;
-          if (snap === 'offer.md') try { skill = fs.readFileSync(path.join(process.cwd(), '.devin/skills/grand-slam-offer/SKILL.md'), 'utf8'); } catch {}
+          if (step === 'offer') skill = offerSkill(file => fs.readFileSync(path.join(process.cwd(), '.devin/skills/grand-slam-offer', file), 'utf8'));
           const s = await client.createSession({ prompt: sessionPrompt(ctx, text.trim(), { skill, extra }), title: `${biz.name || biz.profile?.name || 'Studio'} · Studio`, schema: STRUCTURED_SCHEMA, tags: ['studio'] });
-          await agentUpsert(uid, biz.id, scope, { devin_session_id: s.session_id, devin_status: 'working', last_prompt_at: new Date().toISOString() });
+          await agentUpsert(uid, biz.id, scope, { devin_session_id: s.session_id, devin_status: 'working', last_prompt_at: new Date().toISOString(), context_hashes: partHashes(parts) });
         } else {
-          // A live session only saw the Brain as it was when it started; resend it when it has changed since.
-          const changed = biz.brain_updated_at && Date.parse(biz.brain_updated_at) > Date.parse(row.last_prompt_at || 0) && snap !== 'brain.md';
-          const fresh = changed ? brainContext(biz.brain, biz.profile) : '';
-          await client.sendMessage(row.devin_session_id, fresh ? `My Business Brain changed since my last message. Use these figures from now on, replacing any earlier ones:\n\n${fresh}\n\n---\n\n${text.trim()}` : text.trim());
-          await agentUpsert(uid, biz.id, scope, { devin_status: 'working', last_prompt_at: new Date().toISOString() });
+          const { parts } = await latestContext(uid, biz.id);
+          const hashes = partHashes(parts);
+          const changed = changedParts(parts, row.context_hashes, { skip: snap === 'brain.md' ? ['brain'] : [] });
+          const fresh = changed.length ? `Things changed in Studio since my last message. Use these versions from now on, replacing earlier ones:\n\n${changed.map(part => part.text).join('\n\n')}\n\n---\n\n` : '';
+          const skill = step === 'offer'
+            ? `${offerSkill(file => fs.readFileSync(path.join(process.cwd(), '.devin/skills/grand-slam-offer', file), 'utf8'))}\n\n`
+            : '';
+          await client.sendMessage(row.devin_session_id, `${skill}${fresh}${text.trim()}`);
+          await agentUpsert(uid, biz.id, scope, { devin_status: 'working', last_prompt_at: new Date().toISOString(), context_hashes: hashes });
         }
         return send(res, 202, { ok: true });
       }
@@ -346,7 +365,21 @@ export default async function handler(req, res) {
         const seen = cursor ? items.findIndex(m => m.id === cursor) : -1;
         const messages = seen >= 0 ? items.slice(seen + 1) : items;
         const res2 = await applyOutput(uid, biz, row, s);
-        if (res2) await agentUpsert(uid, biz.id, scope, { applied_hash: res2.hash });
+        if (res2) {
+          const { parts } = await latestContext(uid, biz.id);
+          const hashes = partHashes(parts);
+          const appliedHashes = {};
+          for (const kind of res2.applied) {
+            const key = kind === 'calendar' ? 'calendar'
+              : kind === 'experiments' ? 'experiments'
+                : kind === 'profile numbers' ? null : `doc:${kind}`;
+            if (key && hashes[key]) appliedHashes[key] = hashes[key];
+            if (kind === 'profile numbers') {
+              for (const profileKey of ['profile', 'brain']) if (hashes[profileKey]) appliedHashes[profileKey] = hashes[profileKey];
+            }
+          }
+          await agentUpsert(uid, biz.id, scope, { applied_hash: res2.hash, context_hashes: { ...(row.context_hashes || {}), ...appliedHashes } });
+        }
         const busy = isBusy(s);
         if (row.devin_status !== status) await agentUpsert(uid, biz.id, scope, { devin_status: status });
         const starting = busy && !items.some(m => m.kind === 'agent') && Date.now() - Date.parse(row.last_prompt_at || 0) < 180000;

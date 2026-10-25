@@ -397,6 +397,27 @@ export function brainMath(raw, profile) {
   };
 }
 
+export function growthTargets(raw, profile) {
+  const cleaned = cleanBrain(raw);
+  const math = brainMath(cleaned, profile);
+  const item = math.items.find(candidate => !candidate.gaps.length && !candidate.notProfitable) || null;
+  const perSale = item ? (item.discounted?.earnings ?? item.earnings) : null;
+  const maxCac = math.ltv != null ? round(math.ltv / 3) : perSale > 0 ? perSale : null;
+  const campaignSpend = num(answerOf(cleaned, profile, QBY.campaignSpend).v);
+  const missing = [...math.missing];
+  if (math.ltv == null && !(perSale > 0)) missing.push('Lifetime value or profitable per-sale earnings');
+  if (campaignSpend == null) missing.push('Sprint budget');
+  return {
+    item: item?.name || null,
+    breakEven: item?.breakEven ?? null,
+    forTarget: item?.forTarget ?? null,
+    maxCac,
+    maxCacBasis: math.ltv != null ? 'ltv' : perSale > 0 ? 'first-sale' : null,
+    budget: campaignSpend,
+    missing: [...new Set(missing)],
+  };
+}
+
 const money = n => (n == null ? '—' : `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })}`);
 const show = v => (Array.isArray(v) ? v.join(', ') : String(v ?? '').trim());
 const tagOf = a => (a?.s ? ` [${a.s}]` : '');

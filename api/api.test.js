@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 process.env.STUDIO_SECRET_KEY ||= 'a'.repeat(64);
 
 import { enc, dec } from './_lib/secrets.js';
-import { cleanCalendar } from './_lib/business.js';
-import { buildContext, applyStructuredOutput, sessionPrompt, hashOf, OUTPUT_CONTRACT } from './_lib/prompts.js';
+import { cleanCalendar, cleanExperiments } from './_lib/business.js';
+import { buildContext, contextParts, partHashes, changedParts, offerSkill, applyStructuredOutput, sessionPrompt, hashOf, OUTPUT_CONTRACT } from './_lib/prompts.js';
+import { experimentStats } from '../ui/web/src/experiments.js';
+import { SCORE_EXPERIMENTS, STEPS, setSprint } from '../ui/web/src/steps.js';
 import { validProject, isBusy } from './index.js';
 
 test('secrets round-trip AES-256-GCM', () => {
@@ -24,6 +27,23 @@ test('cleanCalendar keeps renderable items and counts the rest', () => {
   assert.deepEqual(cleanCalendar({}), { items: null, issues: 1 });
 });
 
+test('cleanExperiments sanitizes and caps experiment data', () => {
+  const data = [
+    { id: ' e1 ', name: ' Test ', hypothesis: ` ${'x'.repeat(510)} `, cost: '12.5', spent: '', target: 'not a number', maxCac: '4', status: 'bad' },
+    { id: '', name: 'missing id' },
+    { id: 'e2', name: '  ' },
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `e${i + 3}`, name: `Item ${i}` })),
+  ];
+  const result = cleanExperiments(data);
+  assert.equal(result.items.length, 8);
+  assert.deepEqual(result.items[0], {
+    id: 'e1', name: 'Test', hypothesis: 'x'.repeat(500), channel: '', cost: 12.5, spent: null,
+    metric: '', target: null, maxCac: 4, rule: '', status: 'running', verdict: '',
+  });
+  assert.equal(result.issues, 3);
+  assert.deepEqual(cleanExperiments(null), { items: null, issues: 0 });
+});
+
 test('buildContext inlines profile, docs and calendar with truncation', () => {
   const big = 'x'.repeat(13000);
   const biz = { profile: { name: 'A' }, inputs: { offer: { sell: 'candles' } }, calendar: [{ date: '2026-01-01', title: 't' }] };
@@ -37,6 +57,43 @@ test('buildContext inlines profile, docs and calendar with truncation', () => {
   assert.ok(!buildContext(biz, {}).includes('### offer'));
 });
 
+test('context parts retain buildContext ordering and hash per part', () => {
+  const biz = { profile: { name: 'A' }, inputs: { x: 1 }, tracker: [{ id: 1 }], experiments: [{ id: 'e1', name: 'Test' }], calendar: [{ date: '2026-01-01', title: 't' }] };
+  const docs = { offer: { content: 'Offer' }, strategy: { content: 'Strategy' } };
+  const parts = contextParts(biz, docs);
+  assert.equal(buildContext(biz, docs), parts.map(part => part.text).join('\n\n'));
+  assert.deepEqual(parts.map(part => part.key), ['profile', 'inputs', 'tracker', 'experiments', 'doc:offer', 'doc:strategy', 'calendar']);
+  assert.ok(parts.find(part => part.key === 'experiments').text.startsWith('Growth experiments (JSON): '));
+  const hashes = partHashes(parts);
+  const edited = contextParts({ ...biz, tracker: [{ id: 2 }] }, docs);
+  const changed = partHashes(edited);
+  assert.equal(changed.tracker === hashes.tracker, false);
+  assert.equal(changed.profile, hashes.profile);
+  assert.equal(changed['doc:offer'], hashes['doc:offer']);
+});
+
+test('changedParts returns only edited nonempty context and can skip Brain', () => {
+  const original = contextParts({ profile: {}, brain: { answers: { campaignSpend: { v: '100', s: 'known' } } } }, { offer: { content: 'old' } });
+  const hashes = partHashes(original);
+  assert.deepEqual(changedParts(original, hashes), []);
+  const edited = contextParts({ profile: {}, brain: { answers: { campaignSpend: { v: '200', s: 'known' } } } }, { offer: { content: 'new' } });
+  assert.deepEqual(changedParts(edited, hashes).map(part => part.key), ['brain', 'doc:offer']);
+  assert.deepEqual(changedParts(edited, hashes, { skip: ['brain'] }).map(part => part.key), ['doc:offer']);
+  assert.deepEqual(changedParts([{ key: 'doc:offer', text: 'new' }], {}).map(part => part.key), ['doc:offer']);
+});
+
+test('offerSkill bundles all files with cloud-safe instructions', () => {
+  const contents = {
+    'SKILL.md': 'SKILL BODY',
+    'references/framework.md': 'FRAMEWORK BODY',
+    'templates/offer-doc.md': 'TEMPLATE BODY',
+  };
+  const skill = offerSkill(file => contents[file]);
+  for (const value of Object.values(contents)) assert.ok(skill.includes(value));
+  assert.match(skill, /Don't try to read or save files/);
+  assert.match(skill, /return the document as offer\.md in the structured output/);
+});
+
 test('applyStructuredOutput validates files, cleans calendar, stable hash', () => {
   const so = { files: { 'offer.md': '# Offer', 'evil.md': 'x', 'calendar.json': [{ date: '2026-01-01', title: 't' }, { bad: 1 }], 'notes.txt': 'nope' }, summary: 's' };
   const r = applyStructuredOutput(so);
@@ -47,6 +104,56 @@ test('applyStructuredOutput validates files, cleans calendar, stable hash', () =
   assert.equal(applyStructuredOutput(null), null);
   assert.equal(applyStructuredOutput({ files: {} }), null);
   assert.equal(applyStructuredOutput({ files: { 'offer.md': 'x'.repeat(200001) } }), null);
+});
+
+test('applyStructuredOutput accepts experiments and rejects unknown files', () => {
+  const experiment = { id: 'e1', name: 'Test', cost: '8', status: 'running' };
+  const result = applyStructuredOutput({ files: { 'experiments.json': [experiment], 'unknown.json': [] } });
+  assert.equal(result.experiments[0].cost, 8);
+  assert.deepEqual(result.docs, {});
+  assert.equal(applyStructuredOutput({ files: { 'unknown.json': [] } }), null);
+  assert.ok(OUTPUT_CONTRACT.includes('experiments.json'));
+});
+
+test('experimentStats groups tracker rows and leaves unknown acquisition cost blank', () => {
+  const rows = [
+    { experiment: 'e1', stage: 'Lead', value: 50 },
+    { experiment: 'e1', stage: 'Won', value: '40' },
+    { experiment: 'e1', stage: 'Won', value: '60' },
+    { experiment: 'e2', stage: 'Won', value: 500 },
+  ];
+  assert.deepEqual(experimentStats({ id: 'e1', spent: 30 }, rows), { leads: 3, won: 2, revenue: 100, costPerCustomer: 15 });
+  assert.equal(experimentStats({ id: 'e1', spent: null }, rows).costPerCustomer, null);
+  assert.equal(experimentStats({ id: 'e1', spent: 30 }, rows.filter(row => row.stage !== 'Won')).costPerCustomer, null);
+});
+
+test('holiday strategy and calendar prompts match the pre-change snapshot', () => {
+  setSprint('holiday');
+  const strategy = STEPS.find(step => step.id === 'strategy');
+  const calendar = STEPS.find(step => step.id === 'calendar');
+  const strategyPrompt = strategy.prompt({}, strategy);
+  const calendarPrompt = calendar.prompt({}, calendar);
+  assert.equal(createHash('sha256').update(strategyPrompt).digest('hex'), '13c5b7dbd12c2c6d318f456202d82f8a09d230a7189dab57e556cb88d093edbc');
+  assert.equal(createHash('sha256').update(calendarPrompt).digest('hex'), '77d34155165ee7913dc573a2295292ee17b1236b27a6b8940e4332ceb2a00564');
+  assert.doesNotMatch(strategyPrompt, /experiments\.json/);
+});
+
+test('growth prompts include calculated targets, experiment linkage and scoring guidance', () => {
+  setSprint('growth');
+  const strategy = STEPS.find(step => step.id === 'strategy');
+  const calendar = STEPS.find(step => step.id === 'calendar');
+  const brain = {
+    answers: { campaignSpend: { v: '200', s: 'known' } },
+    items: [{ name: { v: 'Candle box', s: 'known' }, price: { v: '40', s: 'known' }, materials: { v: '10', s: 'known' }, hours: { v: '0', s: 'known' }, other: { v: '0', s: 'known' } }],
+  };
+  const strategyPrompt = strategy.prompt({}, strategy, { brain, profile: {} });
+  assert.match(strategyPrompt, /experiments\.json/);
+  assert.match(strategyPrompt, /App-calculated sprint targets:.*break-even:.*Candle box/);
+  assert.match(strategyPrompt, /total planned cost within that budget/);
+  assert.match(calendar.prompt({}, calendar), /"experiment": "<id>"/);
+  assert.match(SCORE_EXPERIMENTS, /each tracker row's "experiment" field is an experiment id/);
+  assert.match(SCORE_EXPERIMENTS, /Return the full updated experiments\.json/);
+  setSprint('holiday');
 });
 
 test('sessionPrompt bundles skill, context, contract, request', () => {

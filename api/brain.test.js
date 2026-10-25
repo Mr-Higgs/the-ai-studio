@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { answersFromDevin, brainContext, brainMath, brainReady, cleanBrain, helpPrompt, mergeDevinAnswers, profileWithBrain } from '../ui/web/src/brain.js';
+import { answersFromDevin, brainContext, brainMath, brainReady, cleanBrain, growthTargets, helpPrompt, mergeDevinAnswers, profileWithBrain } from '../ui/web/src/brain.js';
 import { applyStructuredOutput, buildContext, GROUNDING } from './_lib/prompts.js';
 import { integrationNotes } from './index.js';
 
@@ -37,6 +37,39 @@ test('brainMath: flags losing offers and lists missing inputs', () => {
   assert.equal(m.items[0].notProfitable, true);
   assert.ok(m.missing.includes('Hourly labor cost'));
   assert.ok(brainMath({}).missing.some(x => x.startsWith('Price and costs')));
+});
+
+test('growthTargets uses LTV for CAC cap and preserves the available target item', () => {
+  const result = growthTargets({
+    answers: { ltv: a('120'), campaignSpend: a('200') },
+    items: [{ name: a('Candle box'), price: a('40'), materials: a('10'), hours: a('0'), other: a('0') }],
+  }, {});
+  assert.equal(result.item, 'Candle box');
+  assert.equal(result.maxCac, 40);
+  assert.equal(result.maxCacBasis, 'ltv');
+  assert.equal(result.budget, 200);
+});
+
+test('growthTargets falls back to discount-adjusted first-sale earnings', () => {
+  const result = growthTargets({
+    answers: { discount: a('10') },
+    items: [{ name: a('Candle box'), price: a('40'), materials: a('10'), hours: a('0'), other: a('0') }],
+  }, {});
+  assert.equal(result.maxCac, 26);
+  assert.equal(result.maxCacBasis, 'first-sale');
+  assert.equal(result.budget, null);
+});
+
+test('growthTargets keeps blank figures unknown and explains missing inputs', () => {
+  const result = growthTargets({ items: [{ name: a('Box'), price: a('40') }] }, {});
+  assert.equal(result.item, null);
+  assert.equal(result.breakEven, null);
+  assert.equal(result.forTarget, null);
+  assert.equal(result.maxCac, null);
+  assert.equal(result.maxCacBasis, null);
+  assert.equal(result.budget, null);
+  assert.ok(result.missing.some(x => x.includes('Materials')));
+  assert.ok(result.missing.includes('Sprint budget'));
 });
 
 test('brainReady needs the required sections', () => {
