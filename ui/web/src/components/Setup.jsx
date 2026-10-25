@@ -135,6 +135,73 @@ function DevinKeys({ item, recheck }) {
   );
 }
 
+function MetaApiInput({ item, recheck }) {
+  const [open, setOpen] = useState(!item.ok);
+  const [token, setToken] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [state, setState] = useState('');
+  const [message, setMessage] = useState('');
+  const save = async event => {
+    event.preventDefault();
+    setState('saving');
+    setMessage('');
+    try {
+      const result = await post('/api/setup/meta', { token: token.trim(), accountId: accountId.trim() });
+      setToken('');
+      setAccountId('');
+      setState('');
+      setMessage(`Connected to ${result.account}`);
+      setOpen(false);
+      await recheck();
+    } catch (error) {
+      setState(error.message);
+    }
+  };
+  const disconnect = async () => {
+    setState('saving');
+    setMessage('');
+    try {
+      await post('/api/setup/meta', { disconnect: true });
+      setState('');
+      setOpen(true);
+      await recheck();
+    } catch (error) {
+      setState(error.message);
+    }
+  };
+  if (item.ok && !open) return <>
+    <span className="hint">Ready</span>
+    <button className="btn ghost" onClick={() => setOpen(true)}>Replace</button>
+    <button className="btn ghost" disabled={state === 'saving'} onClick={disconnect}>{state === 'saving' ? 'Disconnecting…' : 'Disconnect'}</button>
+    {message && <p className="hint ok">{message}</p>}
+    {state && state !== 'saving' && <p className="msg err" role="alert">{state}</p>}
+  </>;
+  return (
+    <div className="meta-setup">
+      <form className="key-form" onSubmit={save}>
+        <label htmlFor="meta-access-token" className="sr">Access token</label>
+        <input id="meta-access-token" type="password" autoComplete="off" spellCheck={false} value={token} onChange={event => setToken(event.target.value)} placeholder="Access token" />
+        <label htmlFor="meta-account-id" className="sr">Ad account ID</label>
+        <input id="meta-account-id" autoComplete="off" spellCheck={false} value={accountId} onChange={event => setAccountId(event.target.value)} placeholder="Ad account ID" />
+        <button className="btn primary" disabled={!token.trim() || !accountId.trim() || state === 'saving'}>{state === 'saving' ? 'Connecting…' : 'Save'}</button>
+        {item.ok && <button type="button" className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>}
+        {state && state !== 'saving' && <p className="msg err" role="alert">{state}</p>}
+      </form>
+      {message && <p className="hint ok">{message}</p>}
+      <details className="integ-note">
+        <summary className="hint">How to get these</summary>
+        <ol>
+          <li>In Meta Business Settings → Users → System users, add a system user.</li>
+          <li>Assign it your ad account with “View performance” access.</li>
+          <li>Generate a token with the <code>ads_read</code> permission and paste it here.</li>
+          <li>The ad account ID is the number after <code>act=</code> in the Ads Manager URL.</li>
+        </ol>
+      </details>
+      <p className="hint">Studio only reads results. It never creates or changes ads.</p>
+    </div>
+  );
+}
+
 export default function Setup({ health, recheck }) {
   const [checking, setChecking] = useState(false);
   const missing = g => health?.filter(h => h.group === g && !h.ok) || [];
@@ -167,6 +234,7 @@ export default function Setup({ health, recheck }) {
                 <span className={'dot ' + (h.ok ? 'ok' : g === 'required' ? 'bad' : 'warn')} />
                 <span className="health-name">{h.name}<small>{h.why}</small></span>
                 {h.id === 'devin' ? <DevinKeys item={h} recheck={recheck} />
+                  : h.id === 'meta_api' ? <MetaApiInput item={h} recheck={recheck} />
                   : h.key ? <KeyInput item={h} recheck={recheck} />
                   : h.ok ? <span className="hint">Ready</span> : null}
               </li>

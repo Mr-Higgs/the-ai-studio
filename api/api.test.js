@@ -37,11 +37,15 @@ test('cleanExperiments sanitizes and caps experiment data', () => {
   const result = cleanExperiments(data);
   assert.equal(result.items.length, 8);
   assert.deepEqual(result.items[0], {
-    id: 'e1', name: 'Test', hypothesis: 'x'.repeat(500), channel: '', cost: 12.5, spent: null,
+    id: 'e1', name: 'Test', campaignId: null, hypothesis: 'x'.repeat(500), channel: '', cost: 12.5, spent: null,
     metric: '', target: null, maxCac: 4, rule: '', status: 'running', verdict: '',
   });
   assert.equal(result.issues, 3);
   assert.deepEqual(cleanExperiments(null), { items: null, issues: 0 });
+  assert.deepEqual(cleanExperiments([
+    { id: 'linked', name: 'Linked', campaignId: '123456' },
+    { id: 'invalid', name: 'Invalid', campaignId: 'abc' },
+  ]).items.map(item => item.campaignId), ['123456', null]);
 });
 
 test('buildContext inlines profile, docs and calendar with truncation', () => {

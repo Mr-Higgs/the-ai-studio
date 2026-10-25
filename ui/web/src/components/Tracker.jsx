@@ -45,7 +45,7 @@ export default function Tracker({ step, ...ctx }) {
   return (
     <>
       <StepHead step={step} ctx={ctx} />
-      {biz.experiments?.length > 0 && <Experiments experiments={biz.experiments} rows={rows} step={step} agent={agent} agentName={agentName} generate={generate} refresh={refresh} />}
+      {biz.experiments?.length > 0 && <Experiments experiments={biz.experiments} rows={rows} step={step} agent={agent} agentName={agentName} generate={generate} refresh={refresh} adInsights={biz.adInsights} />}
       <dl className="stats">
         {stats.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
       </dl>
