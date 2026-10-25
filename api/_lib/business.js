@@ -71,6 +71,7 @@ export async function businessState(uid) {
     sprint: biz.sprint, profile: biz.profile, inputs: biz.inputs || {}, tracker: biz.tracker, brain: biz.brain || {},
     experiments: cleanExperiments(biz.experiments).items || [],
     adInsights: biz.ad_insights || null,
+    instagramInsights: biz.instagram_insights || null,
     calendar: cal.items, calendarIssues: Math.max(cal.issues, biz.calendar_issues || 0), docs: docsOut, history,
     mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null },
     agent: 'devin', busy: (sess || []).some(s => s.devin_status === 'working'),

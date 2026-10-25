@@ -7,7 +7,7 @@ import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusin
 import { devinCreds, devinClient } from './_lib/devin.js';
 import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
 import { contextParts, changedParts, partHashes, offerSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
-import { applyAdSpend, normalizeAccountId, syncAds } from './_lib/meta.js';
+import { applyAdSpend, findInstagramAccounts, normalizeAccountId, NO_INSTAGRAM_ACCOUNT_MESSAGE, syncAds, syncInstagram, tryConnectInstagram } from './_lib/meta.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
@@ -38,13 +38,14 @@ export const INTEGRATIONS = {
   google_maps: { name: 'Google Maps', marketplace: 'Google Maps', why: 'Lets Devin look up local competitors, ratings and review themes near you.',
     prompt: 'The owner connected Google Maps in Devin. Use it to find local competitors near the business, their categories, ratings and common review themes. Cite the places you used.' },
 };
-export const metaHealthItem = settings => ({
+export const metaHealthItem = (settings, instagram = null) => ({
   id: 'meta_api',
   group: 'optional',
   name: 'Meta ad results',
   why: 'Studio reads spend, clicks and leads from your Meta ad account. Read-only.',
   ok: !!(settings.meta_access_token && settings.meta_ad_account_id),
   meta: true,
+  instagram: instagram || null,
 });
 // Devin has no API for adding org MCPs and Meta needs the owner's own Facebook login, so for
 // custom (url) servers a Devin session walks them through it, then checks the tools respond.
@@ -99,7 +100,7 @@ async function latestContext(uid, bizId) {
     db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', bizId),
   ]);
   const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null } : null;
+  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null } : null;
   return { biz: contextBiz, parts: contextBiz ? contextParts(contextBiz, docMap) : [] };
 }
 
@@ -157,6 +158,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && url.pathname === '/api/auth/me') return send(res, 200, { hosted: true, email: user.email });
     if (req.method === 'GET' && url.pathname === '/api/health') {
       const s = await settings(uid);
+      const { data: active } = await db.from('businesses').select('instagram_insights').eq('user_id', uid).eq('is_active', true).maybeSingle();
       // Settle pending "Set up with Devin" sessions: Devin's structured output decides.
       const integ = { ...(s.integrations || {}) }, pending = { ...(integ._setup || {}) };
       const client = Object.keys(pending).length && await devinCreds(uid).then(devinClient, () => null);
@@ -178,7 +180,7 @@ export default async function handler(req, res) {
         { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: !!(s.devin_api_key && s.devin_org_id), key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
         ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: !!s.integrations?.[id], setup: s.integrations?._setup?.[id] })),
         { id: 'heygen', group: 'optional', name: 'HeyGen API key', why: 'Imports your HeyGen videos and makes new ones from your avatars.', ok: !!s.heygen_api_key, key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
-        metaHealthItem(s),
+        metaHealthItem(s, active?.instagram_insights?.account?.username || null),
       ] });
     }
     if (req.method === 'POST' && url.pathname === '/api/setup/meta') {
@@ -188,6 +190,7 @@ export default async function handler(req, res) {
           user_id: uid,
           meta_access_token: null,
           meta_ad_account_id: null,
+          meta_instagram_id: null,
           updated_at: new Date().toISOString(),
         });
         return send(res, 200, { ok: true });
@@ -197,15 +200,21 @@ export default async function handler(req, res) {
       if (!/^[\x21-\x7e]{4,1024}$/.test(data.token || ''))
         return send(res, 400, { error: 'That doesn’t look like an API key. Paste it again with no spaces.' });
       const adInsights = await syncAds({ token: data.token, accountId });
+      const instagram = await tryConnectInstagram(data.token);
       const biz = await activeBusiness(uid);
       await db.from('user_settings').upsert({
         user_id: uid,
         meta_access_token: enc(data.token),
         meta_ad_account_id: enc(accountId),
+        meta_instagram_id: instagram.igId,
         updated_at: new Date().toISOString(),
       });
-      await db.from('businesses').update({ ad_insights: adInsights, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
-      return send(res, 200, { ok: true, account: adInsights.account.name });
+      await db.from('businesses').update({
+        ad_insights: adInsights,
+        ...(instagram.insights ? { instagram_insights: instagram.insights } : {}),
+        updated_at: new Date().toISOString(),
+      }).eq('user_id', uid).eq('id', biz.id);
+      return send(res, 200, { ok: true, account: adInsights.account.name, instagram: instagram.instagram });
     }
     if (req.method === 'POST' && url.pathname === '/api/ads/sync') {
       const s = await settings(uid);
@@ -220,6 +229,29 @@ export default async function handler(req, res) {
         ...(changed ? { experiments } : {}),
         updated_at: new Date().toISOString(),
       }).eq('user_id', uid).eq('id', biz.id);
+      return send(res, 200, await businessState(uid));
+    }
+    if (req.method === 'POST' && url.pathname === '/api/instagram/account') {
+      const data = await readJson(req);
+      const s = await settings(uid);
+      if (!s.meta_access_token) return send(res, 400, { error: 'Connect your Meta account in Setup first.' });
+      const token = dec(s.meta_access_token);
+      const accounts = await findInstagramAccounts(token);
+      const account = accounts.find(item => item.id === String(data.igId || ''));
+      if (!account) return send(res, 400, { error: NO_INSTAGRAM_ACCOUNT_MESSAGE });
+      await db.from('user_settings').upsert({ user_id: uid, meta_instagram_id: account.id, updated_at: new Date().toISOString() });
+      const instagramInsights = await syncInstagram({ token, igId: account.id });
+      const biz = await activeBusiness(uid);
+      await db.from('businesses').update({ instagram_insights: instagramInsights, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
+      return send(res, 200, await businessState(uid));
+    }
+    if (req.method === 'POST' && url.pathname === '/api/instagram/sync') {
+      const s = await settings(uid);
+      if (!s.meta_access_token) return send(res, 400, { error: 'Connect your Meta account in Setup first.' });
+      if (!s.meta_instagram_id) return send(res, 400, { error: NO_INSTAGRAM_ACCOUNT_MESSAGE });
+      const instagramInsights = await syncInstagram({ token: dec(s.meta_access_token), igId: s.meta_instagram_id });
+      const biz = await activeBusiness(uid);
+      await db.from('businesses').update({ instagram_insights: instagramInsights, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
       return send(res, 200, await businessState(uid));
     }
     if (req.method === 'POST' && url.pathname === '/api/setup/env') {
@@ -386,7 +418,7 @@ export default async function handler(req, res) {
         if (!row?.devin_session_id || ['expired', 'finished', 'suspended', 'exit', 'error'].includes(row.devin_status)) {
           const { data: docs } = await db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id);
           const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-          const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null };
+          const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null };
           const parts = contextParts(b2, docMap);
           const ctx = parts.map(part => part.text).join('\n\n');
           const extra = [scope !== 'business' ? `This conversation is about the promo video project '${scope}'.` : null, integrationNotes((await settings(uid)).integrations)].filter(Boolean).join('\n\n') || null;

@@ -16,6 +16,10 @@ export function contextParts(biz, docs) {
     const { account = {}, syncedAt, campaigns } = biz.adInsights;
     out.push({ key: 'ads', text: `Meta ad results (read-only, pulled by Studio from the owner's ad account "${account.name || ''}", amounts in ${account.currency || ''}, lifetime totals, synced ${syncedAt || ''}): ${cut(JSON.stringify(campaigns))}` });
   }
+  if (biz.instagramInsights) {
+    const { account = {}, last28, posts, syncedAt } = biz.instagramInsights;
+    out.push({ key: 'instagram', text: `Instagram organic results (read-only, pulled by Studio from @${account.username || ''}, last 28 days, synced ${syncedAt || ''}): ${cut(JSON.stringify({ account, last28, posts }))}` });
+  }
   for (const k of BUSINESS_DOCS) if (docs?.[k]?.content) out.push({ key: `doc:${k}`, text: `### ${k}.md\n${cut(docs[k].content)}` });
   if (biz.calendar?.length) out.push({ key: 'calendar', text: `### calendar.json\n${cut(JSON.stringify(biz.calendar))}` });
   return out;

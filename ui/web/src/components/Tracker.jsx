@@ -3,6 +3,7 @@ import { put } from '../api.js';
 import { TRACKER_INSIGHTS } from '../steps.js';
 import { StepHead } from './GenerateStep.jsx';
 import Experiments from './Experiments.jsx';
+import InstagramPanel from './InstagramPanel.jsx';
 
 const STAGES = ['Lead', 'Contacted', 'Quoted', 'Won', 'Lost'];
 const SOURCES = ['Instagram', 'Facebook', 'TikTok', 'Email', 'Google', 'Website', 'Referral', 'Walk-in', 'Other'];
@@ -46,6 +47,7 @@ export default function Tracker({ step, ...ctx }) {
     <>
       <StepHead step={step} ctx={ctx} />
       {biz.experiments?.length > 0 && <Experiments experiments={biz.experiments} rows={rows} step={step} agent={agent} agentName={agentName} generate={generate} refresh={refresh} adInsights={biz.adInsights} />}
+      {biz.instagramInsights && <InstagramPanel insights={biz.instagramInsights} refresh={refresh} />}
       <dl className="stats">
         {stats.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
       </dl>
