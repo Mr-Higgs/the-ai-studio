@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Calendar from './Calendar.jsx';
-import { STEPS, phaseOf } from '../steps.js';
+import { STEPS, phaseOf, targetSummary } from '../steps.js';
 import { growthTargets } from '../brain.js';
 import Experiments from './Experiments.jsx';
 
@@ -140,12 +140,7 @@ export default function GenerateStep({ step, ...ctx }) {
   const mine = workingOn === step.title;
   const history = biz.history?.[step.file.replace(/\.(md|json)$/, '')];
   const targetHints = biz.sprint?.id === 'growth' && step.id === 'strategy' ? growthTargets(biz.brain, biz.profile) : null;
-  const targetValues = targetHints ? [
-    targetHints.breakEven != null && targetHints.item ? `break-even: ${targetHints.breakEven} sales of ${targetHints.item}` : null,
-    targetHints.forTarget != null && targetHints.item ? `${targetHints.forTarget} sales for the profit goal` : null,
-    targetHints.maxCac != null ? `max CAC: $${targetHints.maxCac} (${targetHints.maxCacBasis === 'ltv' ? 'LTV ÷ 3' : 'first-sale earnings'})` : null,
-    targetHints.budget != null ? `budget: $${targetHints.budget}` : null,
-  ].filter(Boolean) : [];
+  const targetSummaryText = targetHints ? targetSummary(targetHints) : '';
 
   const run = () => {
     saveInputs(step.id, inputs);
@@ -155,7 +150,7 @@ export default function GenerateStep({ step, ...ctx }) {
   const form = (
     <div className="inputs">
       <div className="fields"><Fields fields={step.inputs} values={inputs} onChange={setInputs} /></div>
-      {targetHints && <p className="hint growth-target-hint">{targetValues.length ? `App-calculated sprint targets: ${targetValues.join('; ')}` : `App-calculated targets are incomplete. Missing: ${targetHints.missing.join(', ') || 'product costs and customer value'}.`}</p>}
+      {targetHints && <p className="hint growth-target-hint">{targetSummaryText ? `App-calculated sprint targets: ${targetSummaryText}` : `App-calculated targets are incomplete. Missing: ${targetHints.missing.join(', ') || 'product costs and customer value'}.`}</p>}
       <div className="actions">
         <button className="btn primary" onClick={run} disabled={agent.busy}>
           {mine ? `${agentName} is writing…` : has ? `Rewrite with ${agentName}` : `Write it with ${agentName}`}

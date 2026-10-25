@@ -27,7 +27,7 @@ const answers = (inputs, fields) => fields
   })
   .filter(Boolean).join('\n') || '- (nothing extra — use the profile)';
 const dollars = value => `$${Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
-const targetSummary = targets => [
+export const targetSummary = targets => [
   targets.breakEven != null && targets.item ? `break-even: ${targets.breakEven} sales of ${targets.item}` : null,
   targets.forTarget != null && targets.item ? `${targets.forTarget} sales for the goal` : null,
   targets.maxCac != null ? `max cost to win a customer: ${dollars(targets.maxCac)} (${targets.maxCacBasis === 'ltv' ? 'LTV ÷ 3' : 'discount-adjusted first-sale earnings'})` : null,
