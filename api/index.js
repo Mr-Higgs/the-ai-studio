@@ -7,6 +7,7 @@ import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusin
 import { devinCreds, devinClient } from './_lib/devin.js';
 import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
 import { contextParts, changedParts, partHashes, offerSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
+import { applyAdSpend, normalizeAccountId, syncAds } from './_lib/meta.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
@@ -37,6 +38,14 @@ export const INTEGRATIONS = {
   google_maps: { name: 'Google Maps', marketplace: 'Google Maps', why: 'Lets Devin look up local competitors, ratings and review themes near you.',
     prompt: 'The owner connected Google Maps in Devin. Use it to find local competitors near the business, their categories, ratings and common review themes. Cite the places you used.' },
 };
+export const metaHealthItem = settings => ({
+  id: 'meta_api',
+  group: 'optional',
+  name: 'Meta ad results',
+  why: 'Studio reads spend, clicks and leads from your Meta ad account. Read-only.',
+  ok: !!(settings.meta_access_token && settings.meta_ad_account_id),
+  meta: true,
+});
 // Devin has no API for adding org MCPs and Meta needs the owner's own Facebook login, so for
 // custom (url) servers a Devin session walks them through it, then checks the tools respond.
 const SETUP_SCHEMA = { type: 'object', properties: { connected: { type: 'boolean' }, note: { type: 'string' } }, required: ['connected', 'note'] };
@@ -90,7 +99,8 @@ async function latestContext(uid, bizId) {
     db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', bizId),
   ]);
   const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-  return { biz, parts: biz ? contextParts(biz, docMap) : [] };
+  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null } : null;
+  return { biz: contextBiz, parts: contextBiz ? contextParts(contextBiz, docMap) : [] };
 }
 
 // v3 status: new | claimed | running | resuming | suspended | exit | error; while running,
@@ -168,7 +178,49 @@ export default async function handler(req, res) {
         { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: !!(s.devin_api_key && s.devin_org_id), key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
         ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: !!s.integrations?.[id], setup: s.integrations?._setup?.[id] })),
         { id: 'heygen', group: 'optional', name: 'HeyGen API key', why: 'Imports your HeyGen videos and makes new ones from your avatars.', ok: !!s.heygen_api_key, key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
+        metaHealthItem(s),
       ] });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/setup/meta') {
+      const data = await readJson(req);
+      if (data.disconnect === true) {
+        await db.from('user_settings').upsert({
+          user_id: uid,
+          meta_access_token: null,
+          meta_ad_account_id: null,
+          updated_at: new Date().toISOString(),
+        });
+        return send(res, 200, { ok: true });
+      }
+      const accountId = normalizeAccountId(data.accountId);
+      if (!accountId) return send(res, 400, { error: 'Enter a valid ad account ID.' });
+      if (!/^[\x21-\x7e]{4,1024}$/.test(data.token || ''))
+        return send(res, 400, { error: 'That doesn’t look like an API key. Paste it again with no spaces.' });
+      const adInsights = await syncAds({ token: data.token, accountId });
+      const biz = await activeBusiness(uid);
+      await db.from('user_settings').upsert({
+        user_id: uid,
+        meta_access_token: enc(data.token),
+        meta_ad_account_id: enc(accountId),
+        updated_at: new Date().toISOString(),
+      });
+      await db.from('businesses').update({ ad_insights: adInsights, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
+      return send(res, 200, { ok: true, account: adInsights.account.name });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/ads/sync') {
+      const s = await settings(uid);
+      if (!s.meta_access_token || !s.meta_ad_account_id)
+        return send(res, 400, { error: 'Connect your Meta ad account in Setup first.' });
+      const credentials = { token: dec(s.meta_access_token), accountId: dec(s.meta_ad_account_id) };
+      const adInsights = await syncAds(credentials);
+      const biz = await activeBusiness(uid);
+      const { items: experiments, changed } = applyAdSpend(biz.experiments || [], adInsights.campaigns);
+      await db.from('businesses').update({
+        ad_insights: adInsights,
+        ...(changed ? { experiments } : {}),
+        updated_at: new Date().toISOString(),
+      }).eq('user_id', uid).eq('id', biz.id);
+      return send(res, 200, await businessState(uid));
     }
     if (req.method === 'POST' && url.pathname === '/api/setup/env') {
       const { name, value } = await readJson(req);
@@ -334,7 +386,7 @@ export default async function handler(req, res) {
         if (!row?.devin_session_id || ['expired', 'finished', 'suspended', 'exit', 'error'].includes(row.devin_status)) {
           const { data: docs } = await db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id);
           const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-          const b2 = { ...biz, calendar: biz.calendar };
+          const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null };
           const parts = contextParts(b2, docMap);
           const ctx = parts.map(part => part.text).join('\n\n');
           const extra = [scope !== 'business' ? `This conversation is about the promo video project '${scope}'.` : null, integrationNotes((await settings(uid)).integrations)].filter(Boolean).join('\n\n') || null;

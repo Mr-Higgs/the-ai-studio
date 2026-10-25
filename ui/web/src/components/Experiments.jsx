@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { put } from '../api.js';
+import { post, put } from '../api.js';
 import { SCORE_EXPERIMENTS } from '../steps.js';
 import { experimentStats } from '../experiments.js';
 
 const STATUSES = ['running', 'scale', 'keep', 'kill'];
-const money = value => value == null || !Number.isFinite(Number(value))
+const money = (value, currency = 'USD') => value == null || !Number.isFinite(Number(value))
   ? '—'
-  : Number(value).toLocaleString([], { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+  : Number(value).toLocaleString([], { style: 'currency', currency, maximumFractionDigits: 2 });
 
-export default function Experiments({ experiments = [], rows = [], step, agent, agentName, generate, refresh }) {
+export default function Experiments({ experiments = [], rows = [], step, agent, agentName, generate, refresh, adInsights }) {
+  const campaigns = adInsights?.campaigns || [];
+  const currency = adInsights?.account?.currency || 'USD';
   const propKey = JSON.stringify(experiments);
   const [items, setItems] = useState(experiments);
   const [saveState, setSaveState] = useState('');
+  const [metaState, setMetaState] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const timer = useRef();
   const itemsRef = useRef(items);
   const dirty = useRef(false);
@@ -28,8 +32,8 @@ export default function Experiments({ experiments = [], rows = [], step, agent, 
   }, [propKey]);
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  const update = (id, field, value) => {
-    const next = itemsRef.current.map(item => item.id === id ? { ...item, [field]: value } : item);
+  const update = (id, changes) => {
+    const next = itemsRef.current.map(item => item.id === id ? { ...item, ...changes } : item);
     itemsRef.current = next;
     setItems(next);
     dirty.current = true;
@@ -47,6 +51,18 @@ export default function Experiments({ experiments = [], rows = [], step, agent, 
       }
     }, 500);
   };
+  const refreshMeta = async () => {
+    setSyncing(true);
+    setMetaState('');
+    try {
+      await post('/api/ads/sync', {});
+      await refresh();
+    } catch (error) {
+      setMetaState(error.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   if (!items.length) return null;
   return (
@@ -55,6 +71,13 @@ export default function Experiments({ experiments = [], rows = [], step, agent, 
         <div>
           <h2>Growth experiments</h2>
           <p className="hint">Track what each test costs and whether it is bringing in customers.</p>
+          {campaigns.length > 0 && (
+            <div className="meta-refresh">
+              <button className="btn" onClick={refreshMeta} disabled={syncing}>{syncing ? 'Refreshing…' : 'Refresh Meta results'}</button>
+              <span className="hint">Synced {adInsights.syncedAt ? new Date(adInsights.syncedAt).toLocaleString() : 'time unknown'}</span>
+              {metaState && <p className="msg err" role="alert">{metaState}</p>}
+            </div>
+          )}
         </div>
         <button className="btn" onClick={() => generate(step, SCORE_EXPERIMENTS)} disabled={agent.busy}>
           Score my experiments with {agentName}
@@ -64,6 +87,7 @@ export default function Experiments({ experiments = [], rows = [], step, agent, 
       <div className="experiment-grid">
         {items.map(experiment => {
           const stats = experimentStats(experiment, rows);
+          const linkedCampaign = campaigns.find(campaign => String(campaign.id) === experiment.campaignId);
           return (
             <article className="experiment-card" key={experiment.id}>
               <div className="experiment-title">
@@ -72,21 +96,42 @@ export default function Experiments({ experiments = [], rows = [], step, agent, 
               </div>
               <p className="experiment-channel">{experiment.channel || 'Channel not set'}</p>
               {experiment.hypothesis && <p className="experiment-hypothesis">{experiment.hypothesis}</p>}
-              <p className="experiment-cost">Planned test cost: {money(experiment.cost)}</p>
+              <p className="experiment-cost">Planned test cost: {money(experiment.cost, currency)}</p>
               <dl className="experiment-stats">
                 <div><dt>Leads</dt><dd>{stats.leads}</dd></div>
                 <div><dt>{experiment.target != null ? 'Won / target' : 'Customers won'}</dt><dd>{stats.won}{experiment.target != null ? ` / ${experiment.target}` : ''}</dd></div>
-                <div><dt>Revenue</dt><dd>{money(stats.revenue)}</dd></div>
-                <div><dt>Cost / customer</dt><dd>{money(stats.costPerCustomer)}{experiment.maxCac != null ? ` / ${money(experiment.maxCac)} max` : ' / — max'}</dd></div>
+                <div><dt>Revenue</dt><dd>{money(stats.revenue, currency)}</dd></div>
+                <div><dt>Cost / customer</dt><dd>{money(stats.costPerCustomer, currency)}{experiment.maxCac != null ? ` / ${money(experiment.maxCac, currency)} max` : ' / — max'}</dd></div>
               </dl>
+              {campaigns.length > 0 && (
+                <label className="experiment-campaign">
+                  Meta campaign
+                  <select
+                    value={experiment.campaignId || ''}
+                    onChange={event => {
+                      const campaignId = event.target.value;
+                      const campaign = campaigns.find(item => String(item.id) === campaignId);
+                      update(experiment.id, {
+                        campaignId: campaignId || null,
+                        ...(campaign ? { spent: campaign.spend } : {}),
+                      });
+                    }}
+                  >
+                    <option value="">Not linked</option>
+                    {campaigns.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
+                  </select>
+                </label>
+              )}
+              {linkedCampaign && <p className="experiment-meta">Meta: {money(linkedCampaign.spend, currency)} · {linkedCampaign.leads} leads · {linkedCampaign.clicks} clicks</p>}
               <div className="experiment-controls">
                 <label>
-                  Actual spend ($)
-                  <input type="number" min="0" step="0.01" inputMode="decimal" value={experiment.spent ?? ''} onChange={event => update(experiment.id, 'spent', event.target.value === '' ? null : event.target.value)} />
+                  Actual spend ({adInsights?.account?.currency ? currency : '$'})
+                  <input type="number" min="0" step="0.01" inputMode="decimal" readOnly={!!linkedCampaign} value={experiment.spent ?? ''} onChange={event => update(experiment.id, { spent: event.target.value === '' ? null : event.target.value })} />
+                  {linkedCampaign && <small className="hint">from Meta</small>}
                 </label>
                 <label>
                   Status
-                  <select value={experiment.status} onChange={event => update(experiment.id, 'status', event.target.value)}>
+                  <select value={experiment.status} onChange={event => update(experiment.id, { status: event.target.value })}>
                     {STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                   </select>
                 </label>

@@ -185,7 +185,7 @@ export default function GenerateStep({ step, ...ctx }) {
           <div className="prose"><Markdown remarkPlugins={[remarkGfm]}>{doc.content}</Markdown></div>
         </article>
       )}
-      {step.id === 'strategy' && biz.experiments?.length > 0 && <Experiments experiments={biz.experiments} rows={biz.tracker || []} step={step} agent={agent} agentName={agentName} generate={generate} refresh={refresh} />}
+      {step.id === 'strategy' && biz.experiments?.length > 0 && <Experiments experiments={biz.experiments} rows={biz.tracker || []} step={step} agent={agent} agentName={agentName} generate={generate} refresh={refresh} adInsights={biz.adInsights} />}
       {!has && !mine && (
         <div className="placeholder">
           <p>Nothing here yet. Answer what you can above (blanks are fine) and {agentName} will write this step from your profile and everything you’ve made so far.</p>

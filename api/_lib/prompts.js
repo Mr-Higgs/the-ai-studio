@@ -12,6 +12,10 @@ export function contextParts(biz, docs) {
   if (biz.inputs && Object.keys(biz.inputs).length) out.push({ key: 'inputs', text: `Step answers (JSON): ${JSON.stringify(biz.inputs)}` });
   if (biz.tracker?.length) out.push({ key: 'tracker', text: `Lead tracker (JSON): ${cut(JSON.stringify(biz.tracker))}` });
   if (biz.experiments?.length) out.push({ key: 'experiments', text: `Growth experiments (JSON): ${cut(JSON.stringify(biz.experiments))}` });
+  if (biz.adInsights?.campaigns?.length) {
+    const { account = {}, syncedAt, campaigns } = biz.adInsights;
+    out.push({ key: 'ads', text: `Meta ad results (read-only, pulled by Studio from the owner's ad account "${account.name || ''}", amounts in ${account.currency || ''}, lifetime totals, synced ${syncedAt || ''}): ${cut(JSON.stringify(campaigns))}` });
+  }
   for (const k of BUSINESS_DOCS) if (docs?.[k]?.content) out.push({ key: `doc:${k}`, text: `### ${k}.md\n${cut(docs[k].content)}` });
   if (biz.calendar?.length) out.push({ key: 'calendar', text: `### calendar.json\n${cut(JSON.stringify(biz.calendar))}` });
   return out;

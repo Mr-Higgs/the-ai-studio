@@ -24,6 +24,7 @@ export function cleanExperiments(data) {
   const items = valid.slice(0, 8).map(item => ({
     id: item.id.trim().slice(0, 80),
     name: experimentText(item.name),
+    campaignId: typeof item.campaignId === 'string' && /^\d{1,40}$/.test(item.campaignId) ? item.campaignId : null,
     hypothesis: experimentText(item.hypothesis),
     channel: experimentText(item.channel),
     cost: experimentNumber(item.cost),
@@ -69,6 +70,7 @@ export async function businessState(uid) {
   return {
     sprint: biz.sprint, profile: biz.profile, inputs: biz.inputs || {}, tracker: biz.tracker, brain: biz.brain || {},
     experiments: cleanExperiments(biz.experiments).items || [],
+    adInsights: biz.ad_insights || null,
     calendar: cal.items, calendarIssues: Math.max(cal.issues, biz.calendar_issues || 0), docs: docsOut, history,
     mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null },
     agent: 'devin', busy: (sess || []).some(s => s.devin_status === 'working'),

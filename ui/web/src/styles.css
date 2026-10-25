@@ -322,6 +322,8 @@ textarea { resize: vertical; line-height: 1.45; }
 .experiments-head h2 { font: 600 20px/1.2 var(--display); margin: 0 0 4px; }
 .experiments-head p { margin: 0; }
 .experiment-save { margin: 0 0 8px; }
+.meta-refresh { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 10px; }
+.meta-refresh .msg { flex-basis: 100%; margin: 0; }
 .experiment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 12px; }
 .experiment-card { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); }
 .experiment-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
@@ -329,6 +331,9 @@ textarea { resize: vertical; line-height: 1.45; }
 .experiment-channel { margin: 4px 0 8px; color: var(--accent); font-size: 13px; font-weight: 600; }
 .experiment-hypothesis { margin: 0 0 12px; color: var(--muted); font-size: 13.5px; }
 .experiment-cost { margin: 0; color: var(--muted); font-size: 12.5px; }
+.experiment-campaign { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; font-size: 13px; font-weight: 600; }
+.experiment-campaign select { min-width: 0; }
+.experiment-meta { margin: 0 0 12px; color: var(--accent); font-size: 13.5px; font-weight: 600; }
 .experiment-status { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--frost); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .experiment-status.status-scale { color: var(--ok); }
 .experiment-status.status-kill { color: var(--bad); }
@@ -339,6 +344,8 @@ textarea { resize: vertical; line-height: 1.45; }
 .experiment-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .experiment-controls label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
 .experiment-controls input, .experiment-controls select { width: 100%; min-width: 0; }
+.experiment-controls small { margin-top: -3px; }
+.experiment-controls input[readonly] { opacity: .75; cursor: not-allowed; }
 .experiment-verdict { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13.5px; }
 @media (max-width: 500px) {
   .experiments-head { align-items: flex-start; flex-direction: column; }
@@ -431,6 +438,7 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .health > li:first-child { border-top: 0; }
 .health-name { font-weight: 600; flex: 1 1 240px; min-width: 0; }
 .health > li > .hint { margin-left: auto; color: var(--ok); }
+.meta-setup { flex: 1 1 100%; min-width: 0; margin-left: 21px; }
 .health > li > .integ-note { flex-basis: 100%; margin: 0 0 0 21px; color: var(--muted); font-size: 13.5px; }
 .integ-note ol { margin: 6px 0; padding-left: 18px; font-size: 14px; }
 .integ-note summary { cursor: pointer; }
