@@ -157,6 +157,7 @@ test('growth prompts include calculated targets, experiment linkage and scoring 
   assert.match(calendar.prompt({}, calendar), /"experiment": "<id>"/);
   assert.match(SCORE_EXPERIMENTS, /each tracker row's "experiment" field is an experiment id/);
   assert.match(SCORE_EXPERIMENTS, /Return the full updated experiments\.json/);
+  assert.match(SCORE_EXPERIMENTS, /For organic Instagram experiments, use the Instagram organic results \(reach, views, interactions\) as the leading signal when the tracker has few leads\./);
   setSprint('holiday');
 });
 

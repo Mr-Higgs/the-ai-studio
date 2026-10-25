@@ -2,9 +2,10 @@ import { useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Calendar from './Calendar.jsx';
-import { STEPS, phaseOf, targetSummary } from '../steps.js';
+import { SPRINT, SPRINTS, STEPS, phaseOf, targetSummary } from '../steps.js';
 import { growthTargets } from '../brain.js';
 import Experiments from './Experiments.jsx';
+import InstagramPanel from './InstagramPanel.jsx';
 
 export function StepHead({ step, ctx, children }) {
   return (
@@ -186,6 +187,7 @@ export default function GenerateStep({ step, ...ctx }) {
         </article>
       )}
       {step.id === 'strategy' && biz.experiments?.length > 0 && <Experiments experiments={biz.experiments} rows={biz.tracker || []} step={step} agent={agent} agentName={agentName} generate={generate} refresh={refresh} adInsights={biz.adInsights} />}
+      {step.id === 'strategy' && SPRINT === SPRINTS.growth && biz.instagramInsights && <InstagramPanel insights={biz.instagramInsights} refresh={refresh} />}
       {!has && !mine && (
         <div className="placeholder">
           <p>Nothing here yet. Answer what you can above (blanks are fine) and {agentName} will write this step from your profile and everything you’ve made so far.</p>

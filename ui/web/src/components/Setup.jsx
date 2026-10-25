@@ -141,16 +141,19 @@ function MetaApiInput({ item, recheck }) {
   const [accountId, setAccountId] = useState('');
   const [state, setState] = useState('');
   const [message, setMessage] = useState('');
+  const [instagramError, setInstagramError] = useState('');
   const save = async event => {
     event.preventDefault();
     setState('saving');
     setMessage('');
+    setInstagramError('');
     try {
       const result = await post('/api/setup/meta', { token: token.trim(), accountId: accountId.trim() });
       setToken('');
       setAccountId('');
       setState('');
       setMessage(`Connected to ${result.account}`);
+      if (result.instagram?.error) setInstagramError(result.instagram.error);
       setOpen(false);
       await recheck();
     } catch (error) {
@@ -171,9 +174,11 @@ function MetaApiInput({ item, recheck }) {
   };
   if (item.ok && !open) return <>
     <span className="hint">Ready</span>
+    <span className="hint">Instagram: {item.instagram ? `@${item.instagram}` : 'not found'}</span>
     <button className="btn ghost" onClick={() => setOpen(true)}>Replace</button>
     <button className="btn ghost" disabled={state === 'saving'} onClick={disconnect}>{state === 'saving' ? 'Disconnecting…' : 'Disconnect'}</button>
     {message && <p className="hint ok">{message}</p>}
+    {instagramError && <p className="msg err" role="alert">{instagramError}</p>}
     {state && state !== 'saving' && <p className="msg err" role="alert">{state}</p>}
   </>;
   return (
@@ -193,8 +198,9 @@ function MetaApiInput({ item, recheck }) {
         <ol>
           <li>In Meta Business Settings → Users → System users, add a system user.</li>
           <li>Assign it your ad account with “View performance” access.</li>
-          <li>Generate a token with the <code>ads_read</code> permission and paste it here.</li>
+          <li>Generate a token with <code>ads_read</code> and, for Instagram, <code>instagram_basic</code>, <code>instagram_manage_insights</code> and <code>pages_read_engagement</code>; paste it here.</li>
           <li>The ad account ID is the number after <code>act=</code> in the Ads Manager URL.</li>
+          <li>To include organic Instagram, also assign your Facebook Page (connected to Instagram) to the system user.</li>
         </ol>
       </details>
       <p className="hint">Studio only reads results. It never creates or changes ads.</p>

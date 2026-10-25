@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyAdSpend, metaGet, normalizeAccountId, syncAds } from './_lib/meta.js';
+import { applyAdSpend, findInstagramAccounts, metaGet, normalizeAccountId, syncAds, syncInstagram, tryConnectInstagram } from './_lib/meta.js';
 import { contextParts, buildContext } from './_lib/prompts.js';
 import { metaHealthItem } from './index.js';
 
@@ -157,6 +157,99 @@ test('Meta health item reports readiness without exposing stored credentials', (
     why: 'Studio reads spend, clicks and leads from your Meta ad account. Read-only.',
     ok: true,
     meta: true,
+    instagram: null,
   });
   assert.doesNotMatch(JSON.stringify(item), /SECRET|act_123/);
+  assert.equal(metaHealthItem({ meta_access_token: 'SECRET', meta_ad_account_id: 'act_123' }, 'studio').instagram, 'studio');
+});
+
+test('Instagram discovery skips pages without a connected Instagram account', async () => {
+  const fetchImpl = async rawUrl => {
+    const url = new URL(rawUrl);
+    const body = url.searchParams.has('after')
+      ? { data: [{ name: 'Page B', instagram_business_account: { id: '1789', username: 'studio' } }] }
+      : { data: [{ name: 'Page A' }], paging: { next: `${url.origin}${url.pathname}?after=next` } };
+    return { ok: true, json: async () => body };
+  };
+  assert.deepEqual(await findInstagramAccounts('SECRET', fetchImpl), [
+    { id: '1789', username: 'studio', page: 'Page B' },
+  ]);
+});
+
+test('Instagram sync uses a 28-day window, limits media to one page, and tolerates post insight errors', async () => {
+  const calls = [];
+  const media = [
+    { id: 'p1', caption: 'x'.repeat(200), media_type: 'IMAGE', permalink: 'https://instagram.test/p/1', timestamp: '2026-01-02T00:00:00Z', like_count: '4', comments_count: '2' },
+    { id: 'p2', caption: 'short', media_product_type: 'REELS', permalink: 'https://instagram.test/reel/2', timestamp: '2026-01-01T00:00:00Z', like_count: '1', comments_count: '0' },
+  ];
+  const fetchImpl = async rawUrl => {
+    const url = new URL(rawUrl);
+    calls.push(url);
+    let body;
+    if (url.pathname.endsWith('/1789/media')) {
+      assert.equal(url.searchParams.get('limit'), '12');
+      body = { data: media, paging: { next: `${url.origin}${url.pathname}?after=second` } };
+    } else if (url.pathname.endsWith('/1789/insights')) {
+      body = { data: ['reach', 'views', 'accounts_engaged', 'total_interactions'].map((name, index) => ({ name, total_value: { value: index + 10 } })) };
+    } else if (url.pathname.endsWith('/p2/insights')) {
+      body = { error: { code: 10, message: 'not supported for this media type' } };
+      return { ok: false, json: async () => body };
+    } else if (url.pathname.endsWith('/p1/insights')) {
+      body = { data: ['reach', 'views', 'saved', 'shares', 'total_interactions'].map((name, index) => ({ name, total_value: { value: index + 1 } })) };
+    } else {
+      body = { username: 'studio', followers_count: '150', media_count: '20' };
+    }
+    return { ok: true, json: async () => body };
+  };
+  const result = await syncInstagram({ token: 'SECRET', igId: '1789' }, fetchImpl);
+  const accountCall = calls.find(url => url.pathname.endsWith('/1789/insights'));
+  const since = Number(accountCall.searchParams.get('since'));
+  const until = Number(accountCall.searchParams.get('until'));
+  assert.equal(until - since, 28 * 24 * 60 * 60);
+  assert.equal(accountCall.searchParams.get('metric'), 'reach,views,accounts_engaged,total_interactions');
+  assert.equal(accountCall.searchParams.get('period'), 'day');
+  assert.equal(accountCall.searchParams.get('metric_type'), 'total_value');
+  assert.deepEqual(result.account, { id: '1789', username: 'studio', followers: 150, mediaCount: 20 });
+  assert.deepEqual(result.last28, { reach: 10, views: 11, accountsEngaged: 12, interactions: 13 });
+  assert.equal(result.posts[0].caption.length, 140);
+  assert.equal(result.posts[0].caption.endsWith('…'), true);
+  assert.equal(result.posts[0].interactions, 5);
+  assert.deepEqual(
+    [result.posts[1].reach, result.posts[1].views, result.posts[1].saved, result.posts[1].shares, result.posts[1].interactions],
+    [null, null, null, null, null],
+  );
+  assert.equal(calls.filter(url => url.pathname.endsWith('/1789/media')).length, 1);
+  assert.equal(calls.some(url => url.searchParams.get('after') === 'second'), false);
+});
+
+test('Instagram permission errors map to the Setup guidance and discovery failure is non-fatal', async () => {
+  const permissionMessage = "Your Meta token can't read Instagram yet. Add instagram_basic, instagram_manage_insights and pages_read_engagement to it, and assign your Facebook Page to the system user.";
+  for (const code of [10, 200]) {
+    await assert.rejects(metaGet('SECRET', '1789/insights', {}, async () => ({
+      ok: false,
+      json: async () => ({ error: { code, message: 'permission denied' } }),
+    })), error => {
+      assert.equal(error.status, 400);
+      assert.equal(error.message, permissionMessage);
+      return true;
+    });
+  }
+  const connected = await tryConnectInstagram('SECRET', async () => { throw new Error('offline'); });
+  assert.equal(connected.igId, null);
+  assert.equal(connected.insights, null);
+  assert.match(connected.instagram.error, /offline/);
+});
+
+test('Instagram context follows ads and is omitted when absent', () => {
+  const business = {
+    profile: { name: 'A' },
+    experiments: [{ id: 'e1', name: 'Test' }],
+    adInsights: { account: { name: 'Studio', currency: 'USD' }, syncedAt: 'now', campaigns: [{ id: 'c1' }] },
+    instagramInsights: { account: { username: 'studio' }, last28: { reach: 1 }, posts: [], syncedAt: 'then' },
+    calendar: [{ date: '2026-01-01' }],
+  };
+  const parts = contextParts(business, { offer: { content: 'Offer' } });
+  assert.deepEqual(parts.map(part => part.key), ['profile', 'experiments', 'ads', 'instagram', 'doc:offer', 'calendar']);
+  assert.equal(parts[3].text, 'Instagram organic results (read-only, pulled by Studio from @studio, last 28 days, synced then): {"account":{"username":"studio"},"last28":{"reach":1},"posts":[]}');
+  assert.deepEqual(contextParts({ ...business, instagramInsights: null }, { offer: { content: 'Offer' } }).map(part => part.key), ['profile', 'experiments', 'ads', 'doc:offer', 'calendar']);
 });
