@@ -6,7 +6,7 @@ const parse = d => { const [y, m, day] = d.split('-').map(Number); return new Da
 const monday = d => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const fmt = (d, o) => d.toLocaleDateString([], o);
 
-export default function Calendar({ items, refresh }) {
+export default function Calendar({ items, experiments = [], refresh }) {
   const [list, setList] = useState(items);
   const [open, setOpen] = useState(null);
   const [error, setError] = useState('');
@@ -47,7 +47,7 @@ export default function Calendar({ items, refresh }) {
                 </label>
                 <button className="cal-main" aria-expanded={open === i} onClick={() => setOpen(open === i ? null : i)}>
                   <span className="cal-date">{fmt(d, { weekday: 'short', day: 'numeric' })}</span>
-                  <span className="cal-chan">{item.channel}<em>{item.format}</em></span>
+                  <span className="cal-chan">{item.channel}<em>{item.format}</em>{item.experiment && <small className="cal-experiment">{experiments.find(experiment => experiment.id === item.experiment)?.name || 'Experiment'}</small>}</span>
                   <span className="cal-title">{item.title}</span>
                 </button>
                 {open === i && (
