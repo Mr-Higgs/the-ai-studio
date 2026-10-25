@@ -25,7 +25,7 @@ http.createServer(async (req, res) => {
     if (req.method !== 'GET' && String(req.headers['content-type']).startsWith('application/json')) {
       let b = '';
       for await (const c of req) b += c;
-      req.body = JSON.parse(b || '{}');
+      try { req.body = JSON.parse(b || '{}'); } catch { req.body = b; }
     }
     return handler(req, res);
   }

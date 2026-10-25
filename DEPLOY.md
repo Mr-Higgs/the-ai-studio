@@ -13,7 +13,7 @@ to install.
    **Project URL**, the **anon public key**, and the **service_role key** (Settings → API).
    The reference deployment uses project `owoaljgzwrecwcnkmxle`, already migrated.
 2. Run the migration files in `supabase/migrations/` in order, through
-   `0005_instagram.sql` (`supabase link --project-ref <ref>` then `supabase db push`, or
+   `0006_field_timestamps_lead_form.sql` (`supabase link --project-ref <ref>` then `supabase db push`, or
    paste each file into the SQL editor).
 3. In **Authentication → Providers → Email**: keep "Allow new users to sign up" ON (sign-up
    happens through Supabase Auth directly). Turn OFF "Confirm email" if you want participants

@@ -73,7 +73,7 @@ class StepBoundary extends Component {
     if (!this.state.error) return this.props.children;
     return (
       <div className="placeholder" role="alert">
-        <p>Something went wrong showing this step{this.props.file ? <> — probably <code>business/{this.props.file}</code> isn’t in the shape the page expects. Ask the assistant to fix that file</> : ''}, then reload.</p>
+        <p>Something went wrong showing this step — probably the saved content isn’t in the shape the page expects. Ask Devin to rewrite it, then reload.</p>
         <p className="hint">{String(this.state.error.message || this.state.error)}</p>
       </div>
     );
@@ -181,7 +181,7 @@ export default function App() {
     <div className="shell">
       <aside className="rail">
         <div className="brand">
-          <span className="brand-name">{SPRINTS[biz.sprint?.id]?.name || SPRINTS.holiday.name}</span>
+          <span className="brand-name">{SPRINTS[biz.sprint?.id]?.name || SPRINTS.growth.name}</span>
           <div className="countdown" aria-label={`${days} days to ${label}`}>
             <span className="countdown-n">{days}</span>
             <span className="countdown-l">{days === 1 ? 'day' : 'days'} to {label}</span>
@@ -265,7 +265,7 @@ function BusinessPick({ current, busy }) {
 
 // Same steps either way; the sprint changes the wording, prompts and countdown. Saved per business.
 function SprintPick({ sprint, busy }) {
-  const current = SPRINTS[sprint?.id] ? sprint.id : 'holiday';
+  const current = SPRINTS[sprint?.id] ? sprint.id : 'growth';
   const pick = async id => {
     if (!(await ask(`Switch to ${SPRINTS[id].name}? Your existing plans stay; regenerate steps to fit the new sprint.`, 'Switch sprint'))) return;
     try {

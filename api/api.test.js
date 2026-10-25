@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 process.env.STUDIO_SECRET_KEY ||= 'a'.repeat(64);
 
 import { enc, dec } from './_lib/secrets.js';
-import { cleanCalendar, cleanExperiments } from './_lib/business.js';
+import { cleanCalendar, cleanExperiments, fieldMtime } from './_lib/business.js';
 import { buildContext, contextParts, partHashes, changedParts, offerSkill, applyStructuredOutput, sessionPrompt, hashOf, OUTPUT_CONTRACT } from './_lib/prompts.js';
 import { experimentStats } from '../ui/web/src/experiments.js';
 import { SCORE_EXPERIMENTS, STEPS, setSprint } from '../ui/web/src/steps.js';
@@ -48,8 +48,15 @@ test('cleanExperiments sanitizes and caps experiment data', () => {
   ]).items.map(item => item.campaignId), ['123456', null]);
 });
 
+test('fieldMtime prefers the per-field timestamp and falls back to updated_at', () => {
+  const biz = { profile: { name: 'A' }, calendar: [], updated_at: '2026-01-01T00:00:00Z', profile_updated_at: '2026-02-02T00:00:00Z' };
+  assert.equal(fieldMtime(biz, 'profile'), Date.parse('2026-02-02T00:00:00Z'));
+  assert.equal(fieldMtime(biz, 'calendar'), Date.parse('2026-01-01T00:00:00Z'));
+  assert.equal(fieldMtime(biz, 'tracker'), null);
+});
+
 test('buildContext inlines profile, docs and calendar with truncation', () => {
-  const big = 'x'.repeat(13000);
+  const big = 'x'.repeat(41000);
   const biz = { profile: { name: 'A' }, inputs: { offer: { sell: 'candles' } }, calendar: [{ date: '2026-01-01', title: 't' }] };
   const ctx = buildContext(biz, { offer: { content: big }, strategy: { content: 'small' } });
   assert.match(ctx, /Business profile \(JSON\): \{"name":"A"\}/);
@@ -57,7 +64,7 @@ test('buildContext inlines profile, docs and calendar with truncation', () => {
   assert.match(ctx, /\(truncated\)/);
   assert.match(ctx, /### strategy\.md\nsmall/);
   assert.match(ctx, /### calendar\.json/);
-  assert.ok(ctx.length < 20000);
+  assert.ok(ctx.length < 60000);
   assert.ok(!buildContext(biz, {}).includes('### offer'));
 });
 
@@ -67,6 +74,9 @@ test('context parts retain buildContext ordering and hash per part', () => {
   const parts = contextParts(biz, docs);
   assert.equal(buildContext(biz, docs), parts.map(part => part.text).join('\n\n'));
   assert.deepEqual(parts.map(part => part.key), ['profile', 'inputs', 'tracker', 'experiments', 'doc:offer', 'doc:strategy', 'calendar']);
+  const withLead = contextParts({ ...biz, leadFormUrl: 'https://x/api/lead/abc' }, docs);
+  assert.ok(withLead.some(part => part.key === 'leadForm' && part.text.includes('https://x/api/lead/abc')));
+  assert.ok(!parts.some(part => part.key === 'leadForm'));
   assert.ok(parts.find(part => part.key === 'experiments').text.startsWith('Growth experiments (JSON): '));
   const hashes = partHashes(parts);
   const edited = contextParts({ ...biz, tracker: [{ id: 2 }] }, docs);
@@ -137,7 +147,7 @@ test('holiday strategy and calendar prompts match the pre-change snapshot', () =
   const calendar = STEPS.find(step => step.id === 'calendar');
   const strategyPrompt = strategy.prompt({}, strategy);
   const calendarPrompt = calendar.prompt({}, calendar);
-  assert.equal(createHash('sha256').update(strategyPrompt).digest('hex'), '13c5b7dbd12c2c6d318f456202d82f8a09d230a7189dab57e556cb88d093edbc');
+  assert.equal(createHash('sha256').update(strategyPrompt).digest('hex'), '12cf2c3ca4612438bd290803162408c992d541df3723db86f166b77356417951');
   assert.equal(createHash('sha256').update(calendarPrompt).digest('hex'), '77d34155165ee7913dc573a2295292ee17b1236b27a6b8940e4332ceb2a00564');
   assert.doesNotMatch(strategyPrompt, /experiments\.json/);
 });

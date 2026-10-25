@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Calendar from './Calendar.jsx';
+import { api, toast } from '../api.js';
 import { SPRINT, SPRINTS, STEPS, phaseOf, targetSummary } from '../steps.js';
 import { growthTargets } from '../brain.js';
 import Experiments from './Experiments.jsx';
@@ -111,7 +112,7 @@ const ago = ms => {
   const m = Math.round((Date.now() - ms) / 60000);
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
-const stampOf = f => { const m = /-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})/.exec(f); return m ? new Date(Date.UTC(m[1], m[2] - 1, m[3], m[4], m[5])).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : f; };
+const stampLabel = at => new Date(at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 export function CopyButton({ text, label = 'Copy' }) {
   const [copied, setCopied] = useState(false);
@@ -123,11 +124,23 @@ export function CopyButton({ text, label = 'Copy' }) {
 }
 
 function History({ files }) {
+  const [view, setView] = useState(null); // { kind, content } fetched on click
   if (!files?.length) return null;
+  const open = f => api(`/api/business/history/${f.id}`).then(r => setView({ ...r, at: f.at })).catch(e => toast(e.message));
+  let items = null;
+  if (view?.kind === 'calendar') { try { items = JSON.parse(view.content); } catch { items = []; } }
   return (
     <details className="history">
       <summary>Previous versions ({files.length})</summary>
-      <ul>{files.map(f => <li key={f}><a href={`/business/history/${f}`} target="_blank" rel="noreferrer">{stampOf(f)}</a></li>)}</ul>
+      <ul>{files.map(f => <li key={f.id}><button type="button" className="btn ghost" onClick={() => open(f)}>{stampLabel(f.at)}</button></li>)}</ul>
+      {view && (
+        <div className="history-view">
+          <div className="doc-bar"><span>Version from {stampLabel(view.at)}</span><CopyButton text={view.content} /></div>
+          {view.kind === 'calendar'
+            ? <ul>{(items || []).map((item, i) => <li key={i}>{item.date} · {item.channel} {item.format} · {item.title}</li>)}</ul>
+            : <div className="prose"><Markdown remarkPlugins={[remarkGfm]}>{view.content}</Markdown></div>}
+        </div>
+      )}
     </details>
   );
 }
@@ -169,11 +182,11 @@ export default function GenerateStep({ step, ...ctx }) {
       {has ? <details className="inputs-fold"><summary>Change the answers and rewrite</summary>{form}</details> : form}
 
       {step.kind === 'calendar' && biz.calendarIssues > 0 && (
-        <p className="stale" role="status">{biz.calendarIssues} calendar item{biz.calendarIssues > 1 ? 's' : ''} couldn’t be read. Ask {agentName}: “Fix business/calendar.json so every item has a date (YYYY-MM-DD) and a title.”</p>
+        <p className="stale" role="status">{biz.calendarIssues} calendar item{biz.calendarIssues > 1 ? 's' : ''} couldn’t be read. Ask {agentName}: “Fix the calendar so every item has a date (YYYY-MM-DD) and a title.”</p>
       )}
       {step.kind === 'calendar' && has && (
         <>
-          <div className="doc-bar"><span>Saved to <code>business/calendar.json</code></span><History files={history} /></div>
+          <div className="doc-bar"><span>Saved · {biz.calendar.length} items</span><History files={history} /></div>
           <Calendar items={biz.calendar} experiments={biz.experiments || []} refresh={refresh} />
         </>
       )}

@@ -11,7 +11,9 @@ sprint; Devin (cloud API) writes each step's documents. This file is the archite
   `STUDIO_SECRET_KEY`), `business.js` (business state + cleanCalendar + export), `devin.js`
   (v3 org-sessions client), `prompts.js` (context builder + output contract + schema).
 - **Supabase**: auth.users + tables `user_settings` (encrypted keys), `businesses`
-  (one `is_active` per user, holds sprint/profile/inputs/tracker/calendar/brain JSON),
+  (one `is_active` per user, holds sprint/profile/inputs/tracker/calendar/brain JSON,
+  `lead_token` for the public lead form, and per-field `profile/calendar/tracker_updated_at`
+  timestamps that drive the "changed" notices instead of the shared `updated_at`),
   `docs` (per-kind markdown), `doc_history`, `agent_sessions` (Devin session per scope),
   `projects`; private storage bucket `videos` under `<uid>/<project>/`. RLS on everything.
 - **Devin**: v3 `POST /v3/organizations/{org}/sessions` with `structured_output_schema` —
@@ -20,14 +22,19 @@ sprint; Devin (cloud API) writes each step's documents. This file is the archite
   doc_history first). Poll = `GET /api/agent/<scope>/poll?cursor=<event_id>`; UI polls
   every 4 s while busy. `sendMessage` continues a live session; a new session is created
   (with the full business context inlined) only when the old one is expired/finished/etc.
+- **Lead form**: public `GET/POST /api/lead/<token>` (api/_lib/leads.js) appends to
+  `businesses.tracker`; `?exp=<id>&src=<channel>` tag the row; URL is inlined into Devin
+  context as the CTA link.
 - Local dev: `npm run dev:api` (dev/server.mjs: .env → env, /api → handler, static ui/dist).
 
 ## The agent contract (api/_lib/prompts.js)
 Devin cloud sessions have no filesystem. `buildContext` inlines the business profile, step
-answers, tracker, every existing doc (12k-char cap each) and the calendar into the first
+answers, tracker, every existing doc (40k-char cap each) and the calendar into the first
 prompt; `OUTPUT_CONTRACT` tells it to write results back through `files` in the structured
 output and never say "saved to business/…". Per-step prompt text lives in
-`ui/web/src/steps.js` (`STEPS`, `SPRINTS`, `PHASES`, `AGENDA`); the offer step inlines
+`ui/web/src/steps.js` (`STEPS`, `SPRINTS`, `PHASES`, `AGENDA`; step order: profile, offer,
+research, visibility, strategy, content, video, calendar, automation, tracker, action-plan;
+default sprint is growth); the offer step inlines
 `.devin/skills/grand-slam-offer/SKILL.md` (bundled via vercel.json `includeFiles`).
 
 ## Business Brain (`ui/web/src/brain.js`, `#brain`)

@@ -8,6 +8,7 @@ import { devinCreds, devinClient } from './_lib/devin.js';
 import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
 import { contextParts, changedParts, partHashes, offerSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
 import { applyAdSpend, findInstagramAccounts, normalizeAccountId, NO_INSTAGRAM_ACCOUNT_MESSAGE, syncAds, syncInstagram, tryConnectInstagram } from './_lib/meta.js';
+import { leadToken, LEAD_TOKEN, cleanLead, appendLead, leadFormHtml } from './_lib/leads.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
@@ -93,14 +94,22 @@ async function agentRow(uid, bizId, scope) {
 async function agentUpsert(uid, bizId, scope, fields) {
   await admin().from('agent_sessions').upsert({ user_id: uid, business_id: bizId, scope, ...fields }, { onConflict: 'business_id,scope' });
 }
-async function latestContext(uid, bizId) {
+// Public lead form lives at /api/lead/<token>; forwarded headers carry the real origin on Vercel.
+const leadFormUrl = (req, token) => {
+  if (!token) return null;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const proto = req.headers['x-forwarded-proto'] || (String(host || '').startsWith('localhost') ? 'http' : 'https');
+  return `${proto}://${host}/api/lead/${token}`;
+};
+
+async function latestContext(uid, bizId, req) {
   const db = admin();
   const [{ data: biz }, { data: docs }] = await Promise.all([
     db.from('businesses').select('*').eq('user_id', uid).eq('id', bizId).maybeSingle(),
     db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', bizId),
   ]);
   const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null } : null;
+  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, leadFormUrl: leadFormUrl(req, biz.lead_token) } : null;
   return { biz: contextBiz, parts: contextBiz ? contextParts(contextBiz, docMap) : [] };
 }
 
@@ -122,7 +131,8 @@ async function applyOutput(uid, biz, row, session) {
   }
   if (applied.calendar) {
     await snapshot(uid, biz.id, 'calendar', JSON.stringify(biz.calendar));
-    await db.from('businesses').update({ calendar: applied.calendar, calendar_issues: applied.issues, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
+    const now = new Date().toISOString();
+    await db.from('businesses').update({ calendar: applied.calendar, calendar_issues: applied.issues, calendar_updated_at: now, updated_at: now }).eq('user_id', uid).eq('id', biz.id);
   }
   if (applied.experiments) {
     await db.from('businesses').update({ experiments: applied.experiments, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
@@ -150,6 +160,41 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET' && url.pathname === '/api/health' && !/^Bearer /.test(req.headers.authorization || ''))
       return send(res, 200, { hosted: true, items: [] });
+    // Public lead-capture form — no auth. Always 200 on POST so bots learn nothing.
+    if (parts[0] === 'api' && parts[1] === 'lead' && parts.length === 3) {
+      const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+      const ok = () => { res.writeHead(200, { 'Content-Type': 'application/json', ...cors }); res.end('{"ok":true}'); };
+      const thanks = () => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...cors }); res.end('<!doctype html><meta charset="utf-8"><title>Thanks</title><p>Thanks — we’ll be in touch shortly.</p>'); };
+      if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
+      if (!LEAD_TOKEN.test(parts[2])) return send(res, 404, { error: 'not found' });
+      const { data: biz } = await admin().from('businesses').select('id, user_id, name, profile, tracker, experiments').eq('lead_token', parts[2]).maybeSingle();
+      if (!biz) return send(res, 404, { error: 'not found' });
+      if (req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...cors });
+        return res.end(leadFormHtml({ business: biz.name || biz.profile?.name || 'us', token: parts[2], exp: url.searchParams.get('exp') || '', src: url.searchParams.get('src') || '' }));
+      }
+      if (req.method === 'POST') {
+        let body = req.body;
+        if (body == null || typeof body === 'string') {
+          const raw = typeof body === 'string' ? body : await new Promise((resolve, reject) => {
+            let b = '';
+            req.on('data', c => { b += c; if (b.length > 8192) reject(Object.assign(new Error('too big'), { status: 413 })); });
+            req.on('end', () => resolve(b));
+            req.on('error', reject);
+          });
+          try { body = String(req.headers['content-type'] || '').includes('json') ? JSON.parse(raw || '{}') : Object.fromEntries(new URLSearchParams(raw)); } catch { body = null; }
+        }
+        const lead = cleanLead(body, cleanExperiments(biz.experiments).items || []);
+        if (lead) {
+          const now = new Date().toISOString();
+          await admin().from('businesses').update({ tracker: appendLead(biz.tracker, lead), tracker_updated_at: now, updated_at: now }).eq('id', biz.id);
+        }
+        return String(req.headers['content-type'] || '').includes('json') ? ok() : thanks();
+      }
+      res.writeHead(405, { ...cors });
+      return res.end('{"error":"method"}');
+    }
+
     const user = await userFromReq(req);
     if (!user) return send(res, 401, { error: 'Sign in first.' });
     const uid = user.id;
@@ -176,8 +221,9 @@ export default async function handler(req, res) {
         await db.from('user_settings').upsert({ user_id: uid, integrations: integ, updated_at: new Date().toISOString() });
         s.integrations = integ;
       }
+      const devinOwn = !!(s.devin_api_key && s.devin_org_id), devinShared = !devinOwn && !!(process.env.DEVIN_API_KEY && process.env.DEVIN_ORG_ID);
       return send(res, 200, { hosted: true, items: [
-        { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: !!(s.devin_api_key && s.devin_org_id), key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
+        { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: devinOwn || devinShared, shared: devinShared, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
         ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: !!s.integrations?.[id], setup: s.integrations?._setup?.[id] })),
         { id: 'heygen', group: 'optional', name: 'HeyGen API key', why: 'Imports your HeyGen videos and makes new ones from your avatars.', ok: !!s.heygen_api_key, key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
         metaHealthItem(s, active?.instagram_insights?.account?.username || null),
@@ -292,6 +338,7 @@ export default async function handler(req, res) {
         return send(res, 200, { ok: true });
       }
       const fields = { updated_at: new Date().toISOString(), [col]: col === 'calendar' ? cleanCalendar(data).items : data };
+      if (['profile', 'calendar', 'tracker'].includes(col)) fields[`${col}_updated_at`] = fields.updated_at;
       if (col === 'calendar') fields.calendar_issues = cleanCalendar(data).issues;
       if (col === 'experiments') fields.experiments = cleanExperiments(data).items;
       await db.from('businesses').update(fields).eq('user_id', uid).eq('id', biz.id);
@@ -303,6 +350,24 @@ export default async function handler(req, res) {
       if (parts[2] === 'switch') await switchBusiness(uid, id); else await newBusiness(uid);
       return send(res, 200, await listBusinesses(uid));
     }
+    if (parts[0] === 'api' && parts[1] === 'business' && parts[2] === 'lead-form') {
+      const biz = await activeBusiness(uid);
+      const rotate = req.method === 'POST' && parts[3] === 'rotate';
+      if (!(req.method === 'GET' && parts.length === 3) && !rotate) return send(res, 405, { error: 'method' });
+      let token = biz.lead_token;
+      if (!token || rotate) {
+        for (let tries = 0; tries < 2; tries++) {
+          token = leadToken();
+          const { error } = await db.from('businesses').update({ lead_token: token }).eq('user_id', uid).eq('id', biz.id);
+          if (!error) break;
+          if (tries === 1) throw error;
+        }
+      }
+      const url = leadFormUrl(req, token);
+      const embed = `<form action="${url}" method="post"><input name="name" placeholder="Your name" required><input name="contact" placeholder="Phone or email" required><textarea name="message" placeholder="How can we help?"></textarea><button>Send</button></form>`;
+      const experiments = (cleanExperiments(biz.experiments).items || []).map(e => ({ id: e.id, name: e.name, url: `${url}?exp=${e.id}` }));
+      return send(res, 200, { url, embed, experiments });
+    }
     if (req.method === 'GET' && url.pathname === '/api/business/export.md') {
       res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Content-Disposition': 'attachment; filename="sprint.md"' });
       return res.end(await exportMarkdown(uid));
@@ -310,8 +375,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && parts[0] === 'api' && parts[1] === 'business' && parts[2] === 'history' && parts.length === 4) {
       const { data } = await db.from('doc_history').select('kind, content').eq('user_id', uid).eq('id', parts[3]).maybeSingle();
       if (!data) return send(res, 404, { error: 'not found' });
-      res.writeHead(200, { 'Content-Type': data.kind === 'calendar' ? 'application/json' : 'text/markdown; charset=utf-8' });
-      return res.end(data.content);
+      return send(res, 200, { kind: data.kind, content: data.content });
     }
 
     // ---- projects + storage ----
@@ -418,7 +482,7 @@ export default async function handler(req, res) {
         if (!row?.devin_session_id || ['expired', 'finished', 'suspended', 'exit', 'error'].includes(row.devin_status)) {
           const { data: docs } = await db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id);
           const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-          const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null };
+          const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, leadFormUrl: leadFormUrl(req, biz.lead_token) };
           const parts = contextParts(b2, docMap);
           const ctx = parts.map(part => part.text).join('\n\n');
           const extra = [scope !== 'business' ? `This conversation is about the promo video project '${scope}'.` : null, integrationNotes((await settings(uid)).integrations)].filter(Boolean).join('\n\n') || null;
@@ -427,7 +491,7 @@ export default async function handler(req, res) {
           const s = await client.createSession({ prompt: sessionPrompt(ctx, text.trim(), { skill, extra }), title: `${biz.name || biz.profile?.name || 'Studio'} · Studio`, schema: STRUCTURED_SCHEMA, tags: ['studio'] });
           await agentUpsert(uid, biz.id, scope, { devin_session_id: s.session_id, devin_status: 'working', last_prompt_at: new Date().toISOString(), context_hashes: partHashes(parts) });
         } else {
-          const { parts } = await latestContext(uid, biz.id);
+          const { parts } = await latestContext(uid, biz.id, req);
           const hashes = partHashes(parts);
           const changed = changedParts(parts, row.context_hashes, { skip: snap === 'brain.md' ? ['brain'] : [] });
           const fresh = changed.length ? `Things changed in Studio since my last message. Use these versions from now on, replacing earlier ones:\n\n${changed.map(part => part.text).join('\n\n')}\n\n---\n\n` : '';
@@ -450,7 +514,7 @@ export default async function handler(req, res) {
         const messages = seen >= 0 ? items.slice(seen + 1) : items;
         const res2 = await applyOutput(uid, biz, row, s);
         if (res2) {
-          const { parts } = await latestContext(uid, biz.id);
+          const { parts } = await latestContext(uid, biz.id, req);
           const hashes = partHashes(parts);
           const appliedHashes = {};
           for (const kind of res2.applied) {

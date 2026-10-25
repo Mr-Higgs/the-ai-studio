@@ -2,7 +2,7 @@
 //  EDIT THE SPRINT HERE.
 //  Everything participants see and everything Devin is asked to do lives in this
 //  file: step order, titles, guide text, questions, prompts, the day's agenda and
-//  the video presets. Change it, then restart `npm run studio`.
+//  the video presets. Change it, then restart `npm run dev:api`.
 //
 //  Step fields:
 //    id      url + file key            kind   profile | doc | calendar | video | tracker
@@ -34,11 +34,14 @@ export const targetSummary = targets => [
   targets.budget != null ? `budget ${dollars(targets.budget)}` : null,
 ].filter(Boolean).join('; ');
 
+// Channels offered wherever a step asks where the business shows up.
+export const CHANNELS = ['Google Business Profile', 'Google Search / Maps', 'Yelp', 'Nextdoor', 'Facebook', 'Instagram', 'TikTok', 'Email / SMS list', 'Website', 'Phone call', 'Walk-in / signage', 'Referral / partners', 'Reddit'];
+
 // Rail / Start-here grouping, same for both sprints. Keep in STEPS order.
 export const PHASES = [
-  { name: 'Lay the Groundwork', steps: ['profile', 'offer', 'research', 'strategy'] },
+  { name: 'Lay the Groundwork', steps: ['profile', 'offer', 'research', 'visibility', 'strategy'] },
   { name: 'Create', steps: ['content', 'video'] },
-  { name: 'Prepare to Launch', steps: ['calendar', 'visibility', 'automation', 'tracker'] },
+  { name: 'Prepare to Launch', steps: ['calendar', 'automation', 'tracker'] },
   { name: '🚀 Launch', steps: ['action-plan'] },
 ];
 export const phaseOf = id => PHASES.find(p => p.steps.includes(id));
@@ -65,24 +68,24 @@ export const SPRINTS = {
     spotlight: 'why it makes a great gift', bts: 'How we make or prepare things for the holidays.', introPh: 'Hi, I’m … This holiday season, …',
   },
   growth: {
-    id: 'growth', name: 'Growth Hack Sprint', headline: 'Build your growth engine in a day',
-    campaign: 'running a 30-day growth sprint: cheap, fast, measurable experiments that win new customers', campaignShort: 'growth sprint', adj: '', season: 'during this 30-day sprint', planFor: 'this 30-day sprint',
+    id: 'growth', name: 'Growth Sprint', headline: 'Get found and get more customers in 30 days',
+    campaign: 'running a 30-day growth sprint to get found locally and win new customers with cheap, measurable experiments', campaignShort: 'growth sprint', adj: '', season: 'during this 30-day sprint', planFor: 'this 30-day sprint',
     offerTitle: 'Core offer', deadline: 'A real deadline or limit tied to your 30-day sprint', want: 'what they want right now', urgency: 'real urgency/scarcity tied to the 30-day sprint window',
-    sellQ: 'What do you want to sell more of in the next 30 days?', sellPh: 'e.g. Our candle subscription, and bulk orders for offices', windowPh: 'e.g. the next 30 days',
-    keywordsPh: 'e.g. best soy candles, candle subscription, non-toxic candles', whoPh: 'e.g. people furnishing a new home, office managers', subsPh: 'e.g. r/candles, r/HomeDecorating, r/Austin',
+    sellQ: 'What do you want to sell more of in the next 30 days?', sellPh: 'e.g. brake jobs and collision estimates — or: our candle subscription and office bulk orders', windowPh: 'e.g. the next 30 days',
+    keywordsPh: 'e.g. mechanic near me, brake repair cost, body shop [your city], is it worth fixing', whoPh: 'e.g. commuters with a check-engine light, parents with a dented minivan, fleet managers', subsPh: 'e.g. r/MechanicAdvice, r/Cartalk, r/[your city]',
     searchAngles: 'buying-intent and comparison angles ("best", "recommend", "alternative to")',
-    goalLabel: '30-day goal', goalPh: 'e.g. 25 new customers and $2,500 in sales in 30 days', budgetLabel: 'Marketing budget for the sprint',
+    goalLabel: '30-day goal', goalPh: 'e.g. 40 new customers through the door and $12,000 in repair orders in 30 days', budgetLabel: 'Marketing budget for the sprint',
     phases: 'week 1 launch, weeks 2–3 run and measure, week 4 double down on what worked',
-    strategyExtra: ' Also return experiments.json as an array of 3–5 experiments with exactly these fields: { id, name, hypothesis, channel, cost, spent, metric, target, maxCac, rule, status, verdict }. Use IDs e1 through e5 as applicable; cost is a numeric planned dollar amount, spent is null, metric is a short win measure, target is numeric, maxCac is numeric or null, status is "running", verdict is "", and rule clearly says when to kill or scale. Keep each test cheap enough to run in 30 days, each planned cost within my sprint budget, and total planned cost within that budget. If the app-calculated max cost per customer is supplied, no experiment maxCac may exceed it. Keep every existing strategy section and add a "Growth experiments" section listing every experiment with its hypothesis, channel, cost, target, maxCac and rule.',
+    strategyExtra: ` Also return experiments.json as an array of 3–5 experiments with exactly these fields: { id, name, hypothesis, channel, cost, spent, metric, target, maxCac, rule, status, verdict }. channel must be one of: ${CHANNELS.join(', ')}. Use IDs e1 through e5 as applicable; cost is a numeric planned dollar amount, spent is null, metric is a short win measure, target is numeric, maxCac is numeric or null, status is "running", verdict is "", and rule clearly says when to kill or scale. Keep each test cheap enough to run in 30 days, each planned cost within my sprint budget, and total planned cost within that budget. If the app-calculated max cost per customer is supplied, no experiment maxCac may exceed it. Keep every existing strategy section and add a "Growth experiments" section listing every experiment with its hypothesis, channel, cost, target, maxCac and rule.`,
     contentWhy: 'Writing posts daily while running the business is how sprints die. Write them all now, post them later.',
     calendarDone: 'Every piece on a date across the 30 days, with a weekly experiment review', calendarTip: 'Ask: “Move everything after week 2 one day earlier.”',
     calendarDates: 'a weekly experiment review every 7 days (add each review as an item with format "Other")',
     calendarExperiment: ' For each item connected to a growth experiment, include "experiment": "<id>" using its experiments.json id.',
-    visibilityWhy: 'People search “near me” and ask AI assistants for recommendations. If your listings are thin or inconsistent, you don’t get mentioned.',
-    searchesPh: 'e.g. handmade candles Austin, soy candles near me', landing: 'offer landing section',
+    visibilityWhy: 'Most new customers of a local business start with “near me” on Google Maps or ask an AI assistant. If your profile, site and reviews are thin or inconsistent, the shop down the road gets the call.',
+    searchesPh: 'e.g. auto repair [your city], body shop near me, brake replacement [your neighborhood]', landing: 'offer landing section',
     automationWhy: 'In a 30-day sprint your time is the bottleneck. Every hour automated is an hour back for customers and experiments.',
     after: 'what to do after day 30 to keep new customers coming back and keep the best experiment running',
-    spotlight: 'why it’s worth it', bts: 'How we make or prepare things, day to day.', introPh: 'Hi, I’m … This month, …',
+    spotlight: 'why it’s worth it (what it saves them in money, time or worry)', bts: 'How we do the work, day to day — the bay, the bench, the people.', introPh: 'Hi, I’m … at … This month, …',
   },
 };
 
@@ -91,7 +94,7 @@ export const SPRINTS = {
 export let SPRINT, STEPS, PROFILE_STEP, AGENDA, TRACKER_INSIGHTS, SCORE_EXPERIMENTS;
 let CONTEXT;
 export function setSprint(id) {
-  const v = SPRINTS[id] || SPRINTS.holiday;
+  const v = SPRINTS[id] || SPRINTS.growth;
   if (SPRINT === v) return;
   SPRINT = v;
   const offerLower = v.offerTitle.toLowerCase();
@@ -132,34 +135,75 @@ ${answers(i, s.inputs)}
 
 The document must include: (1) the target customer — who they are, ${v.want}, what stops them buying; (2) 3 ${v.adj}offer options built with the skill's framework (bonuses, guarantee, ${v.urgency}, a name); (3) your recommended offer and why; (4) the one-sentence pitch and main call-to-action.
 
+For a service business, build the angles around services: a low-risk entry offer (e.g. an inspection or estimate), a warranty or redo-it guarantee as the risk reversal, and real seasonal or capacity urgency. Don’t use course, cohort or program language unless I actually run programs.
+
 ${rules('offer.md')}`,
   },
   {
-    id: 'research', kind: 'doc', title: 'Customer conversations', file: 'research.md', uses: ['profile', 'offer'],
-    blurb: 'What your customers are already saying on Reddit and forums — their words, their questions, and where you can genuinely show up.',
+    id: 'research', kind: 'doc', title: 'Customer conversations', file: 'research.md', uses: ['brain', 'profile', 'offer'],
+    blurb: 'What your customers are already saying — in Reddit threads, Google and Yelp reviews (yours and your competitors’), Nextdoor and local groups — in their words, and where you can genuinely show up.',
     guide: {
       time: '30 min',
       why: 'The best-converting copy uses your customers’ own words. And the places they ask for recommendations are where a helpful answer turns into a sale.',
-      done: ['3–6 communities where your customers talk, with their self-promotion rules', 'Pains and wants in customers’ exact words, with links', 'Questions people keep asking — each one a post or FAQ idea', 'A short list of community-friendly growth plays, and what not to do'],
-      tips: ['Ask: “Which 3 threads would be worth replying to this week, and what would a genuinely helpful reply say?”', 'Ask: “Turn the top 5 questions into Instagram post ideas.”', 'Never post links in communities that ban self-promotion — it gets you banned and hurts the brand.'],
+      done: ['3–6 places where your customers talk or review, with their self-promotion rules', 'Pains and wants in customers’ exact words, with links', 'Questions people keep asking — each one a post or FAQ idea', 'A short list of community-friendly growth plays, and what not to do'],
+      tips: ['Ask: “Which 3 threads would be worth replying to this week, and what would a genuinely helpful reply say?”', 'Ask: “Turn the top 5 questions into Instagram post ideas.”', 'Never post links in communities that ban self-promotion — it gets you banned and hurts the brand.', 'Your website and city come from the Business profile — fix them there.'],
     },
     inputs: [
       { id: 'keywords', label: 'What would people search or ask about?', placeholder: v.keywordsPh },
       { id: 'who', label: 'Who are you listening for?', placeholder: v.whoPh },
       { id: 'subs', label: 'Subreddits you already know (optional)', placeholder: v.subsPh },
-      { id: 'region', label: 'City or region (for local communities)', placeholder: 'e.g. Austin, TX' },
+      { id: 'competitors', label: 'Up to 3 competitors whose reviews are worth reading (optional)', placeholder: 'e.g. Joe’s Auto, Midas on Main St' },
     ],
-    prompt: (i, s) => `${CONTEXT}
+    prompt: (i, s, biz) => `${CONTEXT}
 
-Research what my potential customers are saying online, mainly on Reddit, to inform my ${v.campaignShort}.
+Research what my potential customers are saying online — Reddit and forums, public Google and Yelp reviews of my business and the competitors below, and Nextdoor or local Facebook groups where they are publicly readable — to inform my ${v.campaignShort}.
 
+My city/region: ${biz?.profile?.location || '(not given — ask me)'}
 ${answers(i, s.inputs)}
 
-How to research — follow these rules exactly: use ONLY your built-in web search and web fetch tools. Search (e.g. site:reddit.com plus the keywords, ${v.searchAngles}, local subreddits for my region), then open at most 15 of the most relevant threads from the last 2 years with web fetch. Do NOT use the shell for this: no curl, wget, python or other scripts, no custom user agents, no reddit.com .json or API endpoints, no logging in. Never post, comment, vote or message. If a fetch is blocked, don't work around it — use the search-result snippets and other public forums or review sites instead, and say which sources you used. This should take a few minutes, not longer.
+How to research — follow these rules exactly: use ONLY your built-in web search and web fetch tools. For reviews, read only what’s publicly visible without logging in; quote at most 15 words per review and link the listing, not the reviewer. Search (e.g. site:reddit.com plus the keywords, ${v.searchAngles}, local subreddits for my region), then open at most 15 of the most relevant threads or review pages from the last 2 years with web fetch. Do NOT use the shell for this: no curl, wget, python or other scripts, no custom user agents, no reddit.com .json or API endpoints, no logging in. Never post, comment, vote or message. If a fetch is blocked, don't work around it — use the search-result snippets and other public forums or review sites instead, and say which sources you used. This should take a few minutes, not longer.
 
-The document must include: (1) where these customers talk — each community with a link, what it's about, and its rules on self-promotion; (2) top pains and wants in customers' exact words (short quotes under 15 words, each with the thread link); (3) questions people keep asking, each turned into a post, email or FAQ idea; (4) objections and hesitations to answer in my copy; (5) 5 growth plays that respect community rules (e.g. genuinely helpful answers, local weekly promo threads, giveaways or AMAs where mods allow, collaborations); (6) what not to do (spam, fake reviews, vote manipulation, sockpuppets).
+The document must include: (1) where these customers talk — each community with a link, what it's about, and its rules on self-promotion; (2) top pains and wants in customers' exact words (short quotes under 15 words, each with the thread or listing link), and — if competitor reviews were readable — the 3 things people praise and the 3 they complain about at competitors; (3) questions people keep asking, each turned into a post, email or FAQ idea; (4) objections and hesitations to answer in my copy; (5) 5 growth plays that respect community rules (e.g. genuinely helpful answers, local weekly promo threads, giveaways or AMAs where mods allow, collaborations); (6) what not to do (spam, fake reviews, vote manipulation, sockpuppets).
 
 ${rules('research.md')}`,
+  },
+  {
+    id: 'visibility', kind: 'doc', title: 'Get found locally', file: 'visibility.md', uses: ['profile', 'brain', 'research'],
+    blurb: 'Show up when people nearby search Google, Maps and AI assistants for what you do — and know which numbers prove it.',
+    guide: {
+      time: '45 min',
+      why: v.visibilityWhy,
+      done: ['Website fixes with the exact replacement text', 'A Google Business Profile fix list and 4 posts', 'Search phrases mapped to pages, with titles and descriptions written', 'A review-asking routine and the 3 numbers to check weekly', 'A 30-day checklist: today, this week, this month'],
+      tips: ['Do the “today” items before you leave.', 'Ask: “Write my Google Business Profile description in under 750 characters.”', 'Your website and city come from the Business profile — fix them there.'],
+    },
+    inputs: [
+      { id: 'gbp', label: 'Google Business Profile', type: 'select', options: ['Yes, and it’s up to date', 'Yes, but neglected', 'No', 'Not sure'] },
+      { id: 'services', label: 'Services or products you want to be found for, most profitable first', type: 'textarea', placeholder: 'e.g. brake repair, collision repair, AC service' },
+      { id: 'area', label: 'City and the neighborhoods or suburbs you serve', placeholder: 'e.g. Decatur, GA — Oakhurst, Kirkwood, Avondale' },
+      { id: 'competitors', label: 'Up to 3 competitors (names or websites), optional', placeholder: 'e.g. Joe’s Auto, Midas on Main St' },
+      { id: 'tracking', label: 'What you already track', type: 'checks', options: ['Google Business Profile insights', 'Google Analytics', 'Search Console', 'Call tracking', 'None'] },
+    ],
+    prompt: (i, s, biz) => `${CONTEXT}
+
+Create my local visibility plan for ${v.planFor}: how people nearby find me on Google Search, Google Maps and AI assistants, and how I’ll prove it’s working.
+
+My website: ${biz?.profile?.website || '(none given)'}
+${answers(i, s.inputs)}
+
+How to research — follow these rules exactly: use ONLY your built-in web search and web fetch tools; fetch my website’s home page and up to 5 service or contact pages, and search for my competitors and my business name. No shell, scripts, curl or logins. If a fetch is blocked, say so and work from search snippets. Label anything you couldn’t verify.
+
+Write visibility.md with these sections, in this order:
+1. Website audit — for each page fetched: title tag, H1, whether it has a clear service description, phone number with click-to-call, address matching my Google listing, and a call to action. Then the fixes, each with the exact replacement text.
+2. Google Business Profile — the primary and secondary categories to set, the services list, attributes, a photo plan (what to shoot, how many), 3 Q&A entries to seed, 4 ${v.adj}posts ready to paste, and 2 review-reply templates (one for 5 stars, one for a complaint).
+3. Search phrases → pages — 10–20 local-intent phrases grouped by service (use the customers’ words from my research above), each with the page it belongs on and the written title tag (under 60 characters), meta description (under 155) and H1.
+4. Competitors on the map — for up to 3 competitors (mine above, else the closest you find): rating, review count, categories, what they seem to rank for, and one thing I can do better. Say when a figure comes from search snippets.
+5. Listings and consistency — a checklist of where my name, address, phone and hours must match: Google, Apple Maps, Bing Places, Yelp, Facebook, Nextdoor, plus any directories specific to my trade (say “none found” if none).
+6. Getting reviews — who asks, when (e.g. at pickup), the exact spoken script, a text/QR message to send, a weekly target, and how to respond.
+7. Found by AI assistants — 6–8 FAQ answers in plain words, and the business facts that must read the same everywhere.
+8. Proof it’s working — the numbers to write down today as a baseline (Google Business Profile calls, direction requests, website clicks; Search Console impressions and clicks; walk-ins and phone calls per week) and the 3 to check every week, with what to change if each one is flat. Use my website lead form URL (in the context, if present) as the call-to-action link for the counter QR code and website.
+9. 30-day checklist — grouped as today, this week, this month, each item with a time estimate, highest impact first.
+
+${rules('visibility.md')}`,
   },
   {
     id: 'strategy', kind: 'doc', title: 'Strategy & messaging', file: 'strategy.md', uses: ['brain', 'offer', 'research'],
@@ -173,7 +217,7 @@ ${rules('research.md')}`,
     inputs: [
       { id: 'goal', label: v.goalLabel, placeholder: v.goalPh },
       { id: 'budget', label: v.budgetLabel, placeholder: 'e.g. $0, $200, $1,000' },
-      { id: 'channels', label: 'Where you reach customers today', type: 'checks', options: ['Instagram', 'Facebook', 'TikTok', 'LinkedIn', 'Reddit', 'Email list', 'Google Business Profile', 'Website', 'In person / word of mouth'] },
+      { id: 'channels', label: 'Where you reach customers today', type: 'checks', options: CHANNELS },
     ],
     prompt: (i, s, biz) => {
       const targets = v.id === 'growth' ? growthTargets(biz?.brain, biz?.profile) : null;
@@ -184,7 +228,9 @@ Create my ${v.adj}sales and marketing strategy, built around the offer above and
 
 ${answers(i, s.inputs)}
 
-Include: the 2–3 channels to focus on (and what to ignore) given my time and budget; the campaign phases with dates (${v.phases}); the core message and 3 supporting messages, using customers' own words where possible; 5 calls-to-action rewritten for clarity, each matched to where it's used; how a stranger becomes a customer (the path from first touch to purchase); and how I'll know it's working (the 3 numbers to watch weekly).${v.strategyExtra}${summary ? `\n\nApp-calculated sprint targets: ${summary}` : ''}
+Include: the 2–3 channels to focus on (and what to ignore) given my time and budget; the campaign phases with dates (${v.phases}); the core message and 3 supporting messages, using customers' own words where possible; 5 calls-to-action rewritten for clarity, each matched to where it's used; how a stranger becomes a customer (the path from first touch to purchase); and how I'll know it's working (the 3 numbers to watch weekly).
+
+If I run a storefront or a service business (see Business Brain “Where you operate” and “products, services, or both”): also include a review-generation routine (who asks, when, the exact words), one partnership play with a named type of local partner, one in-store or foot-traffic play (counter sign, QR code, pickup script), and make Google Business Profile calls and direction requests two of the weekly numbers.${v.strategyExtra}${summary ? `\n\nApp-calculated sprint targets: ${summary}` : ''}
 
 ${rules('strategy.md')}`;
     },
@@ -199,7 +245,7 @@ ${rules('strategy.md')}`;
       tips: ['Ask: “Rewrite post 2 so it sounds more like me — here’s a caption I wrote last year: …”', 'Ask: “Make the hooks shorter; people scroll fast.”', 'Copy straight from the page into your phone’s notes app.'],
     },
     inputs: [
-      { id: 'channels', label: 'Write for', type: 'checks', options: ['Instagram', 'Facebook', 'TikTok', 'LinkedIn', 'Reddit', 'Email', 'Google Business Profile', 'Website banner', 'Text message'] },
+      { id: 'channels', label: 'Write for', type: 'checks', options: CHANNELS.filter(c => !['Phone call', 'Walk-in / signage', 'Referral / partners'].includes(c)) },
       { id: 'voice', label: 'Your brand voice', placeholder: 'e.g. warm, a little funny, never pushy' },
       { id: 'words', label: 'Words or claims to avoid', placeholder: 'optional' },
     ],
@@ -209,7 +255,7 @@ Write my ready-to-use ${v.adj}promotional content, following my strategy above, 
 
 ${answers(i, s.inputs)}
 
-For each channel: 3–5 posts (hook, body, call-to-action, hashtags where relevant), each labelled with the campaign phase it belongs to. For Reddit, write genuinely helpful answer templates for common questions, not ads, and note which communities allow any mention of a business. Also include a 3-email sequence (subject lines + body) for launch, reminder and last chance, and 2 short ad variants. Everything must be copy-paste ready — no placeholders except [link].
+For each channel: 3–5 posts (hook, body, call-to-action, hashtags where relevant), each labelled with the campaign phase it belongs to. For Google Business Profile, write posts (under 1,500 characters, one call-to-action each). For Reddit, write genuinely helpful answer templates for common questions, not ads, and note which communities allow any mention of a business. Also include a 3-email sequence (subject lines + body) for launch, reminder and last chance, and 2 short ad variants. Everything must be copy-paste ready — no placeholders except [link], and use my website lead form URL from the context when it exists.
 
 ${rules('content.md')}`,
   },
@@ -248,30 +294,6 @@ Return it as calendar.json in the structured output (the JSON array itself): an 
 Line the dates up with the campaign phases and ${v.calendarDates}.${v.calendarExperiment} If something critical is missing, ask me at most 3 short questions first. Then reply with a 3-line summary.`,
   },
   {
-    id: 'visibility', kind: 'doc', title: 'Get found', file: 'visibility.md', uses: ['profile', 'research'],
-    blurb: 'Show up when people search Google, Maps, and AI assistants like ChatGPT for what you sell.',
-    guide: {
-      time: '25 min',
-      why: v.visibilityWhy,
-      done: [`A fixed-up Google Business Profile, with ${v.adj}posts ready`, 'The search phrases to target and where they go', 'FAQ answers AI assistants can quote', 'A prioritized checklist with time estimates'],
-      tips: ['Do the 15-minute items today, before you leave.', 'Ask: “Write my Google Business Profile description in under 750 characters.”'],
-    },
-    inputs: [
-      { id: 'site', label: 'Website', placeholder: 'https://… (or "none")' },
-      { id: 'gbp', label: 'Google Business Profile', type: 'select', options: ['Yes, and it’s up to date', 'Yes, but neglected', 'No', 'Not sure'] },
-      { id: 'searches', label: 'What would a customer type to find you?', placeholder: v.searchesPh },
-    ],
-    prompt: (i, s) => `${CONTEXT}
-
-Create my online visibility plan for ${v.planFor}. If I gave a website, fetch it and review it. Use the questions customers ask in my customer research above for the FAQ.
-
-${answers(i, s.inputs)}
-
-Cover: Google Business Profile fixes and 4 ${v.adj}posts for it; the 10 search phrases to target and where each belongs on my site; quick on-page fixes (titles, descriptions, ${v.landing} — write the actual text); getting found by AI assistants (clear FAQ answers, consistent business facts across listings, review requests — write the FAQ and a review-request message); and a prioritized checklist with time estimates.
-
-${rules('visibility.md')}`,
-  },
-  {
     id: 'automation', kind: 'doc', title: 'Automate it', file: 'automation.md', uses: ['brain', 'profile', 'strategy'],
     blurb: 'Hand repetitive work — replies, follow-ups, reminders, posting — to tools and AI, so you can sell.',
     guide: {
@@ -290,7 +312,7 @@ Find the best automation opportunities for my business ${v.season}.
 
 ${answers(i, s.inputs)}
 
-Give me the 5 highest-value automations ranked by hours saved vs. effort to set up. For each: what it does, which of my existing tools can do it (prefer free tiers and what I already pay for), step-by-step setup, and any ready-to-use text it needs (auto-replies, follow-up emails, FAQ answers, booking confirmations — write them). Include one AI-assisted workflow I can run myself each week using Devin. If LinkedIn is one of my channels, suggest the best posting times for my audience.
+Give me the 5 highest-value automations ranked by hours saved vs. effort to set up. For each: what it does, which of my existing tools can do it (prefer free tiers and what I already pay for), step-by-step setup, and any ready-to-use text it needs (auto-replies, follow-up emails, FAQ answers, booking confirmations — write them). Include one AI-assisted workflow I can run myself each week using Devin.
 
 ${rules('automation.md')}`,
   },
@@ -305,7 +327,7 @@ ${rules('automation.md')}`,
     },
   },
   {
-    id: 'action-plan', kind: 'doc', title: 'Action plan', file: 'action-plan.md', uses: ['strategy', 'calendar', 'tracker'],
+    id: 'action-plan', kind: 'doc', title: 'Action plan', file: 'action-plan.md', uses: ['brain', 'strategy', 'calendar', 'tracker'],
     blurb: 'Your launch checklist and weekly routine for after today — what to do, when, and how to improve it.',
     guide: {
       time: '30 min',
@@ -338,13 +360,14 @@ AGENDA = [
   { time: '60 min', what: v.offerTitle, step: 'offer' },
   { time: '15 min', what: 'Break' },
   { time: '30 min', what: 'Customer conversations', step: 'research' },
+  { time: '45 min', what: 'Get found locally', step: 'visibility' },
   { time: '45 min', what: 'Strategy & messaging', step: 'strategy' },
   { time: '45 min', what: 'Lunch' },
   { time: '45 min', what: 'Content kit', step: 'content' },
   { time: '45 min', what: 'Promo videos', step: 'video' },
   { time: '15 min', what: 'Break' },
   { time: '30 min', what: 'Campaign calendar', step: 'calendar' },
-  { time: '45 min', what: 'Get found + Automate it', step: 'visibility' },
+  { time: '20 min', what: 'Automate it', step: 'automation' },
   { time: '15 min', what: 'Lead tracker', step: 'tracker' },
   { time: '30 min', what: 'Action plan, then share one win with the room', step: 'action-plan' },
 ];
@@ -356,7 +379,7 @@ SCORE_EXPERIMENTS = `${CONTEXT}
 
 Score my growth experiments using my experiments and lead tracker above (each tracker row's "experiment" field is an experiment id). For each experiment: leads, customers won, revenue, and cost per customer (spent ÷ customers won; say "not enough data" when spent is blank or nothing is won). Compare with its target and maxCac, apply its kill-or-scale rule, and set status to "scale", "keep" or "kill" with a one-sentence verdict that cites the numbers. Return the full updated experiments.json (same ids and fields; only change status and verdict). If Meta ad results are in the context, use the linked campaign's spend and leads (an experiment's campaignId is the Meta campaign id). For organic Instagram experiments, use the Instagram organic results (reach, views, interactions) as the leading signal when the tracker has few leads. Then reply in chat with the 3 things to do this week. Keep it short.`;
 }
-setSprint('holiday');
+setSprint('growth');
 
 // Shown at the top of Setup. FACILITATOR: replace with your sign-up link and how to redeem
 // the promo code you hand out. `link` is optional; leave it '' to hide the button.

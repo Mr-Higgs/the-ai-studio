@@ -54,7 +54,6 @@ export default function Calendar({ items, experiments = [], refresh }) {
                   <div className="cal-body">
                     <p>{item.copy}</p>
                     {item.cta && <p className="cal-cta">Call to action: {item.cta}</p>}
-                    {item.url && <p><a href={item.url} target="_blank" rel="noreferrer">View on LinkedIn ↗</a></p>}
                     <CopyButton text={item.copy + (item.cta ? `\n\n${item.cta}` : '')} />
                   </div>
                 )}

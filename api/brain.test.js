@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { answersFromDevin, brainContext, brainMath, brainReady, cleanBrain, growthTargets, helpPrompt, mergeDevinAnswers, profileWithBrain } from '../ui/web/src/brain.js';
+import { answersFromDevin, brainContext, brainMath, brainReady, cleanBrain, growthTargets, helpPrompt, mergeDevinAnswers, profileWithBrain, BRAIN_FEEDS } from '../ui/web/src/brain.js';
 import { applyStructuredOutput, buildContext, GROUNDING } from './_lib/prompts.js';
 import { integrationNotes } from './index.js';
+import { STEPS, setSprint } from '../ui/web/src/steps.js';
 
 const a = (v, s = 'known') => ({ v, s });
 const brain = {
@@ -85,6 +86,18 @@ test('brainContext keeps tags and feeds buildContext', () => {
   assert.match(buildContext({ profile: { name: 'Juniper' }, brain }, {}), /## Business Brain/);
   assert.doesNotMatch(buildContext({ profile: {} }, {}), /Business Brain/);
   assert.match(GROUNDING, /Never invent testimonials/);
+});
+
+test('every BRAIN_FEEDS key is a step that uses the brain', () => {
+  for (const sprint of ['holiday', 'growth']) {
+    setSprint(sprint);
+    for (const id of Object.keys(BRAIN_FEEDS)) {
+      const step = STEPS.find(s => s.id === id);
+      assert.ok(step, `${sprint}: ${id} is not a step`);
+      assert.ok(step.uses?.includes('brain'), `${sprint}: ${id}.uses lacks 'brain'`);
+    }
+  }
+  setSprint('growth');
 });
 
 test('integrationNotes only mentions connected Meta servers', () => {

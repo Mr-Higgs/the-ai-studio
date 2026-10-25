@@ -120,7 +120,10 @@ function DevinKeys({ item, recheck }) {
       setKey(''); setOrg(''); setState(''); setOpen(false); await recheck();
     } catch (err) { setState(err.message); }
   };
-  if (!open) return <><span className="hint">Ready</span><button className="btn ghost" onClick={() => setOpen(true)}>Replace</button></>;
+  if (!open) return <>
+    {item.shared ? <span className="hint">Using the workshop’s shared Devin account — add your own key to run on your own usage.</span> : <span className="hint">Ready</span>}
+    <button className="btn ghost" onClick={() => setOpen(true)}>{item.shared ? 'Add my own' : 'Replace'}</button>
+  </>;
   return (
     <form className="key-form" onSubmit={save}>
       <label htmlFor="devin-key" className="sr">Devin API key</label>

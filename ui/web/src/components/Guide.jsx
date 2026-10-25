@@ -12,7 +12,7 @@ export default function Guide({ ctx, agentName }) {
     <article className="guide">
       <header className="step-head">
         <h1>{SPRINT.headline}</h1>
-        <p>You’ll work on your own business, with {agentName} as your campaign partner. You bring what you know; {agentName} turns it into an offer, a plan, ready-to-post content, videos and a calendar. Everything is saved on your computer.</p>
+        <p>You’ll work on your own business, with {agentName} as your campaign partner. You bring what you know; {agentName} turns it into an offer, a plan, ready-to-post content, videos and a calendar. Everything is saved to your account.</p>
         <div className="actions">
           {!isDone('brain') && <a className="btn primary" href="#brain">Fill in your Business Brain</a>}
           <a className={'btn' + (isDone('brain') ? ' primary' : '')} href={'#' + (first?.id || 'profile')}>{first && first.id !== 'profile' ? `Continue: ${first.title}` : 'Start with your business profile'}</a>
@@ -60,7 +60,6 @@ export default function Guide({ ctx, agentName }) {
           <li><strong>Answer a few questions.</strong> Blanks are fine — {agentName} already knows your profile and earlier steps.</li>
           <li><strong>Click “Write it with {agentName}”.</strong> It may ask you a quick question in the chat first.</li>
           <li><strong>Read it, then ask for changes in the chat.</strong> Plain words work: “shorter”, “sound more like me”, “add a gift-card option”.</li>
-          <li><strong>Approve actions.</strong> When {agentName} needs to run something on your computer, a card asks first. <em>Allow</em> runs it once.</li>
         </ol>
         <p>Each step opens with a short <strong>How to do this step</strong> box: how long it takes, why it matters, and what “done” looks like.</p>
       </section>

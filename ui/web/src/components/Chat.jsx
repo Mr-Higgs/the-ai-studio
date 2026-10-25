@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { api, post, toast } from '../api.js';
+import { ask } from '../api.js';
 
 const STATUS = { pending: '○', in_progress: '◐', completed: '✓', failed: '✕' };
 // Machine-wide grants and bypass mode don't belong behind a one-click button.
@@ -10,12 +10,6 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
   const [text, setText] = useState('');
   const scroller = useRef(null);
   const pinned = useRef(true);
-  const [convos, setConvos] = useState({ current: '', list: [] });
-
-  useEffect(() => { if (agent.base && !agent.busy) api(`${agent.base}/conversations`).then(setConvos).catch(() => {}); }, [agent.base, agent.busy, agent.items.length === 0]);
-
-  const switchTo = (action, id) => post(`${agent.base}/conversations/${action}`, { id }).then(agent.restart).catch(e => toast(e.message));
-
   useEffect(() => {
     const el = scroller.current;
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
@@ -31,12 +25,8 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
   return (
     <div className="chat">
       <div className="chat-bar">
-        <select aria-label="Past conversations" value={convos.current} disabled={agent.busy || !convos.list.length}
-          onChange={e => switchTo('open', e.target.value)}>
-          {!convos.list.some(c => c.id === convos.current) && <option value={convos.current}>{convos.current ? 'Current conversation' : 'New conversation'}</option>}
-          {convos.list.map(c => <option key={c.id} value={c.id}>{new Date(c.at).toLocaleDateString()} · {c.title}</option>)}
-        </select>
-        <button type="button" className="btn" disabled={agent.busy || !agent.items.length} onClick={() => switchTo('new')}>New conversation</button>
+        <button type="button" className="btn" disabled={agent.busy || !agent.items.length}
+          onClick={async () => { if (await ask('Start a new conversation? Devin keeps your documents but forgets this chat.', 'Start new')) agent.restart(); }}>New conversation</button>
       </div>
       <div
         className="chat-log"

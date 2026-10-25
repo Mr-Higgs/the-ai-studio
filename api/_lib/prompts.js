@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { BUSINESS_DOCS, cleanCalendar, cleanExperiments } from './business.js';
 import { answersFromDevin, brainContext } from '../../ui/web/src/brain.js';
 
-const MAX_DOC = 12000;
+const MAX_DOC = 40000;
 const cut = (t, n = MAX_DOC) => (t && t.length > n ? `${t.slice(0, n)}\n\n(truncated)` : t);
 
 export function contextParts(biz, docs) {
@@ -10,6 +10,7 @@ export function contextParts(biz, docs) {
   const brain = brainContext(biz.brain, biz.profile);
   if (brain) out.push({ key: 'brain', text: brain });
   if (biz.inputs && Object.keys(biz.inputs).length) out.push({ key: 'inputs', text: `Step answers (JSON): ${JSON.stringify(biz.inputs)}` });
+  if (biz.leadFormUrl) out.push({ key: 'leadForm', text: `Website lead form (use this URL wherever a call-to-action needs a link, instead of [link]): ${biz.leadFormUrl}` });
   if (biz.tracker?.length) out.push({ key: 'tracker', text: `Lead tracker (JSON): ${cut(JSON.stringify(biz.tracker))}` });
   if (biz.experiments?.length) out.push({ key: 'experiments', text: `Growth experiments (JSON): ${cut(JSON.stringify(biz.experiments))}` });
   if (biz.adInsights?.campaigns?.length) {

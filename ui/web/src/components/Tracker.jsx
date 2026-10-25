@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { put } from '../api.js';
-import { TRACKER_INSIGHTS } from '../steps.js';
-import { StepHead } from './GenerateStep.jsx';
+import { api, ask, post, put, toast } from '../api.js';
+import { CHANNELS, TRACKER_INSIGHTS } from '../steps.js';
+import { CopyButton, StepHead } from './GenerateStep.jsx';
 import Experiments from './Experiments.jsx';
 import InstagramPanel from './InstagramPanel.jsx';
 
 const STAGES = ['Lead', 'Contacted', 'Quoted', 'Won', 'Lost'];
-const SOURCES = ['Instagram', 'Facebook', 'TikTok', 'Email', 'Google', 'Website', 'Referral', 'Walk-in', 'Other'];
+
 const money = n => n.toLocaleString([], { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -48,6 +48,7 @@ export default function Tracker({ step, ...ctx }) {
       <StepHead step={step} ctx={ctx} />
       {biz.experiments?.length > 0 && <Experiments experiments={biz.experiments} rows={rows} step={step} agent={agent} agentName={agentName} generate={generate} refresh={refresh} adInsights={biz.adInsights} />}
       {biz.instagramInsights && <InstagramPanel insights={biz.instagramInsights} refresh={refresh} />}
+      <LeadForm />
       <dl className="stats">
         {stats.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
       </dl>
@@ -65,7 +66,7 @@ export default function Tracker({ step, ...ctx }) {
                 <tr key={r.id || i} className={'stage-' + r.stage.toLowerCase()}>
                   <td><input aria-label="Name" value={r.name} onChange={e => set(i, 'name', e.target.value)} placeholder="Name" /></td>
                   <td><input aria-label="Contact" value={r.contact} onChange={e => set(i, 'contact', e.target.value)} placeholder="Email or phone" /></td>
-                  <td><select aria-label="Source" value={r.source} onChange={e => set(i, 'source', e.target.value)}><option value="">—</option>{SOURCES.map(s => <option key={s}>{s}</option>)}</select></td>
+                  <td><select aria-label="Source" value={r.source} onChange={e => set(i, 'source', e.target.value)}><option value="">—</option>{CHANNELS.map(s => <option key={s}>{s}</option>)}{r.source && !CHANNELS.includes(r.source) && <option key={r.source}>{r.source}</option>}</select></td>
                   {biz.experiments?.length > 0 && <td><select aria-label="Experiment" value={r.experiment || ''} onChange={e => set(i, 'experiment', e.target.value || null)}><option value="">—</option>{biz.experiments.map(experiment => <option key={experiment.id} value={experiment.id}>{experiment.name}</option>)}</select></td>}
                   <td><select aria-label="Stage" value={r.stage} onChange={e => set(i, 'stage', e.target.value)}>{STAGES.map(s => <option key={s}>{s}</option>)}</select></td>
                   <td><input aria-label="Value" type="number" min="0" inputMode="decimal" value={r.value} onChange={e => set(i, 'value', e.target.value)} /></td>
@@ -82,5 +83,39 @@ export default function Tracker({ step, ...ctx }) {
       )}
       {rows.length > 0 && next && <div className="next"><button className="btn" onClick={() => go(next.id)}>Next: {next.title}</button></div>}
     </>
+  );
+}
+
+// The public form link + embed snippet; every submission lands in the tracker above.
+function LeadForm() {
+  const [form, setForm] = useState(null);
+  const load = () => api('/api/business/lead-form').then(setForm).catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!form) return null;
+  const rotate = async () => {
+    if (!(await ask('Make a new link? The old one stops working.', 'Make new'))) return;
+    try { setForm(await post('/api/business/lead-form/rotate')); } catch (e) { toast(e.message); }
+  };
+  return (
+    <section className="panel lead-form">
+      <h2>Website & counter form</h2>
+      <p>Share this link, print it as a QR code for the counter, or paste the snippet into your website. Every submission lands in this tracker.</p>
+      <div className="lead-form-link">
+        <input readOnly value={form.url} onFocus={e => e.target.select()} />
+        <CopyButton text={form.url} label="Copy link" />
+        <button className="btn ghost" onClick={rotate}>Make a new link</button>
+      </div>
+      <details>
+        <summary>Embed on your website</summary>
+        <pre>{form.embed}</pre>
+        <CopyButton text={form.embed} label="Copy snippet" />
+      </details>
+      {form.experiments?.length > 0 && (
+        <>
+          <h3>One link per experiment</h3>
+          <ul>{form.experiments.map(e => <li key={e.id}>{e.name} — <code>{e.url}</code> <CopyButton text={e.url} label="Copy" /></li>)}</ul>
+        </>
+      )}
+    </section>
   );
 }

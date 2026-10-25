@@ -39,6 +39,9 @@ export function cleanExperiments(data) {
   return { items, issues: data.length - items.length };
 }
 
+// Per-field timestamps: only bumps when that field is saved. Old rows fall back to updated_at.
+export const fieldMtime = (biz, f) => biz[f] ? Date.parse(biz[`${f}_updated_at`] || biz.updated_at) : null;
+
 export async function activeBusiness(uid) {
   const db = admin();
   const { data: rows } = await db.from('businesses').select('*').eq('user_id', uid).eq('is_active', true).limit(1);
@@ -58,15 +61,15 @@ export async function businessState(uid) {
   const biz = await activeBusiness(uid);
   const [{ data: docs }, { data: hist }, { data: sess }] = await Promise.all([
     db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id),
-    db.from('doc_history').select('id, kind').eq('user_id', uid).eq('business_id', biz.id).order('created_at', { ascending: false }),
+    db.from('doc_history').select('id, kind, created_at').eq('user_id', uid).eq('business_id', biz.id).order('created_at', { ascending: false }),
     db.from('agent_sessions').select('scope, devin_status').eq('user_id', uid).eq('business_id', biz.id),
   ]);
   const docsOut = {}, history = {};
   for (const k of BUSINESS_DOCS) docsOut[k] = null;
   for (const d of docs || []) docsOut[d.kind] = { content: d.content, mtime: Date.parse(d.updated_at) };
-  for (const h of hist || []) (history[h.kind] ||= []).push(h.id);
+  for (const h of hist || []) (history[h.kind] ||= []).push({ id: h.id, at: Date.parse(h.created_at) });
   const cal = cleanCalendar(biz.calendar);
-  const mt = f => (biz[f] ? Date.parse(biz.updated_at) : null);
+  const mt = f => fieldMtime(biz, f);
   return {
     sprint: biz.sprint, profile: biz.profile, inputs: biz.inputs || {}, tracker: biz.tracker, brain: biz.brain || {},
     experiments: cleanExperiments(biz.experiments).items || [],
@@ -104,7 +107,7 @@ export async function snapshot(uid, bizId, kind, content) {
 
 export async function exportMarkdown(uid) {
   const b = await businessState(uid);
-  const out = [`# ${b.sprint?.name || 'Holiday Growth Sprint'} — ${b.profile?.name || 'my business'}`, `_Exported ${new Date().toLocaleString()}_`];
+  const out = [`# ${b.sprint?.name || 'Growth Sprint'} — ${b.profile?.name || 'my business'}`, `_Exported ${new Date().toLocaleString()}_`];
   if (b.profile) out.push('## Business profile', ...Object.entries(b.profile).filter(([, v]) => typeof v === 'string' && v).map(([k, v]) => `- **${PROFILE_LABELS[k] || k}:** ${v}`));
   const brain = brainContext(b.brain, b.profile);
   if (brain) out.push('\n---\n', brain);

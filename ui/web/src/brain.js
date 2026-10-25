@@ -126,7 +126,7 @@ export const BRAIN_SECTIONS = [
   {
     id: 'goals', title: 'Campaign goals and boundaries', required: true,
     questions: [
-      { id: 'occasions', label: 'Which holidays or occasions you want to serve' },
+      { id: 'occasions', label: 'Seasons, occasions or events that drive demand (e.g. winter tires, holidays, back-to-school)' },
       { id: 'dates', label: 'Promotion dates, ordering deadlines and fulfillment dates', type: 'textarea', key: true },
       { id: 'weeks', label: 'How many weeks the campaign runs', num: true },
       { id: 'priority', label: 'Your priority', type: 'select', options: ['Profit', 'Revenue', 'New customers', 'Repeat purchases', 'Filling quiet periods'], key: true },
@@ -176,7 +176,7 @@ export const BRAIN_FEEDS = {
   strategy: ['goals', 'marketing', 'capacity', 'expenses'],
   content: ['marketing', 'customers'],
   calendar: ['goals', 'capacity'],
-  visibility: ['basics', 'marketing'],
+  visibility: ['basics', 'marketing', 'customers'],
   automation: ['leads', 'capacity'],
   'action-plan': ['goals', 'expenses'],
 };
