@@ -16,7 +16,7 @@ const metaError = (body, path, token) => {
   const code = Number(body?.error?.code);
   if (code === 190) return error(400, 'Meta rejected the token. Paste a new one in Setup.');
   if (RATE_LIMIT_CODES.has(code)) return error(429, 'Meta is rate-limiting. Wait a minute and try again.');
-  if (code === 10 || code === 200) return error(400, INSTAGRAM_PERMISSION_MESSAGE);
+  if ((code === 10 || code === 200) && !/^act_/i.test(path)) return error(400, INSTAGRAM_PERMISSION_MESSAGE);
   if (code === 100 && !path.includes('/'))
     return error(400, "Meta couldn't find that ad account. Check the ID (the number after act= in Ads Manager) and that the token can see it.");
   return error(502, redact(body?.error?.message || 'Meta could not complete the request.', token));

@@ -234,6 +234,14 @@ test('Instagram permission errors map to the Setup guidance and discovery failur
       return true;
     });
   }
+  await assert.rejects(metaGet('SECRET', 'act_123/insights', {}, async () => ({
+    ok: false,
+    json: async () => ({ error: { code: 200, message: 'requires ads_read' } }),
+  })), error => {
+    assert.equal(error.status, 502);
+    assert.match(error.message, /ads_read/);
+    return true;
+  });
   const connected = await tryConnectInstagram('SECRET', async () => { throw new Error('offline'); });
   assert.equal(connected.igId, null);
   assert.equal(connected.insights, null);
