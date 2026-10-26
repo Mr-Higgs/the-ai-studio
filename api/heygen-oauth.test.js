@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 
-import { pkce, randomState, publicOrigin, redirectUri, registerClient, buildAuthorizeUrl, exchangeCode, toStored, RESOURCE } from './_lib/heygen-oauth.js';
+import { pkce, randomState, publicOrigin, redirectUri, registerClient, buildAuthorizeUrl, exchangeCode, toStored } from './_lib/heygen-oauth.js';
 
 test('pkce produces a base64url verifier and a sha256 challenge', () => {
   const { verifier, challenge } = pkce();
@@ -22,16 +22,15 @@ test('redirectUri honours forwarded headers and localhost', () => {
   assert.equal(publicOrigin({ headers: { 'x-forwarded-host': 'a.com', host: 'internal' } }), 'https://a.com');
 });
 
-test('buildAuthorizeUrl carries code + PKCE + resource params', () => {
+test('buildAuthorizeUrl carries code + PKCE params and no resource (HeyGen rejects api.heygen.com)', () => {
   const url = buildAuthorizeUrl({ clientId: 'cid', redirectUri: 'https://x/cb', state: 'st', challenge: 'ch' });
   const u = new URL(url);
   assert.equal(u.origin + u.pathname, 'https://app.heygen.com/oauth/authorize');
   for (const [k, v] of Object.entries({
     response_type: 'code', client_id: 'cid', redirect_uri: 'https://x/cb',
-    scope: 'openid', state: 'st', code_challenge: 'ch', code_challenge_method: 'S256',
-    resource: 'https://api.heygen.com',
+    scope: 'openid profile email', state: 'st', code_challenge: 'ch', code_challenge_method: 'S256',
   })) assert.equal(u.searchParams.get(k), v, k);
-  assert.ok(url.includes('resource=https%3A%2F%2Fapi.heygen.com'));
+  assert.equal(u.searchParams.has('resource'), false);
 });
 
 test('exchangeCode posts form-encoded grant fields and surfaces error_description', async () => {
@@ -45,7 +44,7 @@ test('exchangeCode posts form-encoded grant fields and surfaces error_descriptio
     assert.equal(body.get('grant_type'), 'authorization_code');
     assert.equal(body.get('code'), 'CODE');
     assert.equal(body.get('code_verifier'), 'VER');
-    assert.equal(body.get('resource'), RESOURCE);
+    assert.equal(body.has('resource'), false);
     assert.equal(body.get('client_id'), 'cid');
     globalThis.fetch = async () => ({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant', error_description: 'code expired' }) });
     await assert.rejects(exchangeCode({ clientId: 'c', code: 'x', verifier: 'v', redirectUri: 'r' }), /code expired/);

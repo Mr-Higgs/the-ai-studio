@@ -6,8 +6,11 @@ export const AUTHORIZE_URL = process.env.HEYGEN_OAUTH_AUTHORIZE_URL || 'https://
 export const TOKEN_URL = process.env.HEYGEN_OAUTH_TOKEN_URL || 'https://api2.heygen.com/v1/oauth/token';
 export const REGISTER_URL = process.env.HEYGEN_OAUTH_REGISTER_URL || 'https://api2.heygen.com/v1/oauth/register';
 export const REVOKE_URL = process.env.HEYGEN_OAUTH_REVOKE_URL || 'https://api2.heygen.com/v1/oauth/revoke';
-export const RESOURCE = process.env.HEYGEN_OAUTH_RESOURCE || 'https://api.heygen.com';
-export const SCOPE = 'openid';
+export const API_BASE = 'https://api.heygen.com';
+// HeyGen rejects resource=https://api.heygen.com; its CLI gets api.heygen.com tokens by omitting it.
+export const RESOURCE = process.env.HEYGEN_OAUTH_RESOURCE || '';
+export const SCOPE = 'openid profile email';
+const withResource = fields => (RESOURCE ? { ...fields, resource: RESOURCE } : fields);
 
 export const pkce = () => {
   const verifier = crypto.randomBytes(32).toString('base64url');
@@ -41,10 +44,10 @@ export async function registerClient(redirect_uri) {
 
 export function buildAuthorizeUrl({ clientId, redirectUri: redirect_uri, state, challenge }) {
   const u = new URL(AUTHORIZE_URL);
-  u.search = new URLSearchParams({
+  u.search = new URLSearchParams(withResource({
     response_type: 'code', client_id: clientId, redirect_uri, scope: SCOPE, state,
-    code_challenge: challenge, code_challenge_method: 'S256', resource: RESOURCE,
-  });
+    code_challenge: challenge, code_challenge_method: 'S256',
+  }));
   return u.toString();
 }
 
@@ -58,9 +61,9 @@ const tokenPost = async fields => {
   return body;
 };
 export const exchangeCode = ({ clientId, code, verifier, redirectUri: redirect_uri }) =>
-  tokenPost({ grant_type: 'authorization_code', code, redirect_uri, client_id: clientId, code_verifier: verifier, resource: RESOURCE });
+  tokenPost(withResource({ grant_type: 'authorization_code', code, redirect_uri, client_id: clientId, code_verifier: verifier }));
 export const refreshTokens = ({ clientId, refreshToken }) =>
-  tokenPost({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId, resource: RESOURCE });
+  tokenPost(withResource({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId }));
 
 // Shape stored (encrypted) in user_settings.heygen_oauth.
 export const toStored = (t, client_id, prev = {}) => ({
