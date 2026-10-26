@@ -637,10 +637,10 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 /* Landing (signed-out front page) */
 .fiber-bg { position: fixed !important; inset: 0; z-index: 0; max-width: none !important; pointer-events: none; }
 .landing > :not(.fiber-bg), .login > :not(.fiber-bg) { position: relative; z-index: 1; }
-/* Dim the fibers behind the copy and lift the grey text so it reads over them */
-.fiber-bg::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 40%, transparent); }
-:root[data-theme="light"] .fiber-bg::after { background: color-mix(in srgb, var(--paper) 15%, transparent); }
-@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .fiber-bg::after { background: color-mix(in srgb, var(--paper) 15%, transparent); } }
+/* Light theme only: a faint paper scrim. Dark theme shows the fibers bare. */
+:root[data-theme="light"] .fiber-bg::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 15%, transparent); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .fiber-bg::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 15%, transparent); } }
+/* Lift the grey text so it reads over the fibers */
 .landing, .login { --muted: var(--muted-strong); }
 .landing :is(h2, .brand-name) { text-shadow: 0 0 18px var(--paper), 0 0 4px var(--paper); }
 /* Solid panels behind the text blocks, same as .landing-card */
