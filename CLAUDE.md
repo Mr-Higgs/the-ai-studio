@@ -54,7 +54,8 @@ which `mergeDevinAnswers` applies only to blank or help-tagged answers. The grap
 Meta MCP servers are added in the user's Devin org; `user_settings.integrations` only toggles the
 prompt notes (`INTEGRATIONS` in api/index.js).
 - **HeyGen auth** (`api/_lib/heygen-oauth.js`): OAuth via api2.heygen.com — dynamic client
-  registration, PKCE S256, `resource=https://api.heygen.com`, callback at the unauthenticated
+  registration, PKCE S256, `scope=openid profile email` and no `resource` (HeyGen rejects
+  `https://api.heygen.com`; its CLI omits it), callback at the unauthenticated
   `GET /api/heygen/oauth/callback` (the pending row's `state` identifies the user) — bills the
   user's *plan* credits. An API key bills separate *API* credits; `heygenAuth()` picks OAuth
   first and refreshes the token on demand, falling back to `X-Api-Key`.
