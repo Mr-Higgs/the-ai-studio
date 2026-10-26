@@ -4,6 +4,18 @@ import BuiltWithDevin from './BuiltWithDevin.jsx';
 import FiberBackground from './FiberBackground.jsx';
 
 // Hosted gate: one card, "Sign in" or "Create account".
+// Supabase Auth 429s: the built-in mailer allows only a few confirmation emails per hour, and
+// sign-up/sign-in requests are limited per IP (a whole workshop room shares one).
+const authMessage = (error, mode) => {
+  if (error.code === 'over_email_send_rate_limit')
+    return 'Too many sign-up emails went out in the last hour. Try again later, or sign in if you already have an account.';
+  if (error.code === 'over_request_rate_limit' || error.status === 429)
+    return `Too many ${mode === 'up' ? 'sign-ups' : 'sign-in attempts'} from this network right now. Wait a minute and try again.`;
+  if (error.code === 'user_already_exists') return 'That email already has an account. Sign in instead.';
+  if (error.message === 'Invalid login credentials') return 'Wrong email or password.';
+  return error.message;
+};
+
 export default function Login({ onDone }) {
   const [mode, setMode] = useState('in');
   const [email, setEmail] = useState('');
@@ -16,12 +28,12 @@ export default function Login({ onDone }) {
     try {
       if (mode === 'up') {
         const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw new Error(error.message);
+        if (error) throw new Error(authMessage(error, mode));
         // Supabase returns no session when email confirmation is on; the user signs in after clicking the link.
         if (!data.session) { setState('Check your email for a confirmation link, then sign in.'); return; }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Wrong email or password.' : error.message);
+        if (error) throw new Error(authMessage(error, mode));
       }
       onDone();
     } catch (err) { setState(err.message); }
