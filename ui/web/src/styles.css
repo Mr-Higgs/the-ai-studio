@@ -640,7 +640,14 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 /* Dim the fibers behind the copy and lift the grey text so it reads over them */
 .fiber-bg::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 40%, transparent); }
 .landing, .login { --muted: var(--muted-strong); }
-.landing :is(h1, h2, h3, .lede, .partners-label, .landing-how, .landing-phase, .brand-name) { text-shadow: 0 0 18px var(--paper), 0 0 4px var(--paper); }
+.landing :is(h2, .brand-name) { text-shadow: 0 0 18px var(--paper), 0 0 4px var(--paper); }
+/* Solid panels behind the text blocks, same as .landing-card */
+.landing :is(.landing-hero, .landing-phase, .landing-how, .landing-final) { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+.landing-hero { margin-block: 16px 40px; padding: 32px 28px !important; }
+.landing-phase { padding: 4px 20px 18px; margin-top: 12px; }
+.landing-phase h3 { margin-top: 16px; }
+.landing .landing-how { padding: 20px 20px 20px 40px; margin: 0; }
+.landing .landing-final { padding: 40px 24px; margin-top: 48px; }
 .landing { min-height: 100dvh; background: var(--paper); color: var(--ink); font-family: var(--body); padding: 0 16px 48px; }
 .landing > * { max-width: 880px; margin-inline: auto; }
 .landing section { padding: 48px 0; border-top: 1px solid var(--line); }
@@ -657,7 +664,6 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .rll-logo { filter: var(--logo-filter); height: auto; }
 .landing-nav .rll-logo { width: 176px; max-width: 40vw; flex: none; } /* 714×165 source → ~41px tall */
 .login-card .rll-logo { width: 180px; align-self: center; margin-bottom: 4px; }
-.landing-hero { border-top: 0 !important; padding-top: 32px !important; }
 .landing-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .landing-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; }
 .landing-card p { margin: 0; line-height: 1.5; }
