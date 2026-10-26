@@ -30,8 +30,7 @@ export default function FiberBackground() {
       foldGlow={0.3}
       flow={0.25}
       sparkle={0.3}
-      brightness={light ? 1.3 : 0.7}
-      glow={0.5}
+      {...(light && { brightness: 1.3, glow: 0.5 })}
     />
   );
 }
