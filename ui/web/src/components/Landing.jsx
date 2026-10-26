@@ -37,7 +37,7 @@ export default function Landing() {
         <p className="eyebrow">GENESIS · A hands-on workshop with Be One &amp; Branches</p>
         <h1>{SPRINTS.growth.name}: Build Your AI-Powered Sales Engine</h1>
         <p className="lede">This hands-on workshop helps micro and small business owners use AI to turn the holiday season into a real growth opportunity. You’ll work on your own business and build a practical holiday sales campaign that attracts new customers, strengthens engagement and grows revenue.</p>
-        <div className="landing-ctas">{cta}<a className="btn lg" href="#what">See what you get</a></div>
+        <div className="landing-ctas">{cta}<a className="btn lg" href="#what">See what you get</a><a className="btn lg" href="/guide">How it works, step by step</a></div>
         <p className="partners-label">Presented by</p>
         <div className="landing-logos partners">
           <img src="/be-one.png" alt="Be One" />

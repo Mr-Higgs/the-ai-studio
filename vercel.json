@@ -3,6 +3,10 @@
   "outputDirectory": "ui/dist",
   "rewrites": [
     {
+      "source": "/guide",
+      "destination": "/guide.html"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index"
     }

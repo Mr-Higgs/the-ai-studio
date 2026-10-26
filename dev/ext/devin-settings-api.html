@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Devin API settings — illustration</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 15px/1.5 -apple-system, 'Segoe UI', Inter, system-ui, sans-serif; background: #f8f8f7; color: #17181a; }
+  .app { display: grid; grid-template-columns: 230px 1fr; height: 100vh; }
+  .menu { background: #fff; border-right: 1px solid #e4e4e1; padding: 18px 12px; }
+  .logo { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 15px; padding: 4px 10px 18px; }
+  .logo i { width: 22px; height: 22px; border-radius: 6px; background: #17181a; display: inline-block; }
+  .menu a { display: block; padding: 8px 10px; border-radius: 6px; color: #57575e; text-decoration: none; font-weight: 500; margin-bottom: 2px; }
+  .menu a.active { background: #f0f0ee; color: #17181a; font-weight: 600; }
+  .menu .sep { border-top: 1px solid #e4e4e1; margin: 12px 0; }
+  .menu .sub a { padding-left: 26px; font-size: 14px; }
+  main { padding: 34px 44px; }
+  .crumb { font-size: 13px; color: #8a8a90; margin-bottom: 6px; }
+  h1 { font-size: 26px; margin: 0 0 22px; font-weight: 700; letter-spacing: -.01em; }
+  .org { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #e4e4e1; border-radius: 10px; padding: 14px 16px; margin-bottom: 26px; max-width: 560px; }
+  .org label { font-weight: 600; font-size: 14px; }
+  .org code { font: 14px ui-monospace, 'SF Mono', Menlo, monospace; background: #f0f0ee; padding: 3px 8px; border-radius: 5px; color: #333; }
+  .org .copy { margin-left: auto; border: 1px solid #ddd; background: #fff; border-radius: 6px; width: 30px; height: 30px; display: grid; place-items: center; color: #57575e; font-size: 15px; }
+  .tabs { display: flex; gap: 22px; border-bottom: 1px solid #e4e4e1; margin-bottom: 20px; max-width: 720px; }
+  .tabs span { padding: 8px 2px; font-weight: 500; color: #8a8a90; border-bottom: 2px solid transparent; }
+  .tabs span.active { color: #17181a; font-weight: 600; border-bottom-color: #17181a; }
+  table { width: 100%; max-width: 720px; border-collapse: collapse; background: #fff; border: 1px solid #e4e4e1; border-radius: 10px; overflow: hidden; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #8a8a90; font-weight: 600; padding: 10px 16px; background: #fafaf9; border-bottom: 1px solid #e4e4e1; }
+  td { padding: 14px 16px; border-bottom: 1px solid #eee; font-size: 14px; }
+  td code { font: 13px ui-monospace, 'SF Mono', Menlo, monospace; color: #57575e; }
+  .pill { font-size: 12px; background: #e7f4ec; color: #1c7a4d; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+  .btn { display: inline-block; background: #17181a; color: #fff; border-radius: 7px; padding: 9px 16px; font-weight: 600; font-size: 14px; }
+  .actions { margin-top: 18px; max-width: 720px; display: flex; justify-content: flex-end; }
+  .mk { position: absolute; width: 28px; height: 28px; border-radius: 50%; background: #d33; color: #fff; border: 2px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.5); font: bold 15px/28px system-ui, sans-serif; text-align: center; }
+  .cap { position: fixed; right: 14px; bottom: 10px; font-size: 12px; color: #9a9aa0; }
+  .has-mk { position: relative; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="menu">
+    <div class="logo"><i></i>Devin</div>
+    <a href="#">Home</a>
+    <a href="#">Sessions</a>
+    <a href="#">Billing &amp; usage</a>
+    <div class="sep"></div>
+    <a href="#" class="active has-mk">Settings<span class="mk" style="left:-14px;top:-10px">1</span></a>
+    <div class="sub">
+      <a href="#">General</a>
+      <a href="#">Team</a>
+      <a href="#" style="color:#17181a;font-weight:600">Devin API</a>
+    </div>
+  </nav>
+  <main>
+    <div class="crumb">Settings</div>
+    <h1 class="has-mk">Devin API<span class="mk" style="left:-14px;top:-14px">2</span></h1>
+    <div class="org">
+      <label>Organization ID</label>
+      <code class="has-mk">ORG ID PLACEHOLDER<span class="mk" style="left:-14px;top:-14px">3</span></code>
+      <span class="copy">⧉</span>
+    </div>
+    <div class="tabs"><span class="active">Service users</span><span>Personal access tokens</span></div>
+    <table>
+      <tr><th>Name</th><th>Key</th><th>Created</th><th>Status</th></tr>
+      <tr><td>workshop</td><td><code>cog_••••••••••••</code></td><td>2 weeks ago</td><td><span class="pill">Active</span></td></tr>
+    </table>
+    <div class="actions"><span class="btn has-mk">Create key<span class="mk" style="left:-14px;top:-14px">4</span></span></div>
+  </main>
+</div>
+<div class="cap">Illustration — your Devin screen may look different</div>
+</body>
+</html>

@@ -61,6 +61,7 @@ export default function Login({ onDone }) {
         </div>
         {state && state !== 'busy' && <p className={state.startsWith('Check your email') ? 'msg' : 'msg err'} role="alert">{state}</p>}
         <button className="btn primary" disabled={state === 'busy'}>{state === 'busy' ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}</button>
+        <a className="back-link guide-link" href="/guide">First time? Read how it works</a>
         <BuiltWithDevin />
       </form>
     </main>

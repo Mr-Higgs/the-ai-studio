@@ -7,6 +7,7 @@ import Brain from './components/Brain.jsx';
 import Chat from './components/Chat.jsx';
 import GenerateStep from './components/GenerateStep.jsx';
 import Guide from './components/Guide.jsx';
+import Help from './components/Help.jsx';
 import Profile from './components/Profile.jsx';
 import Tracker from './components/Tracker.jsx';
 import VideoStudio from './components/VideoStudio.jsx';
@@ -117,7 +118,7 @@ export default function App() {
 
   const recheck = () => api('/api/health').then(r => setHealth(r.items));
   if (!me) return <div className="boot">Loading your workspace…</div>;
-  if (me.hosted && !me.email) return hash === 'login' ? <Login onDone={() => api('/api/auth/me').then(setMe)} /> : <Landing />;
+  if (me.hosted && !me.email) return hash === 'login' || hash === 'help' ? <Login onDone={() => api('/api/auth/me').then(setMe)} /> : <Landing />;
   if (!biz) return <div className="boot">Loading your workspace…</div>;
 
   setSprint(biz.sprint?.id); // before anything reads STEPS
@@ -153,6 +154,7 @@ export default function App() {
 
   let page;
   if (route === 'setup') page = <main className="main wide"><Setup health={health} recheck={recheck} /></main>;
+  else if (route === 'help') page = <main className="main wide"><Help ctx={ctx} /></main>;
   else if (route === 'guide' || !step) page = <main className="main wide"><Guide ctx={ctx} agentName={agentName} /></main>;
   else if (step.kind === 'video') page = <StepBoundary key="video"><VideoStudio step={step} projects={projects} ctx={ctx} /></StepBoundary>;
   else page = (
@@ -197,6 +199,7 @@ export default function App() {
         </div>
         <nav aria-label="Workshop steps">
           <a href="#guide" className={'start-here' + (route === 'guide' ? ' active' : '')} aria-current={route === 'guide' ? 'page' : undefined}>Start here</a>
+          <a href="#help" className={'start-here help-link' + (route === 'help' ? ' active' : '')} aria-current={route === 'help' ? 'page' : undefined}>Help: step by step</a>
           <a href="#brain" className={'start-here brain-link' + (route === 'brain' ? ' active' : '') + (isDone('brain') ? ' done' : '')} aria-current={route === 'brain' ? 'page' : undefined}>
             <span>Business Brain</span>
             <small>{isDone('brain') ? '✓' : `${BRAIN_SECTIONS.filter(s => s.required && sectionProgress(biz.brain, biz.profile, s).ready).length}/${BRAIN_SECTIONS.filter(s => s.required).length}`}</small>

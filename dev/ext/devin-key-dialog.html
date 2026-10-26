@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New API key — illustration</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 15px/1.5 -apple-system, 'Segoe UI', Inter, system-ui, sans-serif; background: #f8f8f7; color: #17181a; }
+  .page { height: 100vh; padding: 40px 60px; filter: blur(0px); opacity: .35; }
+  .page h1 { font-size: 24px; margin: 0 0 20px; }
+  .page table { width: 100%; max-width: 720px; border-collapse: collapse; background: #fff; border: 1px solid #e4e4e1; border-radius: 10px; }
+  .page th, .page td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+  .dim { position: fixed; inset: 0; background: rgba(20,20,24,.45); }
+  .modal { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 460px; background: #fff; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.3); padding: 26px 28px; }
+  .modal h2 { margin: 0 0 14px; font-size: 19px; }
+  .key { display: flex; align-items: center; gap: 10px; background: #f4f4f2; border: 1px solid #e0e0dd; border-radius: 8px; padding: 12px 14px; }
+  .key code { flex: 1; font: 15px ui-monospace, 'SF Mono', Menlo, monospace; word-break: break-all; }
+  .key .copy { flex: none; border: 1px solid #ddd; background: #fff; border-radius: 6px; width: 34px; height: 34px; display: grid; place-items: center; color: #333; font-size: 16px; }
+  .warn { margin: 14px 0 20px; color: #8a6d1f; font-size: 13.5px; }
+  .done { display: block; margin-left: auto; background: #17181a; color: #fff; border-radius: 7px; padding: 9px 22px; font-weight: 600; font-size: 14px; }
+  .mk { position: absolute; width: 28px; height: 28px; border-radius: 50%; background: #d33; color: #fff; border: 2px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.5); font: bold 15px/28px system-ui, sans-serif; text-align: center; }
+  .cap { position: fixed; right: 14px; bottom: 10px; font-size: 12px; color: #b9b9bf; }
+  .has-mk { position: relative; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Devin API</h1>
+  <table>
+    <tr><th>Name</th><th>Key</th><th>Created</th><th>Status</th></tr>
+    <tr><td>workshop</td><td>cog_••••••••••••</td><td>2 weeks ago</td><td>Active</td></tr>
+    <tr><td>studio</td><td>cog_••••••••••••</td><td>just now</td><td>Active</td></tr>
+  </table>
+</div>
+<div class="dim"></div>
+<div class="modal">
+  <h2>Your new key</h2>
+  <div class="key">
+    <code class="has-mk">cog_API_KEY_PLACEHOLDER<span class="mk" style="left:-16px;top:-16px">1</span></code>
+    <span class="copy has-mk">⧉<span class="mk" style="left:-14px;top:-14px">2</span></span>
+  </div>
+  <p class="warn">Copy it now — it won’t be shown again.</p>
+  <span class="done">Done</span>
+</div>
+<div class="cap">Illustration — your Devin screen may look different</div>
+</body>
+</html>
