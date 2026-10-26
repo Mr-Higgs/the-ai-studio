@@ -10,7 +10,7 @@ import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
 import { contextParts, changedParts, partHashes, offerSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
 import { applyAdSpend, findInstagramAccounts, normalizeAccountId, NO_INSTAGRAM_ACCOUNT_MESSAGE, syncAds, syncInstagram, tryConnectInstagram } from './_lib/meta.js';
 import { leadToken, LEAD_TOKEN, cleanLead, appendLead, leadFormHtml } from './_lib/leads.js';
-import { pkce, randomState, redirectUri, registerClient, buildAuthorizeUrl, exchangeCode, refreshTokens, toStored, revoke, RESOURCE } from './_lib/heygen-oauth.js';
+import { pkce, randomState, redirectUri, registerClient, buildAuthorizeUrl, exchangeCode, refreshTokens, toStored, revoke, API_BASE } from './_lib/heygen-oauth.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
@@ -106,7 +106,7 @@ async function heygenAuth(uid) {
 }
 async function heygen(uid, apiPath, json) {
   const { headers, mode } = await heygenAuth(uid);
-  const r = await fetch(`https://api.heygen.com${apiPath}`, json
+  const r = await fetch(`${API_BASE}${apiPath}`, json
     ? { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(json) }
     : { headers });
   const body = await r.json().catch(() => ({}));
@@ -145,7 +145,7 @@ async function heygenOauthCallback(res, url) {
     const tokens = await exchangeCode({ clientId: hit.pending.client_id, code, verifier: hit.pending.verifier, redirectUri: hit.pending.redirect_uri });
     const stored = toStored(tokens, hit.pending.client_id);
     try { // best-effort account label for the Setup row
-      const r = await fetch(`${RESOURCE}/v3/users/me`, { headers: { Authorization: `Bearer ${stored.access_token}` } });
+      const r = await fetch(`${API_BASE}/v3/users/me`, { headers: { Authorization: `Bearer ${stored.access_token}` } });
       if (r.ok) {
         const b = await r.json().catch(() => ({}));
         const u = b.data || b;
