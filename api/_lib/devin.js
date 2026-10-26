@@ -3,16 +3,32 @@ import { dec } from './secrets.js';
 
 // v3 org sessions API: https://docs.devin.ai/api-reference/common-flows.md
 const BASE = 'https://api.devin.ai/v3';
-const api = async (creds, path, opts) => {
-  const r = await fetch(`${BASE}/organizations/${creds.org}${path}`, {
-    ...opts,
-    headers: { Authorization: `Bearer ${creds.key}`, 'Content-Type': 'application/json' },
-  });
-  const body = await r.json().catch(() => ({}));
-  if (r.status === 401 || r.status === 403)
-    throw Object.assign(new Error('Devin rejected your API key or Org ID. Check them in Setup.'), { status: 400 });
-  if (!r.ok) throw Object.assign(new Error(`Devin error ${r.status}: ${body.detail || body.title || r.statusText}`), { status: 502 });
-  return body;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const retryAfterMs = r => {
+  const v = r.headers.get('retry-after');
+  const secs = Number(v);
+  if (Number.isFinite(secs)) return secs * 1000;
+  const at = Date.parse(v || '');
+  return Number.isFinite(at) ? Math.max(0, at - Date.now()) : null;
+};
+const MAX_INLINE_WAIT = 3000;
+export const api = async (creds, path, opts, { retries = 2 } = {}) => {
+  for (let attempt = 0; ; attempt++) {
+    const r = await fetch(`${BASE}/organizations/${creds.org}${path}`, {
+      ...opts,
+      headers: { Authorization: `Bearer ${creds.key}`, 'Content-Type': 'application/json' },
+    });
+    if (r.status === 429) {
+      const wait = retryAfterMs(r) ?? 500 * 2 ** attempt;
+      if (attempt < retries && wait <= MAX_INLINE_WAIT) { await sleep(wait); continue; }
+      throw Object.assign(new Error('Devin is rate-limiting requests. Studio will retry shortly.'), { status: 429, retryAfter: Math.ceil(Math.max(wait, 5000) / 1000) });
+    }
+    const body = await r.json().catch(() => ({}));
+    if (r.status === 401 || r.status === 403)
+      throw Object.assign(new Error('Devin rejected your API key or Org ID. Check them in Setup.'), { status: 400 });
+    if (!r.ok) throw Object.assign(new Error(`Devin error ${r.status}: ${body.detail || body.title || r.statusText}`), { status: 502 });
+    return body;
+  }
 };
 
 // Per-user keys from user_settings (encrypted), with a server-wide fallback.

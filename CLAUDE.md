@@ -21,7 +21,8 @@ sprint; Devin (cloud API) writes each step's documents. This file is the archite
   the agent returns `{"files": {"offer.md": "…", "calendar.json": [...]}}` which the server
   applies to docs/calendar on poll (`applied_hash` dedups; changed docs are snapshotted to
   doc_history first). Poll = `GET /api/agent/<scope>/poll?cursor=<event_id>`; UI polls
-  every 4 s while busy. `sendMessage` continues a live session; a new session is created
+  every 4 s while busy, every 60 s when idle, not in hidden tabs, and backs off on Devin 429s
+  (`api/_lib/devin.js` retries short 429s itself, else returns 429 + `retryAfter`). `sendMessage` continues a live session; a new session is created
   (with the full business context inlined) only when the old one is expired/finished/etc.
 - **Lead form**: public `GET/POST /api/lead/<token>` (api/_lib/leads.js) appends to
   `businesses.tracker`; `?exp=<id>&src=<channel>` tag the row; URL is inlined into Devin
