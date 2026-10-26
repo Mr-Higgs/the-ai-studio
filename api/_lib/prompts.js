@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { BUSINESS_DOCS, cleanCalendar, cleanExperiments } from './business.js';
+import { BUSINESS_DOCS, cleanCalendar, cleanExperiments, cleanPosts } from './business.js';
 import { answersFromDevin, brainContext } from '../../ui/web/src/brain.js';
 
 const MAX_DOC = 40000;
@@ -13,6 +13,7 @@ export function contextParts(biz, docs) {
   if (biz.leadFormUrl) out.push({ key: 'leadForm', text: `Website lead form (use this URL wherever a call-to-action needs a link, instead of [link]): ${biz.leadFormUrl}` });
   if (biz.tracker?.length) out.push({ key: 'tracker', text: `Lead tracker (JSON): ${cut(JSON.stringify(biz.tracker))}` });
   if (biz.experiments?.length) out.push({ key: 'experiments', text: `Growth experiments (JSON): ${cut(JSON.stringify(biz.experiments))}` });
+  if (biz.posts?.length) out.push({ key: 'posts', text: `### posts.json\n${cut(JSON.stringify(biz.posts))}` });
   if (biz.adInsights?.campaigns?.length) {
     const { account = {}, syncedAt, campaigns } = biz.adInsights;
     out.push({ key: 'ads', text: `Meta ad results (read-only, pulled by Studio from the owner's ad account "${account.name || ''}", amounts in ${account.currency || ''}, lifetime totals, synced ${syncedAt || ''}): ${cut(JSON.stringify(campaigns))}` });
@@ -52,7 +53,7 @@ How to return your work — IMPORTANT. You have no filesystem access to these fi
 document you create or change into the structured output as
 {"files": {"<name>": <content>}, "summary": "<3 lines>"} where <name> is one of
 ${BUSINESS_DOCS.map(d => `${d}.md`).join(', ')}, calendar.json (the JSON
-array itself, not a string), or experiments.json (the JSON array itself, not a string). Update the structured output whenever a document changes — the app
+array itself, not a string), experiments.json (the JSON array itself, not a string), or posts.json (the JSON array itself, not a string). Update the structured output whenever a document changes — the app
 reads it from there. Still reply in chat with a 3-line summary of what you did. Never say
 "saved to business/…" — you can't write those files.
 If I ask you to work out numbers for my profile or Business Brain, also return the ones I've confirmed as "answers.json": {"<question id>": "<value>"} (strings, no units). The app only fills answers that are blank or marked "help me work this out", and marks them as estimates for me to check.`;
@@ -77,14 +78,14 @@ export const STRUCTURED_SCHEMA = {
   },
 };
 
-const ALLOWED = [...BUSINESS_DOCS.map(d => `${d}.md`), 'calendar.json', 'experiments.json', 'answers.json'];
+const ALLOWED = [...BUSINESS_DOCS.map(d => `${d}.md`), 'calendar.json', 'experiments.json', 'posts.json', 'answers.json'];
 
 // Validate what Devin wrote into its structured output.
 export function applyStructuredOutput(so) {
   const files = so?.files;
   if (!files || typeof files !== 'object') return null;
   const docs = {};
-  let calendar, experiments, answers, issues = 0;
+  let calendar, experiments, answers, posts, issues = 0;
   for (const [name, content] of Object.entries(files)) {
     if (!ALLOWED.includes(name)) continue; // drop anything unexpected
     if (name === 'answers.json') {
@@ -95,12 +96,15 @@ export function applyStructuredOutput(so) {
     } else if (name === 'experiments.json') {
       const c = cleanExperiments(content);
       if (c.items) experiments = c.items;
+    } else if (name === 'posts.json') {
+      const c = cleanPosts(content);
+      if (c.items) posts = c.items;
     } else if (typeof content === 'string' && content.length <= 200000) {
       docs[name.replace(/\.md$/, '')] = content;
     }
   }
-  if (!Object.keys(docs).length && !calendar && !experiments && !answers) return null;
-  return { docs, calendar, experiments, issues, answers, hash: hashOf(files) };
+  if (!Object.keys(docs).length && !calendar && !experiments && !posts && !answers) return null;
+  return { docs, calendar, experiments, posts, issues, answers, hash: hashOf(files) };
 }
 export const hashOf = files => crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex');
 

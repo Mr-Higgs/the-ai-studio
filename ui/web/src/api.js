@@ -29,7 +29,7 @@ function reduce(state, ev) {
   switch (ev.type) {
     case 'reset': return initial;
     case 'hello': return { ...state, busy: ev.busy, dead: false };
-    case 'user': return { ...push({ kind: 'user', text: ev.text }), busy: true };
+    case 'user': return { ...push({ kind: 'user', local: true, text: ev.text }), busy: true };
     case 'done': return ev.stopReason === 'cancelled'
       ? { ...push({ kind: 'sys', text: 'Stopped.' }), busy: false }
       : { ...state, busy: false };
@@ -42,7 +42,13 @@ function reduce(state, ev) {
         ? { kind: 'sys', text: (i.options.find(o => o.optionId === ev.optionId)?.name || 'Request cancelled') + (ev.optionId ? ' ✓' : '') }
         : i),
     };
-    case 'msg': return { ...state, items: [...items.filter(i => !i.starting), { kind: ev.kind, text: ev.text }] };
+    case 'msg': {
+      const kept = items.filter(i => !i.starting);
+      // Devin echoes what we sent; confirm the optimistic bubble instead of adding a second one.
+      const local = ev.kind === 'user' ? kept.findIndex(i => i.local) : -1;
+      if (local >= 0) return { ...state, items: kept.map((x, j) => (j === local ? { ...x, local: false } : x)) };
+      return { ...state, items: [...kept, { kind: ev.kind, text: ev.text }] };
+    }
     case 'starting': return items.some(i => i.starting) ? state
       : { ...state, items: [...items, { kind: 'sys', starting: true, text: 'Devin is starting up — this takes a minute or two.' }] };
     case 'status': return { ...state, busy: ev.busy };

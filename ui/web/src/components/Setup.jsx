@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SETUP_ACCOUNT } from '../steps.js';
 import { post } from '../api.js';
+import { connectHeyGen } from '../heygen.js';
 
 const GROUPS = [
   ['required', 'Needed for everything'],
@@ -138,6 +139,37 @@ function DevinKeys({ item, recheck }) {
   );
 }
 
+// HeyGen: OAuth connection (plan credits) preferred; the API key stays as a fallback.
+function HeyGenRow({ item, recheck }) {
+  const [state, setState] = useState('');
+  const [busy, setBusy] = useState(false);
+  const connect = async () => {
+    setBusy(true); setState('');
+    try { await connectHeyGen(recheck); } catch (err) { setState(err.message); }
+    setBusy(false);
+  };
+  const disconnect = async () => {
+    setBusy(true); setState('');
+    try { await post('/api/heygen/oauth/disconnect'); await recheck(); } catch (err) { setState(err.message); }
+    setBusy(false);
+  };
+  if (item.oauth) return <>
+    <span className="hint">Connected{item.account?.email ? ` as ${item.account.email}` : ''} · uses your HeyGen plan credits</span>
+    <button className="btn ghost" disabled={busy} onClick={disconnect}>{busy ? 'Working…' : 'Disconnect'}</button>
+    {state && <p className="msg err" role="alert">{state}</p>}
+  </>;
+  return <>
+    <button className="btn primary" disabled={busy} onClick={connect}>{busy ? 'Connecting…' : 'Connect HeyGen'}</button>
+    {item.apiKey && <span className="hint">Using your API key (API credits).</span>}
+    {state && <p className="msg err" role="alert">{state}</p>}
+    <details className="integ-note">
+      <summary className="hint">Use an API key instead</summary>
+      <p className="hint">API keys bill HeyGen API credits, which are separate from your plan.</p>
+      <KeyInput item={item} recheck={recheck} />
+    </details>
+  </>;
+}
+
 function MetaApiInput({ item, recheck }) {
   const [open, setOpen] = useState(!item.ok);
   const [token, setToken] = useState('');
@@ -244,6 +276,7 @@ export default function Setup({ health, recheck }) {
                 <span className="health-name">{h.name}<small>{h.why}</small></span>
                 {h.id === 'devin' ? <DevinKeys item={h} recheck={recheck} />
                   : h.id === 'meta_api' ? <MetaApiInput item={h} recheck={recheck} />
+                  : h.id === 'heygen' ? <HeyGenRow item={h} recheck={recheck} />
                   : h.key ? <KeyInput item={h} recheck={recheck} />
                   : h.ok ? <span className="hint">Ready</span> : null}
               </li>

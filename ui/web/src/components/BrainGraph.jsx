@@ -127,7 +127,7 @@ export default function BrainGraph({ brain, profile, name, byId, isDone, onSecti
         ref={fg}
         graphData={data}
         width={width}
-        height={420}
+        height={Math.max(640, Math.round(innerHeight * 0.85))}
         backgroundColor="rgba(0,0,0,0)"
         nodeRelSize={R}
         nodeVal={n => SIZE[n.kind]}

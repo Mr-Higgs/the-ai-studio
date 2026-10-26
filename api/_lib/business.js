@@ -39,6 +39,28 @@ export function cleanExperiments(data) {
   return { items, issues: data.length - items.length };
 }
 
+const postText = value => typeof value === 'string' ? value.trim().slice(0, 1000) : '';
+// Structured copy of the content kit's social posts; a finished avatar video links back via `video`.
+export function cleanPosts(data) {
+  if (!Array.isArray(data)) return { items: null, issues: data == null ? 0 : 1 };
+  const valid = data.filter(item => item && typeof item === 'object' && !Array.isArray(item)
+    && typeof item.id === 'string' && item.id.trim() && typeof item.channel === 'string' && item.channel.trim());
+  const items = valid.slice(0, 60).map(item => ({
+    id: item.id.trim().slice(0, 80),
+    channel: item.channel.trim().slice(0, 60),
+    phase: postText(item.phase),
+    title: postText(item.title),
+    hook: postText(item.hook),
+    body: postText(item.body),
+    cta: postText(item.cta),
+    hashtags: Array.isArray(item.hashtags) ? item.hashtags.map(h => typeof h === 'string' ? h.trim() : '').filter(Boolean).slice(0, 30) : [],
+    ...(item.video && typeof item.video === 'object' && !Array.isArray(item.video)
+      && typeof item.video.project === 'string' && typeof item.video.file === 'string'
+      ? { video: { project: item.video.project, file: item.video.file } } : {}),
+  }));
+  return { items, issues: data.length - valid.length };
+}
+
 // Per-field timestamps: only bumps when that field is saved. Old rows fall back to updated_at.
 export const fieldMtime = (biz, f) => biz[f] ? Date.parse(biz[`${f}_updated_at`] || biz.updated_at) : null;
 
@@ -73,10 +95,11 @@ export async function businessState(uid) {
   return {
     sprint: biz.sprint, profile: biz.profile, inputs: biz.inputs || {}, tracker: biz.tracker, brain: biz.brain || {},
     experiments: cleanExperiments(biz.experiments).items || [],
+    posts: cleanPosts(biz.posts).items || [],
     adInsights: biz.ad_insights || null,
     instagramInsights: biz.instagram_insights || null,
     calendar: cal.items, calendarIssues: Math.max(cal.issues, biz.calendar_issues || 0), docs: docsOut, history,
-    mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null },
+    mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null, posts: biz.posts_updated_at ? Date.parse(biz.posts_updated_at) : null },
     agent: 'devin', busy: (sess || []).some(s => s.devin_status === 'working'),
   };
 }

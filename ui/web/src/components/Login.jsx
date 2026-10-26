@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../supabase.js';
 import { SPRINTS } from '../steps.js';
+import BuiltWithDevin from './BuiltWithDevin.jsx';
 
 // Hosted gate: one card, "Sign in" or "Create account".
 export default function Login({ onDone }) {
@@ -29,6 +30,7 @@ export default function Login({ onDone }) {
   return (
     <main className="login">
       <form className="login-card" onSubmit={submit}>
+        <a className="back-link" href="#">← Back</a>
         <div className="brand"><span className="brand-name">{SPRINTS.holiday.name}</span></div>
         <div className="tabs" role="tablist">
           {[['in', 'Sign in'], ['up', 'Create account']].map(([id, label]) => (
@@ -46,6 +48,7 @@ export default function Login({ onDone }) {
         </div>
         {state && state !== 'busy' && <p className={state.startsWith('Check your email') ? 'msg' : 'msg err'} role="alert">{state}</p>}
         <button className="btn primary" disabled={state === 'busy'}>{state === 'busy' ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}</button>
+        <BuiltWithDevin />
       </form>
     </main>
   );

@@ -37,3 +37,24 @@
     - The responses from the form sent out to their customers should be tracked and stored in a database
     - The user should be able to view and manage their leads from the app
 
+# Agenda
+
+60 min	Setup and business profile
+30 min	Core offer
+15 min	Break
+30 min	Customer conversations
+45 min	Get found locally
+45 min	Strategy & messaging
+45 min	Lunch
+45 min	Content kit
+45 min	Promo videos
+15 min	Break
+30 min	Campaign calendar
+20 min	Automate it
+15 min	Lead tracker
+30 min	Action plan, then share one win with the room
+
+# Create Introductory Slide
+    - Introduce Jerry & Samer, Patterned, RateLimitLabs (AI Consultation & DevelopmentServices), Cognition (Sponsored Technology Platform), HeyGen (Sponsored Video Platform)
+    - Create a slide that introduces the user to the app and what it does
+    - Include a brief overview of the app and its features

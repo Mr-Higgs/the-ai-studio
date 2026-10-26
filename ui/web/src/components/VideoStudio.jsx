@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, post, toast, useAgent } from '../api.js';
+import { api, post, put, toast, useAgent } from '../api.js';
 import { SPRINT, VIDEO_FORMATS } from '../steps.js';
+import { postsFor, videoPosts, toScript, shapeFor, linkPostVideo, linkCalendarVideo, polishPrompt } from '../posts.js';
+import { connectHeyGen } from '../heygen.js';
 import { AGENT_NAMES, ChatGrip } from '../App.jsx';
 import Chat from './Chat.jsx';
 import { StepHead } from './GenerateStep.jsx';
@@ -13,6 +15,7 @@ export default function VideoStudio({ step, projects, ctx }) {
   const [current, setCurrent] = useState(null);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [pick, setPick] = useState(null); // { post } chosen under "From your content kit"
   // Projects can arrive after mount, so fall back to the latest one with a video.
   const project = projects.find(p => p.name === current) || projects.find(p => p.videos.length) || projects[0];
 
@@ -20,6 +23,24 @@ export default function VideoStudio({ step, projects, ctx }) {
     e.preventDefault();
     try { await post('/api/projects', { name: slug(name) }); await refresh(); setCurrent(slug(name)); setName(''); setError(''); }
     catch (err) { setError(err.message); }
+  };
+
+  // Pick a content-kit post: make sure a project exists, then open "Make an avatar video" prefilled.
+  const onPick = async kit => {
+    try {
+      let name = project?.name;
+      if (!name) {
+        const base = slug(kit.title || kit.id) || 'promo';
+        name = base;
+        for (let i = 2; ; i++) {
+          try { await post('/api/projects', { name }); break; }
+          catch (err) { if (i > 5) throw err; name = `${base}-${i}`; }
+        }
+        await refresh();
+      }
+      setCurrent(name);
+      setPick({ post: kit });
+    } catch (err) { toast(err.message); }
   };
 
   const picker = (
@@ -45,9 +66,10 @@ export default function VideoStudio({ step, projects, ctx }) {
 
   return (
     <div className="video">
-      {project ? <ProjectWorkspace key={project.name} project={project} refresh={refresh} top={picker} bottom={nextBtn} /> : (
+      {project ? <ProjectWorkspace key={project.name} project={project} refresh={refresh} biz={ctx.biz} pick={pick} onPick={onPick} top={picker} bottom={nextBtn} /> : (
         <main className="main">
           {picker}
+          <KitPosts biz={ctx.biz} onPick={onPick} />
           <div className="placeholder"><p>Name your first video above. Each video gets its own folder and chat.</p></div>
         </main>
       )}
@@ -55,8 +77,39 @@ export default function VideoStudio({ step, projects, ctx }) {
   );
 }
 
+// Posts from the content kit (structured posts.json, else parsed out of the markdown) to turn into videos.
+function KitPosts({ biz, onPick }) {
+  const { posts, parsed } = videoPosts(biz || {});
+  const hasDoc = !!biz?.docs?.content?.content;
+  return (
+    <section className="panel">
+      <h2>From your content kit</h2>
+      {!hasDoc ? (
+        <p className="hint">Write your <a href="#content">content kit</a> first, then pick a Facebook or Instagram post here.</p>
+      ) : !posts.length ? (
+        <p className="hint">No Facebook or Instagram posts in your content kit — tick Facebook or Instagram under “Write for” in the <a href="#content">content kit</a> and rewrite it.</p>
+      ) : (
+        <>
+          {parsed && <p className="hint">Best guess from your content kit — rewrite the kit to get clean posts.</p>}
+          <ul className="heygen-grid">
+            {posts.map(post => (
+              <li key={post.id}>
+                <button className="heygen-card" onClick={() => onPick(post)} disabled={!!post.video}>
+                  <small>{post.channel}{post.phase ? ` · ${post.phase}` : ''}</small>
+                  <span>{post.title || (post.hook || '').slice(0, 60)}</span>
+                  <small>{post.video ? 'Video made ✓' : 'Make this video'}</small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
 // One video project: its own agent session for the script + the chat column.
-function ProjectWorkspace({ project, refresh, top, bottom }) {
+function ProjectWorkspace({ project, refresh, biz, pick, onPick, top, bottom }) {
   const agent = useAgent(`/api/agent/${enc(project.name)}`, refresh);
   const agentName = 'Devin';
   const started = agent.items.some(i => i.kind === 'user');
@@ -65,7 +118,7 @@ function ProjectWorkspace({ project, refresh, top, bottom }) {
     <>
     <main className="main">
       {top}
-      <Project project={project} refresh={refresh} agent={agent} agentName={agentName} lastAgent={lastAgent} />
+      <Project project={project} refresh={refresh} agent={agent} agentName={agentName} lastAgent={lastAgent} biz={biz} pick={pick} onPick={onPick} />
       {bottom}
     </main>
     <aside className="side" aria-label={`Chat with ${agentName} about ${project.name}`}>
@@ -84,38 +137,45 @@ function ProjectWorkspace({ project, refresh, top, bottom }) {
   );
 }
 
-function Project({ project, refresh, agent, agentName, lastAgent }) {
+function Project({ project, refresh, agent, agentName, lastAgent, biz, pick, onPick }) {
   const videos = project.videos;
+  const kitPosts = postsFor(biz).posts;
   const scriptPrompt = `Write a HeyGen presenter script for a ${SPRINT.adj}promo video for project "${project.name}", selling the offer above (if there is none, ask me what to promote). 60–90 words, spoken-word style, hook in the first sentence, end on the call-to-action. Give me the script in chat (don't write a file), then one line on which avatar look and aspect ratio to pick.`;
   return (
     <>
+      <KitPosts biz={biz} onPick={onPick} />
+
       <section className="panel">
         <h2>Make it in HeyGen</h2>
         <div className="actions">
           <button className="btn primary" onClick={() => agent.send(scriptPrompt)} disabled={agent.busy}>Write the script with {agentName}</button>
         </div>
-        <HeyGen project={project} refresh={refresh} lastAgent={lastAgent} />
+        <HeyGen project={project} refresh={refresh} lastAgent={lastAgent} agent={agent} biz={biz} initial={pick} />
       </section>
 
       <section className="panel">
         <h2>Your videos</h2>
-        {videos.length ? videos.map(v => (
-          <figure key={v.file} className="render">
-            <video controls preload="metadata" src={v.url} />
-            <figcaption><span>{v.file}</span><a className="btn ghost" href={v.url} download={v.file}>Download</a></figcaption>
-          </figure>
-        )) : <p className="hint">Videos you import from HeyGen show up here.</p>}
+        {videos.length ? videos.map(v => {
+          const linked = kitPosts.find(p => p.video?.file === v.file);
+          return (
+            <figure key={v.file} className="render">
+              <video controls preload="metadata" src={v.url} />
+              <figcaption>{linked && <em>{linked.channel} · {linked.title}</em>}<span>{v.file}</span><a className="btn ghost" href={v.url} download={v.file}>Download</a></figcaption>
+            </figure>
+          );
+        }) : <p className="hint">Videos you import from HeyGen show up here.</p>}
       </section>
     </>
   );
 }
 
 // HeyGen, from the user's own account: import finished videos, or make a new one from an avatar.
-function HeyGen({ project, refresh, lastAgent }) {
+function HeyGen({ project, refresh, lastAgent, agent, biz, initial }) {
   const [mode, setMode] = useState(null);
+  useEffect(() => { if (initial?.post) setMode('make'); }, [initial]);
   const close = () => setMode(null);
   if (mode === 'import') return <HeyGenImport project={project} refresh={refresh} close={close} />;
-  if (mode === 'make') return <HeyGenMake project={project} refresh={refresh} close={close} lastAgent={lastAgent} />;
+  if (mode === 'make') return <HeyGenMake key={initial?.post?.id || 'make'} project={project} refresh={refresh} close={close} lastAgent={lastAgent} initial={initial} agent={agent} biz={biz} />;
   return (
     <div className="actions">
       <button className="btn ghost" onClick={() => setMode('import')}>Import from HeyGen</button>
@@ -123,7 +183,26 @@ function HeyGen({ project, refresh, lastAgent }) {
     </div>
   );
 }
-const keyError = error => error && <p className="msg err" role="alert">{error} {/Setup/.test(error) && <a href="#setup">Open setup</a>}</p>;
+// Inline OAuth connect for "Connect/Reconnect HeyGen" errors; retries the failed load after.
+function HeyGenConnect({ onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const run = async () => {
+    setBusy(true); setErr('');
+    try { await connectHeyGen(onDone); } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  return <>
+    <button type="button" className="btn primary" disabled={busy} onClick={run}>{busy ? 'Connecting…' : 'Connect HeyGen'}</button>
+    {err && <span className="msg err" role="alert"> {err}</span>}
+  </>;
+}
+const keyError = (error, retry) => error && (
+  <p className="msg err" role="alert">
+    {error}{' '}
+    {/(Connect|Reconnect) HeyGen/.test(error) ? <HeyGenConnect onDone={retry} /> : /Setup/.test(error) && <a href="#setup">Open setup</a>}
+  </p>
+);
 
 function HeyGenImport({ project, refresh, close }) {
   const [list, setList] = useState(null);
@@ -151,7 +230,7 @@ function HeyGenImport({ project, refresh, close }) {
   return (
     <div className="heygen">
       <h3>Your HeyGen videos</h3>
-      {keyError(error)}
+      {keyError(error, () => load())}
       {!list && <p className="hint">Loading…</p>}
       {list && !list.length && !error && <p className="hint">No finished videos in your HeyGen account yet. Make one with “Make an avatar video”, or at app.heygen.com.</p>}
       <ul className="heygen-grid">
@@ -177,17 +256,24 @@ const SHAPES = { vertical: '9:16', square: '1:1', wide: '16:9' };
 
 // Pick one of the user's avatars, paste the script; HeyGen renders it and we import the MP4 into raw/.
 // ponytail: the browser polls; if the tab closes, the video still finishes and shows under "Import from HeyGen".
-function HeyGenMake({ project, refresh, close, lastAgent }) {
+function HeyGenMake({ project, refresh, close, lastAgent, initial, agent, biz }) {
+  const pickedPost = initial?.post || null;
   const [avatars, setAvatars] = useState(null);
   const [pick, setPick] = useState('');
-  // If Devin just wrote a script in chat, prefill it so the user doesn't have to copy/paste.
-  const [script, setScript] = useState(() => lastAgent || '');
-  const [shape, setShape] = useState('vertical');
+  // If Devin just wrote a script in chat — or a kit post was picked — prefill it.
+  const [script, setScript] = useState(() => pickedPost ? toScript(pickedPost) : (lastAgent || ''));
+  const [shape, setShape] = useState(() => pickedPost ? shapeFor(pickedPost.channel) : 'vertical');
   const [status, setStatus] = useState(''); // '', 'starting', 'rendering', 'importing'
   const [error, setError] = useState('');
+  const [polishing, setPolishing] = useState(false);
+  const [tick, setTick] = useState(0); // bump to re-fetch avatars after connecting HeyGen
+  const seenRef = useRef(lastAgent);
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; }, []);
-  useEffect(() => { api('/api/heygen/avatars').then(r => setAvatars(r.avatars)).catch(e => { setError(e.message); setAvatars([]); }); }, []);
+  useEffect(() => { api('/api/heygen/avatars').then(r => setAvatars(r.avatars)).catch(e => { setError(e.message); setAvatars([]); }); }, [tick]);
+  useEffect(() => {
+    if (polishing && lastAgent && lastAgent !== seenRef.current) { setScript(lastAgent.trim()); setPolishing(false); }
+  }, [lastAgent, polishing]);
 
   const generate = async e => {
     e.preventDefault();
@@ -204,6 +290,21 @@ function HeyGenMake({ project, refresh, close, lastAgent }) {
       }
       setStatus('importing');
       await post(`/api/projects/${enc(project.name)}/heygen`, { id: video_id });
+      // Link the finished MP4 back to the kit post and a matching calendar item.
+      if (pickedPost) {
+        try {
+          const video = { project: project.name, file: `heygen-${video_id}.mp4` };
+          const { posts } = postsFor(biz);
+          await put('/api/business/posts.json', linkPostVideo(posts, pickedPost.id, video));
+          if (biz.calendar?.length) {
+            const { items, index } = linkCalendarVideo(biz.calendar, pickedPost, video);
+            if (index >= 0) {
+              await put('/api/business/calendar.json', items);
+              toast(`Attached to your calendar: ${items[index].date} · ${items[index].channel}`, 'ok');
+            } else toast('No matching calendar item yet — build the calendar and Devin will schedule this video.', 'ok');
+          } else toast('Saved. Build your calendar and Devin will schedule this video.', 'ok');
+        } catch (err) { toast(err.message); }
+      }
       await refresh();
       if (alive.current) { setStatus(''); setScript(''); }
     } catch (err) { if (alive.current) { setError(err.message); setStatus(''); } }
@@ -213,7 +314,7 @@ function HeyGenMake({ project, refresh, close, lastAgent }) {
   return (
     <form className="heygen" onSubmit={generate}>
       <h3>Make an avatar video</h3>
-      {keyError(error)}
+      {keyError(error, () => setTick(t => t + 1))}
       {!avatars && <p className="hint">Loading your avatars…</p>}
       {avatars && !avatars.length && !error && <p className="hint">No avatars in your HeyGen account yet. Create one at app.heygen.com, then come back.</p>}
       <ul className="heygen-grid" role="radiogroup" aria-label="Avatar">
@@ -227,11 +328,14 @@ function HeyGenMake({ project, refresh, close, lastAgent }) {
           </li>
         ))}
       </ul>
+      {pickedPost && <p className="hint">From: {pickedPost.channel} · {pickedPost.title}</p>}
       {avatars?.length > 0 && <div className="fields">
         <div className="field full">
           <label htmlFor="hg-script">What should they say?</label>
           <textarea id="hg-script" rows={4} maxLength={5000} value={script} onChange={e => setScript(e.target.value)} disabled={working}
             placeholder={SPRINT.introPh} />
+          <button type="button" className="btn ghost" disabled={agent.busy || working || !script.trim()} onClick={() => { seenRef.current = lastAgent; setPolishing(true); agent.send(polishPrompt(script)); }}>Polish with Devin</button>
+          {polishing && <p className="hint">Devin is rewriting the script — watch the chat.</p>}
         </div>
         <div className="field">
           <label htmlFor="hg-shape">Shape</label>

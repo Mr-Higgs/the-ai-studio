@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 process.env.STUDIO_SECRET_KEY ||= 'a'.repeat(64);
 
 import { enc, dec } from './_lib/secrets.js';
-import { cleanCalendar, cleanExperiments, fieldMtime } from './_lib/business.js';
+import { cleanCalendar, cleanExperiments, cleanPosts, fieldMtime } from './_lib/business.js';
 import { buildContext, contextParts, partHashes, changedParts, offerSkill, applyStructuredOutput, sessionPrompt, hashOf, OUTPUT_CONTRACT } from './_lib/prompts.js';
 import { experimentStats } from '../ui/web/src/experiments.js';
 import { SCORE_EXPERIMENTS, STEPS, setSprint } from '../ui/web/src/steps.js';
@@ -46,6 +46,27 @@ test('cleanExperiments sanitizes and caps experiment data', () => {
     { id: 'linked', name: 'Linked', campaignId: '123456' },
     { id: 'invalid', name: 'Invalid', campaignId: 'abc' },
   ]).items.map(item => item.campaignId), ['123456', null]);
+});
+
+test('cleanPosts sanitizes, caps at 60 and only keeps valid video links', () => {
+  const data = [
+    { id: ' facebook-1 ', channel: ' Facebook ', phase: ' Launch ', title: ' T ', hook: 'H', body: 'B', cta: 'C', hashtags: [' a ', '', 'b', 7], video: { project: 'promo', file: 'heygen-1.mp4' } },
+    { id: 'ig-1', channel: 'Instagram', video: { project: 'p' } }, // no file → dropped
+    { id: 'ig-2', channel: 'Instagram', video: 'nope' },
+    { id: '', channel: 'x' },
+    null,
+  ];
+  const r = cleanPosts(data);
+  assert.equal(r.items.length, 3);
+  assert.equal(r.issues, 2);
+  assert.deepEqual(r.items[0], {
+    id: 'facebook-1', channel: 'Facebook', phase: 'Launch', title: 'T', hook: 'H', body: 'B', cta: 'C',
+    hashtags: ['a', 'b'], video: { project: 'promo', file: 'heygen-1.mp4' },
+  });
+  assert.ok(!('video' in r.items[1]));
+  assert.equal(cleanPosts(Array.from({ length: 70 }, (_, i) => ({ id: `p${i}`, channel: 'C' }))).items.length, 60);
+  assert.deepEqual(cleanPosts(null), { items: null, issues: 0 });
+  assert.deepEqual(cleanPosts({}), { items: null, issues: 1 });
 });
 
 test('fieldMtime prefers the per-field timestamp and falls back to updated_at', () => {
@@ -129,6 +150,19 @@ test('applyStructuredOutput accepts experiments and rejects unknown files', () =
   assert.ok(OUTPUT_CONTRACT.includes('experiments.json'));
 });
 
+test('applyStructuredOutput accepts posts.json and context exposes posts', () => {
+  const post = { id: 'fb-1', channel: 'Facebook', hook: 'H', body: 'B', hashtags: ['x'], extra: 'dropped' };
+  const r = applyStructuredOutput({ files: { 'posts.json': [post, { nope: 1 }] } });
+  assert.equal(r.posts.length, 1);
+  assert.equal(r.posts[0].id, 'fb-1');
+  assert.ok(!('extra' in r.posts[0]));
+  assert.ok(OUTPUT_CONTRACT.includes('posts.json'));
+  const parts = contextParts({ profile: {}, posts: [post] }, {});
+  const part = parts.find(p => p.key === 'posts');
+  assert.ok(part && part.text.startsWith('### posts.json\n') && part.text.includes('fb-1'));
+  assert.ok(!contextParts({ profile: {} }, {}).some(p => p.key === 'posts'));
+});
+
 test('experimentStats groups tracker rows and leaves unknown acquisition cost blank', () => {
   const rows = [
     { experiment: 'e1', stage: 'Lead', value: 50 },
@@ -148,7 +182,7 @@ test('holiday strategy and calendar prompts match the pre-change snapshot', () =
   const strategyPrompt = strategy.prompt({}, strategy);
   const calendarPrompt = calendar.prompt({}, calendar);
   assert.equal(createHash('sha256').update(strategyPrompt).digest('hex'), '12cf2c3ca4612438bd290803162408c992d541df3723db86f166b77356417951');
-  assert.equal(createHash('sha256').update(calendarPrompt).digest('hex'), '77d34155165ee7913dc573a2295292ee17b1236b27a6b8940e4332ceb2a00564');
+  assert.equal(createHash('sha256').update(calendarPrompt).digest('hex'), '10dd0f5cf886634798c73cf067bacfdfac44a2ae750a3911f86124386320f4c6');
   assert.doesNotMatch(strategyPrompt, /experiments\.json/);
 });
 

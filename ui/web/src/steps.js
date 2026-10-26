@@ -257,16 +257,18 @@ ${answers(i, s.inputs)}
 
 For each channel: 3–5 posts (hook, body, call-to-action, hashtags where relevant), each labelled with the campaign phase it belongs to. For Google Business Profile, write posts (under 1,500 characters, one call-to-action each). For Reddit, write genuinely helpful answer templates for common questions, not ads, and note which communities allow any mention of a business. Also include a 3-email sequence (subject lines + body) for launch, reminder and last chance, and 2 short ad variants. Everything must be copy-paste ready — no placeholders except [link], and use my website lead form URL from the context when it exists.
 
+Also return posts.json in the structured output: one entry per social post you wrote, as {"id", "channel", "phase", "title", "hook", "body", "cta", "hashtags"} — ids like facebook-1, instagram-2; channel spelled exactly as in my channel list; hashtags as an array of strings.
+
 ${rules('content.md')}`,
   },
   {
-    id: 'video', kind: 'video', title: 'Promo videos', uses: ['offer'],
-    blurb: 'Write the script here, make the video in HeyGen with your avatar, and bring it back into your campaign.',
+    id: 'video', kind: 'video', title: 'Promo videos', uses: ['offer', 'content'],
+    blurb: 'Pick a post from your content kit, turn it into a spoken script, make the video in HeyGen with your avatar, and bring it back into your campaign.',
     guide: {
       time: '45 min',
       why: 'Short video is the highest-reach format on every platform right now, and an avatar presenter is enough.',
-      done: ['A 60–90 word script with a hook and a call-to-action', 'One avatar video made in HeyGen and imported here', 'Picked the right shape for where you’ll post it'],
-      tips: ['Click “Write the script” and let Devin draft it from your offer.', 'Paste the script into “Make an avatar video”, pick an avatar and a shape.', 'Already made videos in HeyGen? Use “Import from HeyGen” to pull them in.'],
+      done: ['A 60–90 word script with a hook and a call-to-action', 'One avatar video made in HeyGen from a Facebook or Instagram post and imported here', 'Picked the right shape for where you’ll post it'],
+      tips: ['Pick a Facebook or Instagram post under "From your content kit" — the script is prefilled; press "Polish with Devin" if you want it smoother.', 'Click “Write the script” and let Devin draft it from your offer.', 'Paste the script into “Make an avatar video”, pick an avatar and a shape.', 'Already made videos in HeyGen? Use “Import from HeyGen” to pull them in.'],
     },
   },
   {
@@ -288,6 +290,8 @@ ${rules('content.md')}`,
 Build my ${v.adj}content calendar from my strategy and content kit above (reuse that copy; write new copy only where gaps exist).
 
 ${answers(i, s.inputs)}
+
+Posts in posts.json that carry a \`video\` field already have a finished avatar video: schedule those as video posts (format Reel / video) and copy the \`video\` object onto that calendar item unchanged.
 
 Return it as calendar.json in the structured output (the JSON array itself): an array sorted by date, where each item is exactly
 {"date": "YYYY-MM-DD", "channel": "Instagram", "format": "Reel | Post | Story | Email | Ad | Other", "title": "short label", "copy": "the full ready-to-post text", "cta": "the call-to-action", "status": "planned"}.

@@ -187,7 +187,7 @@ export default function GenerateStep({ step, ...ctx }) {
       {step.kind === 'calendar' && has && (
         <>
           <div className="doc-bar"><span>Saved · {biz.calendar.length} items</span><History files={history} /></div>
-          <Calendar items={biz.calendar} experiments={biz.experiments || []} refresh={refresh} />
+          <Calendar items={biz.calendar} experiments={biz.experiments || []} projects={ctx.projects || []} refresh={refresh} />
         </>
       )}
       {doc && (

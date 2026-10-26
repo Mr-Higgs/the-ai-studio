@@ -6,7 +6,7 @@ const parse = d => { const [y, m, day] = d.split('-').map(Number); return new Da
 const monday = d => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const fmt = (d, o) => d.toLocaleDateString([], o);
 
-export default function Calendar({ items, experiments = [], refresh }) {
+export default function Calendar({ items, experiments = [], projects = [], refresh }) {
   const [list, setList] = useState(items);
   const [open, setOpen] = useState(null);
   const [error, setError] = useState('');
@@ -27,6 +27,7 @@ export default function Calendar({ items, experiments = [], refresh }) {
     w.rows.push({ item, i, d });
   });
   const posted = list.filter(x => x.status === 'posted').length;
+  const videoUrl = v => projects.find(p => p.name === v?.project)?.videos.find(x => x.file === v.file)?.url;
 
   return (
     <section className="calendar" aria-label="Campaign calendar">
@@ -47,13 +48,16 @@ export default function Calendar({ items, experiments = [], refresh }) {
                 </label>
                 <button className="cal-main" aria-expanded={open === i} onClick={() => setOpen(open === i ? null : i)}>
                   <span className="cal-date">{fmt(d, { weekday: 'short', day: 'numeric' })}</span>
-                  <span className="cal-chan">{item.channel}<em>{item.format}</em>{item.experiment && <small className="cal-experiment">{experiments.find(experiment => experiment.id === item.experiment)?.name || 'Experiment'}</small>}</span>
+                  <span className="cal-chan">{item.channel}<em>{item.format}</em>{item.experiment && <small className="cal-experiment">{experiments.find(experiment => experiment.id === item.experiment)?.name || 'Experiment'}</small>}{item.video && <small className="cal-video">▶ video</small>}</span>
                   <span className="cal-title">{item.title}</span>
                 </button>
                 {open === i && (
                   <div className="cal-body">
                     <p>{item.copy}</p>
                     {item.cta && <p className="cal-cta">Call to action: {item.cta}</p>}
+                    {item.video && (videoUrl(item.video)
+                      ? <video controls preload="metadata" src={videoUrl(item.video)} />
+                      : <p className="hint">Video: {item.video.file} (open the Promo videos step to play it)</p>)}
                     <CopyButton text={item.copy + (item.cta ? `\n\n${item.cta}` : '')} />
                   </div>
                 )}

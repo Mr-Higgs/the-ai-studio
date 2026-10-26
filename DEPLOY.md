@@ -38,8 +38,8 @@ to install.
 ## 4. Participant flow
 
 Create account (email + password) → **Setup** → paste **Devin API key**
-(`cog_…`) and **Organization ID** from Devin → Settings → Devin API → done. HeyGen key
-optional (imports/avatar videos). The first account created is just a normal user —
+(`cog_…`) and **Organization ID** from Devin → Settings → Devin API → done. HeyGen optional:
+connect your HeyGen account (or paste an API key) for imports/avatar videos. The first account created is just a normal user —
 there's no admin UI in this version.
 
 ## 5. Costs and notes

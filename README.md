@@ -28,8 +28,8 @@ Your facilitator gives you a web address.
 2. Go to **Setup** and paste your **Devin API key** (`cog_…`) and **Organization ID**
    from Devin → Settings → Devin API (create a Personal access token, or a Service user
    with the Member role). This runs the assistant on your own Devin account and usage.
-3. Optional: paste your **HeyGen API key** to make/import avatar videos in the Promo
-   videos step.
+3. Optional: connect your **HeyGen account** (or paste an API key) to make/import avatar
+   videos in the Promo videos step.
 4. Open **Start here** and follow the steps — each one is written for you by Devin, and
    everything is saved to your account.
 

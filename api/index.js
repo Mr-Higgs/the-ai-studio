@@ -1,20 +1,22 @@
 // Studio API — one Vercel function. Auth = Supabase Bearer token; per-user data in Postgres.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { admin, userFromReq } from './_lib/supabase.js';
 import { enc, dec } from './_lib/secrets.js';
-import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusiness, snapshot, exportMarkdown, cleanCalendar, cleanExperiments, BUSINESS_DOCS } from './_lib/business.js';
+import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusiness, snapshot, exportMarkdown, cleanCalendar, cleanExperiments, cleanPosts, BUSINESS_DOCS } from './_lib/business.js';
 import { devinCreds, devinClient } from './_lib/devin.js';
 import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
 import { contextParts, changedParts, partHashes, offerSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
 import { applyAdSpend, findInstagramAccounts, normalizeAccountId, NO_INSTAGRAM_ACCOUNT_MESSAGE, syncAds, syncInstagram, tryConnectInstagram } from './_lib/meta.js';
 import { leadToken, LEAD_TOKEN, cleanLead, appendLead, leadFormHtml } from './_lib/leads.js';
+import { pkce, randomState, redirectUri, registerClient, buildAuthorizeUrl, exchangeCode, refreshTokens, toStored, revoke, RESOURCE } from './_lib/heygen-oauth.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
 const send = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const readJson = async req => req.body ?? JSON.parse(await new Promise(r => { let b = ''; req.on('data', c => b += c); req.on('end', () => r(b || '{}')); }));
-const BIZ_FIELDS = { 'brain.json': 'brain', 'profile.json': 'profile', 'inputs.json': 'inputs', 'tracker.json': 'tracker', 'sprint.json': 'sprint', 'calendar.json': 'calendar', 'experiments.json': 'experiments' };
+const BIZ_FIELDS = { 'brain.json': 'brain', 'profile.json': 'profile', 'inputs.json': 'inputs', 'tracker.json': 'tracker', 'sprint.json': 'sprint', 'calendar.json': 'calendar', 'experiments.json': 'experiments', 'posts.json': 'posts' };
 const ENV_KEYS = { DEVIN_API_KEY: 'devin_api_key', DEVIN_ORG_ID: 'devin_org_id', HEYGEN_API_KEY: 'heygen_api_key' };
 // MCP servers Devin can use. Devin is the MCP client, so users add these in their own Devin
 // org (Customize → MCPs): Meta's as custom remote servers (`url`), the rest from Devin's
@@ -48,6 +50,11 @@ export const metaHealthItem = (settings, instagram = null) => ({
   meta: true,
   instagram: instagram || null,
 });
+// Account label shown on the Setup row; tokens never leave the ciphertext column.
+const heygenAccount = s => {
+  try { return s.heygen_oauth ? JSON.parse(dec(s.heygen_oauth)).account || null : null; }
+  catch { return null; }
+};
 // Devin has no API for adding org MCPs and Meta needs the owner's own Facebook login, so for
 // custom (url) servers a Devin session walks them through it, then checks the tools respond.
 const SETUP_SCHEMA = { type: 'object', properties: { connected: { type: 'boolean' }, note: { type: 'string' } }, required: ['connected', 'note'] };
@@ -70,18 +77,86 @@ async function settings(uid) {
   const { data } = await admin().from('user_settings').select('*').eq('user_id', uid).maybeSingle();
   return data || {};
 }
+const settingsUpsert = (uid, fields) =>
+  admin().from('user_settings').upsert({ user_id: uid, ...fields, updated_at: new Date().toISOString() });
+
+// HeyGen credentials: OAuth bearer (plan credits) preferred, API key (API credits) as fallback.
+async function heygenAuth(uid) {
+  const s = await settings(uid);
+  if (s.heygen_oauth) {
+    let stored = null;
+    try { stored = JSON.parse(dec(s.heygen_oauth)); } catch { stored = null; }
+    if (stored?.access_token) {
+      if ((stored.expires_at || 0) - 60000 < Date.now() && stored.refresh_token) {
+        try {
+          const t = await refreshTokens({ clientId: stored.client_id, refreshToken: stored.refresh_token });
+          stored = toStored(t, stored.client_id, stored);
+          await settingsUpsert(uid, { heygen_oauth: enc(JSON.stringify(stored)) });
+        } catch {
+          await settingsUpsert(uid, { heygen_oauth: null });
+          throw Object.assign(new Error('Your HeyGen connection expired. Reconnect HeyGen in Setup.'), { status: 400 });
+        }
+      }
+      return { headers: { Authorization: `Bearer ${stored.access_token}` }, mode: 'oauth' };
+    }
+  }
+  const k = s.heygen_api_key ? dec(s.heygen_api_key) : null;
+  if (k && k !== 'your_api_key_here') return { headers: { 'X-Api-Key': k }, mode: 'key' };
+  throw Object.assign(new Error('Connect HeyGen in Setup, then try again.'), { status: 400 });
+}
 async function heygen(uid, apiPath, json) {
-  const raw = (await settings(uid)).heygen_api_key;
-  const k = raw ? dec(raw) : null;
-  if (!k || k === 'your_api_key_here') throw Object.assign(new Error('Add your HeyGen API key in Setup, then try again.'), { status: 400 });
+  const { headers, mode } = await heygenAuth(uid);
   const r = await fetch(`https://api.heygen.com${apiPath}`, json
-    ? { method: 'POST', headers: { 'X-Api-Key': k, 'Content-Type': 'application/json' }, body: JSON.stringify(json) }
-    : { headers: { 'X-Api-Key': k } });
+    ? { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(json) }
+    : { headers });
   const body = await r.json().catch(() => ({}));
-  if (r.status === 401) throw Object.assign(new Error('HeyGen rejected the key. Replace your HeyGen API key in Setup.'), { status: 400 });
+  if (r.status === 401) throw Object.assign(new Error(mode === 'oauth'
+    ? 'HeyGen rejected the connection. Reconnect HeyGen in Setup.'
+    : 'HeyGen rejected the key. Replace your HeyGen API key in Setup.'), { status: 400 });
+  if (r.status === 403 && body.error?.code === 'api_key_required')
+    throw Object.assign(new Error('This HeyGen feature needs an API key (API credits). Add one in Setup.'), { status: 400 });
   if (r.status === 429) throw Object.assign(new Error('HeyGen is rate-limiting. Wait a minute and try again.'), { status: 429 });
   if (!r.ok) throw Object.assign(new Error(body.error?.message || body.message || `HeyGen error ${r.status}`), { status: 502 });
   return body;
+}
+
+const escHtml = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const htmlPage = (res, inner, code = 200) => {
+  res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(`<!doctype html><meta charset="utf-8"><title>HeyGen</title><body style="font-family:system-ui;padding:2em">${inner}</body>`);
+};
+// Browser-redirect target for the HeyGen OAuth flow — unauthenticated; the pending row's
+// `state` identifies the user. Never puts tokens in the page or logs.
+async function heygenOauthCallback(res, url) {
+  const err = url.searchParams.get('error');
+  if (err) return htmlPage(res, `<p>HeyGen didn’t connect: ${escHtml(url.searchParams.get('error_description') || err)}. Close this tab and try again.</p>`);
+  const code = url.searchParams.get('code'), state = url.searchParams.get('state') || '';
+  const { data: rows } = await admin().from('user_settings').select('user_id, heygen_oauth_pending').not('heygen_oauth_pending', 'is', null);
+  let hit = null;
+  for (const row of rows || []) {
+    let p = null;
+    try { p = JSON.parse(dec(row.heygen_oauth_pending)); } catch { continue; }
+    if (!p?.state || Date.now() - (p.created_at || 0) > 15 * 60 * 1000) continue;
+    const a = Buffer.from(String(p.state)), b = Buffer.from(state);
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) { hit = { uid: row.user_id, pending: p }; break; }
+  }
+  if (!hit || !code) return htmlPage(res, '<p>This sign-in link expired. Go back to Studio and click Connect HeyGen again.</p>', 400);
+  try {
+    const tokens = await exchangeCode({ clientId: hit.pending.client_id, code, verifier: hit.pending.verifier, redirectUri: hit.pending.redirect_uri });
+    const stored = toStored(tokens, hit.pending.client_id);
+    try { // best-effort account label for the Setup row
+      const r = await fetch(`${RESOURCE}/v3/users/me`, { headers: { Authorization: `Bearer ${stored.access_token}` } });
+      if (r.ok) {
+        const b = await r.json().catch(() => ({}));
+        const u = b.data || b;
+        stored.account = { email: u.email || null, username: u.username || u.name || null, plan: u.plan || null };
+      }
+    } catch { /* account label is optional */ }
+    await settingsUpsert(hit.uid, { heygen_oauth: enc(JSON.stringify(stored)), heygen_oauth_pending: null });
+    return htmlPage(res, `<p>HeyGen connected. You can close this tab.</p><script>try{window.opener&&window.opener.postMessage({type:'heygen-connected'},'*')}catch(e){};setTimeout(()=>window.close(),800)</script>`);
+  } catch (e) {
+    return htmlPage(res, `<p>HeyGen didn’t connect: ${escHtml(e.message)}. Close this tab and try again.</p>`);
+  }
 }
 
 const HEYGEN_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -137,6 +212,10 @@ async function applyOutput(uid, biz, row, session) {
   if (applied.experiments) {
     await db.from('businesses').update({ experiments: applied.experiments, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('id', biz.id);
   }
+  if (applied.posts) {
+    const now = new Date().toISOString();
+    await db.from('businesses').update({ posts: applied.posts, posts_updated_at: now, updated_at: now }).eq('user_id', uid).eq('id', biz.id);
+  }
   let profileNumbers = false;
   if (applied.answers) {
     const merged = mergeDevinAnswers(biz.profile || {}, cleanBrain(biz.brain), applied.answers);
@@ -151,7 +230,7 @@ async function applyOutput(uid, biz, row, session) {
       profileNumbers = true;
     }
   }
-  return { applied: [...Object.keys(applied.docs), ...(applied.calendar ? ['calendar'] : []), ...(applied.experiments ? ['experiments'] : []), ...(profileNumbers ? ['profile numbers'] : [])], hash: applied.hash };
+  return { applied: [...Object.keys(applied.docs), ...(applied.calendar ? ['calendar'] : []), ...(applied.experiments ? ['experiments'] : []), ...(applied.posts ? ['posts'] : []), ...(profileNumbers ? ['profile numbers'] : [])], hash: applied.hash };
 }
 
 export default async function handler(req, res) {
@@ -195,6 +274,10 @@ export default async function handler(req, res) {
       return res.end('{"error":"method"}');
     }
 
+    // HeyGen OAuth browser redirect — unauthenticated; state in the pending row identifies the user.
+    if (req.method === 'GET' && parts[0] === 'api' && parts[1] === 'heygen' && parts[2] === 'oauth' && parts[3] === 'callback')
+      return heygenOauthCallback(res, url);
+
     const user = await userFromReq(req);
     if (!user) return send(res, 401, { error: 'Sign in first.' });
     const uid = user.id;
@@ -225,7 +308,7 @@ export default async function handler(req, res) {
       return send(res, 200, { hosted: true, items: [
         { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: devinOwn || devinShared, shared: devinShared, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
         ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: !!s.integrations?.[id], setup: s.integrations?._setup?.[id] })),
-        { id: 'heygen', group: 'optional', name: 'HeyGen API key', why: 'Imports your HeyGen videos and makes new ones from your avatars.', ok: !!s.heygen_api_key, key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
+        { id: 'heygen', group: 'optional', name: 'HeyGen', why: 'Makes avatar videos from your scripts and imports them. Connect your HeyGen account to use your plan credits.', ok: !!(s.heygen_oauth || s.heygen_api_key), oauth: !!s.heygen_oauth, apiKey: !!s.heygen_api_key, account: heygenAccount(s), key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
         metaHealthItem(s, active?.instagram_insights?.account?.username || null),
       ] });
     }
@@ -341,6 +424,7 @@ export default async function handler(req, res) {
       if (['profile', 'calendar', 'tracker'].includes(col)) fields[`${col}_updated_at`] = fields.updated_at;
       if (col === 'calendar') fields.calendar_issues = cleanCalendar(data).issues;
       if (col === 'experiments') fields.experiments = cleanExperiments(data).items;
+      if (col === 'posts') { fields.posts = cleanPosts(data).items || []; fields.posts_updated_at = fields.updated_at; }
       await db.from('businesses').update(fields).eq('user_id', uid).eq('id', biz.id);
       return send(res, 200, { ok: true });
     }
@@ -401,7 +485,28 @@ export default async function handler(req, res) {
       return send(res, 201, { name });
     }
 
-    // ---- HeyGen passthrough (per-user key) ----
+    // ---- HeyGen OAuth ----
+    if (req.method === 'POST' && url.pathname === '/api/heygen/oauth/start') {
+      const redirect_uri = redirectUri(req);
+      const client_id = await registerClient(redirect_uri);
+      const { verifier, challenge } = pkce();
+      const state = randomState();
+      await settingsUpsert(uid, { heygen_oauth_pending: enc(JSON.stringify({ state, verifier, client_id, redirect_uri, created_at: Date.now() })) });
+      return send(res, 200, { url: buildAuthorizeUrl({ clientId: client_id, redirectUri: redirect_uri, state, challenge }) });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/heygen/oauth/disconnect') {
+      const s = await settings(uid);
+      if (s.heygen_oauth) {
+        try {
+          const st = JSON.parse(dec(s.heygen_oauth));
+          if (st?.client_id) await revoke({ clientId: st.client_id, token: st.refresh_token || st.access_token });
+        } catch { /* best effort */ }
+      }
+      await settingsUpsert(uid, { heygen_oauth: null, heygen_oauth_pending: null });
+      return send(res, 200, { ok: true });
+    }
+
+    // ---- HeyGen passthrough (OAuth bearer or per-user API key) ----
     if (req.method === 'GET' && url.pathname === '/api/heygen/videos') {
       const q = new URLSearchParams({ limit: '24' });
       if (url.searchParams.get('token')) q.set('token', url.searchParams.get('token'));
@@ -520,6 +625,7 @@ export default async function handler(req, res) {
           for (const kind of res2.applied) {
             const key = kind === 'calendar' ? 'calendar'
               : kind === 'experiments' ? 'experiments'
+                : kind === 'posts' ? 'posts'
                 : kind === 'profile numbers' ? null : `doc:${kind}`;
             if (key && hashes[key]) appliedHashes[key] = hashes[key];
             if (kind === 'profile numbers') {
