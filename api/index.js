@@ -644,6 +644,6 @@ export default async function handler(req, res) {
 
     send(res, 404, { error: 'not found' });
   } catch (e) {
-    if (!res.headersSent) send(res, e.status || 500, { error: e.message });
+    if (!res.headersSent) send(res, e.status || 500, { error: e.message, ...(e.retryAfter && { retryAfter: e.retryAfter }) });
   }
 }

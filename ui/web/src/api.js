@@ -7,7 +7,7 @@ export async function api(url, opts = {}) {
   const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(session && { Authorization: `Bearer ${session.access_token}` }), ...opts.headers } });
   const body = await r.json().catch(() => ({}));
   if (r.status === 401) dispatchEvent(new CustomEvent('unauth')); // hosted: session expired
-  if (!r.ok) throw new Error(body.error || r.statusText);
+  if (!r.ok) throw Object.assign(new Error(body.error || r.statusText), { status: r.status, retryAfter: body.retryAfter });
   return body;
 }
 export const put = (url, data) => api(url, { method: 'PUT', body: JSON.stringify(data) });
@@ -83,6 +83,8 @@ const toolText = content => (content || [])
   .map(c => c.content?.text ?? c.content?.resource?.text ?? (c.type === 'diff' ? `Edited ${c.path}` : ''))
   .filter(Boolean).join('\n').slice(-4000);
 
+const POLL_BUSY = 4000, POLL_IDLE = 60000;
+
 // Polls a Devin-cloud session via the API. Same reducer; user/agent text items only.
 export function useAgent(base, onDone) {
   const [state, dispatch] = useReducer(reduce, initial);
@@ -91,27 +93,41 @@ export function useAgent(base, onDone) {
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
+  const wake = useRef(() => {});
+
+  // Each poll costs two Devin API calls, so poll fast only while Devin is working,
+  // slowly when idle, not at all in a hidden tab, and back off when Devin rate-limits.
   useEffect(() => {
     if (!base) return;
     dispatch({ type: 'reset' });
     cursor.current = '';
-    let stop = false, timer;
+    let stop = false, timer, busy = true, backoff = 0, inFlight = false;
+    const schedule = ms => { clearTimeout(timer); if (!stop && !document.hidden) timer = setTimeout(tick, ms); };
     const tick = async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
         const r = await api(`${base}/poll${cursor.current ? `?cursor=${cursor.current}` : ''}`);
         if (stop) return;
+        backoff = 0;
         for (const m of r.messages || []) {
           cursor.current = m.id;
           dispatch({ type: 'msg', kind: m.kind, text: m.text });
         }
         if (r.starting) dispatch({ type: 'starting' });
+        busy = r.busy;
         dispatch({ type: 'status', busy: r.busy });
         if (r.applied?.length) { dispatch({ type: 'applied', applied: r.applied }); doneRef.current?.(); }
-      } catch { /* keep polling */ }
-      if (!stop) timer = setTimeout(tick, document.hidden ? 30000 : 4000);
+      } catch (e) {
+        if (e.status === 429) backoff = Math.min(Math.max((e.retryAfter || 0) * 1000, backoff * 2 || 15000), 120000);
+      } finally { inFlight = false; }
+      schedule(backoff || (busy ? POLL_BUSY : POLL_IDLE));
     };
+    const onVisible = () => { if (!document.hidden) schedule(0); };
+    wake.current = () => { busy = true; backoff = 0; schedule(POLL_BUSY); };
+    document.addEventListener('visibilitychange', onVisible);
     tick();
-    return () => { stop = true; clearTimeout(timer); };
+    return () => { stop = true; clearTimeout(timer); wake.current = () => {}; document.removeEventListener('visibilitychange', onVisible); };
   }, [base, generation]);
 
   const fail = e => dispatch({ type: 'error', message: e.message });
@@ -121,7 +137,7 @@ export function useAgent(base, onDone) {
     send: async (text, snapshot, step) => {
       dispatch({ type: 'user', text });
       dispatch({ type: 'status', busy: true });
-      try { await post(`${base}/prompt`, { text, snapshot, step }); } catch (e) { fail(e); }
+      try { await post(`${base}/prompt`, { text, snapshot, step }); wake.current(); } catch (e) { fail(e); }
     },
     restart: () => { post(`${base}/new`).catch(() => {}); cursor.current = ''; setGeneration(g => g + 1); },
   };
