@@ -1,0 +1,421 @@
+{
+  "sprint": "holiday",
+  "note": "profile.* → businesses.profile; inputs.<step>.* → businesses.inputs. checks = array of option strings; date = YYYY-MM-DD.",
+  "profile": {
+    "name": {
+      "label": "Business name",
+      "type": "text",
+      "placeholder": "e.g. Juniper & Wick Candle Co.",
+      "group": "Basics"
+    },
+    "location": {
+      "label": "Where you sell",
+      "type": "text",
+      "placeholder": "e.g. Austin, TX + ships nationwide",
+      "group": "Basics"
+    },
+    "sells": {
+      "label": "What you sell",
+      "type": "textarea",
+      "placeholder": "Products or services, in a sentence or two",
+      "group": "Basics"
+    },
+    "customers": {
+      "label": "Who buys from you today",
+      "type": "textarea",
+      "placeholder": "e.g. Women 30–55 buying gifts, local offices ordering client gifts",
+      "group": "Basics"
+    },
+    "price": {
+      "label": "Average sale",
+      "type": "text",
+      "placeholder": "e.g. $48",
+      "group": "Basics"
+    },
+    "website": {
+      "label": "Website",
+      "type": "text",
+      "placeholder": "https://…",
+      "group": "Basics"
+    },
+    "socials": {
+      "label": "Social handles",
+      "type": "text",
+      "placeholder": "e.g. @juniperwick on Instagram and TikTok",
+      "group": "Basics"
+    },
+    "proof": {
+      "label": "Reviews, awards or numbers you’re proud of",
+      "type": "text",
+      "placeholder": "e.g. 4.9★ on Etsy, 300+ reviews",
+      "group": "Basics"
+    },
+    "hoursWeek": {
+      "label": "Hours you work in the business each week",
+      "type": "text",
+      "placeholder": "e.g. 45 — include admin, messages, deliveries",
+      "num": true,
+      "how": "Count a normal week: making or serving, plus messages, admin, buying supplies and deliveries.",
+      "group": "Your time and pay"
+    },
+    "payGoal": {
+      "label": "What you want to take home from the business per year ($)",
+      "type": "text",
+      "placeholder": "e.g. 60000",
+      "num": true,
+      "how": "What you need for your personal bills and savings for a year, plus what would make the work worth it.",
+      "group": "Your time and pay"
+    },
+    "rate": {
+      "label": "What an hour of your time is worth ($/hour)",
+      "type": "text",
+      "placeholder": "e.g. 30",
+      "num": true,
+      "how": "Start from your pay goal ÷ (hours a week × 48 weeks), then compare it with what you’d earn doing similar work for someone else.",
+      "group": "Your time and pay"
+    },
+    "replaceRate": {
+      "label": "What you’d pay someone else to do your work ($/hour)",
+      "type": "text",
+      "placeholder": "e.g. 22",
+      "num": true,
+      "how": "What local job ads or freelancers charge for the same kind of work.",
+      "group": "Your time and pay"
+    },
+    "revenueMonth": {
+      "label": "Sales ($)",
+      "type": "text",
+      "placeholder": "e.g. 6000",
+      "num": true,
+      "how": "Average of the last 3 months of sales from your bank, card reader or shop reports.",
+      "group": "Running costs in a typical month"
+    },
+    "laborMonth": {
+      "label": "Staff and contractor pay — not your own ($)",
+      "type": "text",
+      "placeholder": "e.g. 0 if it’s just you",
+      "num": true,
+      "how": "Wages and contractor payments in a normal month; 0 if it’s just you.",
+      "group": "Running costs in a typical month"
+    },
+    "materialsMonth": {
+      "label": "Materials, stock and supplies ($)",
+      "type": "text",
+      "placeholder": "e.g. 1800",
+      "num": true,
+      "how": "Supplier receipts or card statements for ingredients, stock, packaging and supplies, averaged over 3 months.",
+      "group": "Running costs in a typical month"
+    },
+    "overhead": {
+      "label": "Other running costs — rent, software, insurance, utilities, fees ($)",
+      "type": "text",
+      "placeholder": "e.g. 450",
+      "num": true,
+      "how": "Rent, software, insurance, phone, utilities, platform and card fees — a monthly average from bank statements.",
+      "group": "Running costs in a typical month"
+    },
+    "newMonth": {
+      "label": "New customers in a typical month",
+      "type": "text",
+      "placeholder": "e.g. 25",
+      "num": true,
+      "how": "First-time buyers in a normal month — from order history, booking records, or a rough count.",
+      "group": "Customers over time"
+    },
+    "cac": {
+      "label": "What it costs to win one new customer — ads, samples, discounts (CAC, $)",
+      "type": "text",
+      "placeholder": "marketing spend ÷ new customers",
+      "num": true,
+      "how": "Marketing spend over the last 1–3 months (ads, samples, giveaways, first-order discounts) ÷ new customers in that time.",
+      "group": "Customers over time"
+    },
+    "buysPerYear": {
+      "label": "How many times a customer buys from you per year",
+      "type": "text",
+      "placeholder": "e.g. 3",
+      "num": true,
+      "how": "Look up a few regular customers in your order history and count their purchases in the last year.",
+      "group": "Customers over time"
+    },
+    "years": {
+      "label": "How many years a customer usually stays",
+      "type": "text",
+      "placeholder": "e.g. 2",
+      "num": true,
+      "how": "How long your regulars have been buying from you; use 1 if most buy once.",
+      "group": "Customers over time"
+    },
+    "ltv": {
+      "label": "What a typical customer spends with you over time (lifetime value, $)",
+      "type": "text",
+      "placeholder": "leave blank and the app works it out",
+      "num": true,
+      "how": "Average sale × purchases a year × years they stay.",
+      "group": "Customers over time"
+    }
+  },
+  "inputs": {
+    "offer": {
+      "sell": {
+        "label": "What do you want to sell more of this season?",
+        "type": "textarea",
+        "placeholder": "e.g. Gift boxes of our small-batch candles, and gift cards for last-minute shoppers"
+      },
+      "price": {
+        "label": "Typical price range",
+        "type": "text",
+        "placeholder": "e.g. $35–$120"
+      },
+      "window": {
+        "label": "Campaign window",
+        "type": "text",
+        "placeholder": "e.g. Nov 20 – Dec 23"
+      }
+    },
+    "research": {
+      "keywords": {
+        "label": "What would people search or ask about?",
+        "type": "text",
+        "placeholder": "e.g. candle gift ideas, gifts for coworkers under $50, best soy candles"
+      },
+      "who": {
+        "label": "Who are you listening for?",
+        "type": "text",
+        "placeholder": "e.g. people buying gifts for mom, office managers"
+      },
+      "subs": {
+        "label": "Subreddits you already know (optional)",
+        "type": "text",
+        "placeholder": "e.g. r/GiftIdeas, r/candles, r/Austin"
+      },
+      "competitors": {
+        "label": "Up to 3 competitors whose reviews are worth reading (optional)",
+        "type": "text",
+        "placeholder": "e.g. Joe’s Auto, Midas on Main St"
+      }
+    },
+    "visibility": {
+      "gbp": {
+        "label": "Google Business Profile",
+        "type": "select",
+        "options": [
+          "Yes, and it’s up to date",
+          "Yes, but neglected",
+          "No",
+          "Not sure"
+        ]
+      },
+      "services": {
+        "label": "Services or products you want to be found for, most profitable first",
+        "type": "textarea",
+        "placeholder": "e.g. brake repair, collision repair, AC service"
+      },
+      "area": {
+        "label": "City and the neighborhoods or suburbs you serve",
+        "type": "text",
+        "placeholder": "e.g. Decatur, GA — Oakhurst, Kirkwood, Avondale"
+      },
+      "competitors": {
+        "label": "Up to 3 competitors (names or websites), optional",
+        "type": "text",
+        "placeholder": "e.g. Joe’s Auto, Midas on Main St"
+      },
+      "tracking": {
+        "label": "What you already track",
+        "type": "checks",
+        "options": [
+          "Google Business Profile insights",
+          "Google Analytics",
+          "Search Console",
+          "Call tracking",
+          "None"
+        ]
+      }
+    },
+    "strategy": {
+      "goal": {
+        "label": "Holiday goal",
+        "type": "text",
+        "placeholder": "e.g. 40 orders and $4,000 in sales by Dec 24"
+      },
+      "budget": {
+        "label": "Marketing budget for the season",
+        "type": "text",
+        "placeholder": "e.g. $0, $200, $1,000"
+      },
+      "channels": {
+        "label": "Where you reach customers today",
+        "type": "checks",
+        "options": [
+          "Google Business Profile",
+          "Google Search / Maps",
+          "Yelp",
+          "Nextdoor",
+          "Facebook",
+          "Instagram",
+          "TikTok",
+          "Email / SMS list",
+          "Website",
+          "Phone call",
+          "Walk-in / signage",
+          "Referral / partners",
+          "Reddit"
+        ]
+      }
+    },
+    "content": {
+      "channels": {
+        "label": "Write for",
+        "type": "checks",
+        "options": [
+          "Google Business Profile",
+          "Google Search / Maps",
+          "Yelp",
+          "Nextdoor",
+          "Facebook",
+          "Instagram",
+          "TikTok",
+          "Email / SMS list",
+          "Website",
+          "Reddit"
+        ]
+      },
+      "voice": {
+        "label": "Your brand voice",
+        "type": "text",
+        "placeholder": "e.g. warm, a little funny, never pushy"
+      },
+      "words": {
+        "label": "Words or claims to avoid",
+        "type": "text",
+        "placeholder": "optional"
+      }
+    },
+    "video": {},
+    "calendar": {
+      "start": {
+        "label": "Start date",
+        "type": "date"
+      },
+      "days": {
+        "label": "Length",
+        "type": "select",
+        "options": [
+          "30 days",
+          "45 days",
+          "60 days"
+        ]
+      },
+      "pace": {
+        "label": "How much can you post?",
+        "type": "select",
+        "options": [
+          "2–3 times a week",
+          "4–5 times a week",
+          "Every day"
+        ]
+      }
+    },
+    "automation": {
+      "tools": {
+        "label": "Tools you already use",
+        "type": "text",
+        "placeholder": "e.g. Shopify, Square, Gmail, Instagram, Calendly, Mailchimp"
+      },
+      "chores": {
+        "label": "What eats your time every week?",
+        "type": "textarea",
+        "placeholder": "e.g. answering the same DMs, chasing quotes, posting every day"
+      }
+    },
+    "tracker": {},
+    "action-plan": {
+      "hours": {
+        "label": "Hours per week you can give this",
+        "type": "text",
+        "placeholder": "e.g. 4"
+      },
+      "launch": {
+        "label": "Launch date",
+        "type": "date"
+      },
+      "help": {
+        "label": "Anyone helping you?",
+        "type": "text",
+        "placeholder": "e.g. my partner on weekends, a part-time assistant"
+      }
+    }
+  },
+  "answerTemplate": {
+    "profile": {
+      "name": "",
+      "location": "",
+      "sells": "",
+      "customers": "",
+      "price": "",
+      "website": "",
+      "socials": "",
+      "proof": "",
+      "hoursWeek": "",
+      "payGoal": "",
+      "rate": "",
+      "replaceRate": "",
+      "revenueMonth": "",
+      "laborMonth": "",
+      "materialsMonth": "",
+      "overhead": "",
+      "newMonth": "",
+      "cac": "",
+      "buysPerYear": "",
+      "years": "",
+      "ltv": ""
+    },
+    "inputs": {
+      "offer": {
+        "sell": "",
+        "price": "",
+        "window": ""
+      },
+      "research": {
+        "keywords": "",
+        "who": "",
+        "subs": "",
+        "competitors": ""
+      },
+      "visibility": {
+        "gbp": "",
+        "services": "",
+        "area": "",
+        "competitors": "",
+        "tracking": []
+      },
+      "strategy": {
+        "goal": "",
+        "budget": "",
+        "channels": []
+      },
+      "content": {
+        "channels": [],
+        "voice": "",
+        "words": ""
+      },
+      "video": {},
+      "calendar": {
+        "start": "",
+        "days": "",
+        "pace": ""
+      },
+      "automation": {
+        "tools": "",
+        "chores": ""
+      },
+      "tracker": {},
+      "action-plan": {
+        "hours": "",
+        "launch": "",
+        "help": ""
+      }
+    }
+  }
+}
