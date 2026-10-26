@@ -666,6 +666,11 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .rll-logo { filter: var(--logo-filter); height: auto; }
 .landing-nav .rll-logo { width: 176px; max-width: 40vw; flex: none; } /* 714×165 source → ~41px tall */
 .login-card .rll-logo { width: 180px; align-self: center; margin-bottom: 4px; }
+.login-card h2 { margin: 0; font: 600 20px/1.2 var(--display); }
+.login-card .hint { margin: 0; }
+.login-card .link { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; text-decoration: underline; align-self: flex-start; }
+.login-card .link:hover { color: var(--ink); }
+.login-card .forgot { margin-top: -6px; }
 .landing-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .landing-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; }
 .landing-card p { margin: 0; line-height: 1.5; }
