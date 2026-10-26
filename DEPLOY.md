@@ -19,6 +19,11 @@ to install.
    happens through Supabase Auth directly). Turn OFF "Confirm email" if you want participants
    signed in immediately; leave it on and they get a confirmation link first. Under
    **Authentication → URL Configuration**, set the Site URL to your Vercel address.
+   **Rate limits:** with "Confirm email" on, Supabase's built-in mailer sends only ~2 emails
+   per hour per project, so sign-ups fail with HTTP 429 after the first couple. Either turn
+   "Confirm email" off, or add custom SMTP (**Authentication → Emails → SMTP Settings**, e.g.
+   Resend) and then raise the email limit under **Authentication → Rate Limits**. For a live
+   workshop on shared Wi-Fi, also raise "sign-ups and sign-ins" there, since that limit is per IP.
 
 ## 3. Vercel
 
