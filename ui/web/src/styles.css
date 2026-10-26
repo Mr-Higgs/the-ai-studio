@@ -129,6 +129,9 @@ code { font-family: var(--mono); font-size: .88em; }
 .theme-pick { display: flex; gap: 2px; margin: 4px 10px 0; padding: 2px; border-radius: var(--r-sm); background: var(--rail-hover); }
 .theme-pick button { flex: 1; border: 0; background: none; color: var(--rail-muted); padding: 4px 0; border-radius: 4px; font-size: 12.5px; cursor: pointer; }
 .theme-pick button[aria-pressed="true"] { background: var(--rail-active-bg); color: var(--rail-active-ink); box-shadow: 0 0 0 1px var(--line); }
+.built-with { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--rail-muted); text-decoration: none; }
+.built-with:hover { color: var(--rail-ink); }
+.built-with svg { width: 16px; height: 16px; }
 .agent-pick select { flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--line); color: var(--ink); border-radius: var(--r-sm); padding: 6px 8px; }
 .agent-pick > span { flex: 0 0 60px; }
 .agent-pick + .agent-pick { margin-top: 8px; }
