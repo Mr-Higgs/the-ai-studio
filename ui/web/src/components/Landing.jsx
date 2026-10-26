@@ -1,18 +1,19 @@
 import { PHASES, SPRINTS, STEPS, setSprint } from '../steps.js';
 import BuiltWithDevin from './BuiltWithDevin.jsx';
+import FiberBackground from './FiberBackground.jsx';
 
-// Signed-out front page. Copy follows the $100M Offers frame: dream outcome, proof, speed, low effort, value stack.
+// Signed-out front page for the GENESIS holiday workshop (Be One & Branches). Copy follows the $100M Offers frame: dream outcome, proof, speed, low effort, value stack.
 const PAINS = [
-  ['“I don’t have time to do marketing.”', 'Answer a few questions. Devin writes the strategy, posts, emails and ads for you.'],
-  ['“I never know what to post.”', 'A ready-to-post content kit in your voice, and a calendar that says what goes out when.'],
-  ['“Nobody finds me on Google.”', 'A get-found-locally plan for Google, Maps and AI assistants, with the numbers that prove it’s working.'],
-  ['“My offer sounds like everyone else’s.”', 'One offer so clear and valuable the right customer feels silly saying no.'],
+  ['“I’m too busy in the holidays to do marketing.”', 'Answer a few questions. Devin writes the holiday strategy, posts, emails and ads for you.'],
+  ['“I never know what to post.”', 'A ready-to-post content kit in your voice, and a calendar lined up with Black Friday, Small Business Saturday and Cyber Monday.'],
+  ['“Nobody finds me on Google.”', 'A get-found plan for “gifts near me” searches on Google, Maps and AI assistants.'],
+  ['“My offer sounds like everyone else’s.”', 'One holiday offer so clear and valuable the right customer feels silly saying no.'],
   ['“Leads slip through the cracks.”', 'A lead form and tracker so every inquiry is caught and followed up.'],
 ];
 const HOW = [
-  ['Tell it about your business', 'What you sell, who buys, what it costs. Ten minutes, plain questions.'],
-  ['Devin does the work', 'Each step produces a finished document: offer, research, strategy, content, calendar.'],
-  ['Launch and track', 'Post, follow the plan, and watch leads land in your tracker.'],
+  ['Bring your business to the workshop', 'What you sell, who buys, what it costs. Plain questions, your real numbers.'],
+  ['Devin does the work', 'Each step produces a finished piece of your holiday campaign: offer, research, strategy, content, calendar.'],
+  ['Launch and track', 'Post through the season, follow the plan, and watch leads and sales land in your tracker.'],
 ];
 const TEAM = [
   ['jerry-pierre.jpeg', 'Jerry Pierre', 'Co-Founder & CTO, Patterned · Co-Founder, RateLimitLabs · Devin AI and HeyGen Ambassador'],
@@ -20,22 +21,28 @@ const TEAM = [
 ];
 
 export default function Landing() {
-  setSprint('growth'); // STEPS is only filled once a sprint is picked
+  setSprint('holiday'); // STEPS is only filled once a sprint is picked
   const byId = Object.fromEntries(STEPS.map(s => [s.id, s]));
   const cta = <a className="btn primary lg" href="#login">Start your sprint</a>;
 
   return (
     <main className="landing">
+      <FiberBackground />
       <header className="landing-nav">
-        <span className="brand-name">{SPRINTS.growth.name}</span>
+        <span className="nav-brand"><img className="rll-logo" src="/ratelimitlabs.png" alt="RateLimitLabs" width="714" height="165" /><span className="brand-name">GENESIS | {SPRINTS.holiday.name}</span></span>
         <a className="btn ghost" href="#login">Sign in</a>
       </header>
 
       <section className="landing-hero">
-        <p className="eyebrow">For small business owners</p>
-        <h1>{SPRINTS.growth.headline}, without hiring an agency.</h1>
-        <p className="lede">A guided marketing sprint where an AI agent writes every piece for you: the offer, the plan, the posts, the calendar and the follow-up. You make the calls; Devin does the work.</p>
+        <p className="eyebrow">GENESIS · A hands-on workshop with Be One &amp; Branches</p>
+        <h1>{SPRINTS.holiday.name}: Build Your AI-Powered Sales Engine</h1>
+        <p className="lede">This hands-on workshop helps micro and small business owners use AI to turn the holiday season into a real growth opportunity. You’ll work on your own business and build a practical holiday sales campaign that attracts new customers, strengthens engagement and grows revenue.</p>
         <div className="landing-ctas">{cta}<a className="btn lg" href="#what">See what you get</a></div>
+        <p className="partners-label">Presented by</p>
+        <div className="landing-logos partners">
+          <img src="/be-one.png" alt="Be One" />
+          <img className="tile light" src="/branches.png" alt="Branches — Trish &amp; Dan Bell Family Empowerment Centers" />
+        </div>
       </section>
 
       <section>
@@ -77,14 +84,13 @@ export default function Landing() {
             </div>
           ))}
         </div>
-        <div className="landing-logos">
+        <div className="landing-logos centered">
           <span className="patterned-logo" role="img" aria-label="Patterned" />
-          <img className="tile" src="/ratelimitlabs.png" alt="RateLimitLabs" />
         </div>
       </section>
 
       <section className="landing-final">
-        <h2>Your next 30 days of marketing, done with you.</h2>
+        <h2>Leave the workshop with your holiday campaign built.</h2>
         {cta}
         <BuiltWithDevin />
       </section>

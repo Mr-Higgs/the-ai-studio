@@ -8,6 +8,7 @@
   --primary-hover: #2a2a2d;
   --on-primary: #ffffff;
   --ink: #0b0b0c;
+  --logo-filter: invert(1) hue-rotate(180deg); /* white-on-dark logos read on the light theme */
   --muted: #6b6b70;
   --line: #e3e3e0;
   --accent: #2f6bff;
@@ -38,6 +39,7 @@
     --primary-hover: #d4d4d8;
     --on-primary: #0a0a0b;
     --ink: #ececee;
+    --logo-filter: none;
     --muted: #8d8d95;
     --line: #26262a;
     --accent: #5b8cff;
@@ -55,6 +57,7 @@
   }
 }
 :root[data-theme="dark"] {
+  --logo-filter: none;
   --paper: #0a0a0b;
   --panel: #121214;
   --frost: #1a1a1d;
@@ -629,6 +632,8 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 }
 
 /* Landing (signed-out front page) */
+.fiber-bg { position: fixed !important; inset: 0; z-index: 0; max-width: none !important; pointer-events: none; }
+.landing > :not(.fiber-bg), .login > :not(.fiber-bg) { position: relative; z-index: 1; }
 .landing { min-height: 100dvh; background: var(--paper); color: var(--ink); font-family: var(--body); padding: 0 16px 48px; }
 .landing > * { max-width: 880px; margin-inline: auto; }
 .landing section { padding: 48px 0; border-top: 1px solid var(--line); }
@@ -640,6 +645,11 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .landing .eyebrow { color: var(--accent); font-weight: 600; font-size: 14px; margin: 0; }
 .landing .btn.lg { padding: 12px 20px; font-size: 16px; }
 .landing-nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; }
+.landing-nav .nav-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.landing-nav .nav-brand .brand-name { padding-left: 14px; border-left: 1px solid var(--line); }
+.rll-logo { filter: var(--logo-filter); height: auto; }
+.landing-nav .rll-logo { width: 176px; max-width: 40vw; flex: none; } /* 714×165 source → ~41px tall */
+.login-card .rll-logo { width: 180px; align-self: center; margin-bottom: 4px; }
 .landing-hero { border-top: 0 !important; padding-top: 32px !important; }
 .landing-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .landing-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; }
@@ -657,7 +667,12 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .landing-logos img { width: min(220px, 100%); height: auto; }
 /* White SVG used as a mask so it paints in --ink and flips with the theme */
 .patterned-logo { width: min(220px, 100%); aspect-ratio: 2430 / 1012.5; background: var(--ink); -webkit-mask: url(/patterned.svg) center / contain no-repeat; mask: url(/patterned.svg) center / contain no-repeat; }
-.landing-logos .tile { border-radius: var(--r-sm); } /* logo has a baked-in black background */
+.landing-logos .tile { border-radius: var(--r-sm); padding: 8px 12px; box-sizing: border-box; } /* fixed backdrop: these logos only read on one background */
+.landing-logos .tile.light { background: #fff; }
+.landing .partners-label { margin: 28px 0 0; font-size: 13px; color: var(--muted); }
+.landing-logos.partners { margin-top: 12px; }
+.landing-logos.centered { justify-content: center; }
+.landing-logos.partners img { width: min(180px, 100%); }
 .landing-final { text-align: center; display: grid; justify-items: center; gap: 16px; }
 .landing-final .built-with { color: var(--muted); }
 .login-card .back-link { font-size: 13px; color: var(--muted); text-decoration: none; }

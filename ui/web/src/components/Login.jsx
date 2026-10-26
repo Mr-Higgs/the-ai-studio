@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../supabase.js';
-import { SPRINTS } from '../steps.js';
 import BuiltWithDevin from './BuiltWithDevin.jsx';
+import FiberBackground from './FiberBackground.jsx';
 
 // Hosted gate: one card, "Sign in" or "Create account".
 export default function Login({ onDone }) {
@@ -29,9 +29,10 @@ export default function Login({ onDone }) {
 
   return (
     <main className="login">
+      <FiberBackground />
       <form className="login-card" onSubmit={submit}>
         <a className="back-link" href="#">← Back</a>
-        <div className="brand"><span className="brand-name">{SPRINTS.holiday.name}</span></div>
+        <img className="rll-logo" src="/ratelimitlabs.png" alt="RateLimitLabs" width="714" height="165" />
         <div className="tabs" role="tablist">
           {[['in', 'Sign in'], ['up', 'Create account']].map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={mode === id} className={mode === id ? 'active' : ''}
