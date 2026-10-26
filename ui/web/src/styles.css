@@ -10,6 +10,7 @@
   --ink: #0b0b0c;
   --logo-filter: invert(1) hue-rotate(180deg); /* white-on-dark logos read on the light theme */
   --muted: #6b6b70;
+  --muted-strong: #3f3f45; /* grey body text over the fiber background */
   --line: #e3e3e0;
   --accent: #2f6bff;
   --accent-soft: #e8efff;
@@ -41,6 +42,7 @@
     --ink: #ececee;
     --logo-filter: none;
     --muted: #8d8d95;
+  --muted-strong: #c4c4cc;
     --line: #26262a;
     --accent: #5b8cff;
     --accent-soft: #15203a;
@@ -66,6 +68,7 @@
   --on-primary: #0a0a0b;
   --ink: #ececee;
   --muted: #8d8d95;
+  --muted-strong: #c4c4cc;
   --line: #26262a;
   --accent: #5b8cff;
   --accent-soft: #15203a;
@@ -634,6 +637,19 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 /* Landing (signed-out front page) */
 .fiber-bg { position: fixed !important; inset: 0; z-index: 0; max-width: none !important; pointer-events: none; }
 .landing > :not(.fiber-bg), .login > :not(.fiber-bg) { position: relative; z-index: 1; }
+/* Light theme only: a faint paper scrim. Dark theme shows the fibers bare. */
+:root[data-theme="light"] .fiber-bg::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 15%, transparent); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .fiber-bg::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 15%, transparent); } }
+/* Lift the grey text so it reads over the fibers */
+.landing, .login { --muted: var(--muted-strong); }
+.landing :is(h2, .brand-name) { text-shadow: 0 0 18px var(--paper), 0 0 4px var(--paper); }
+/* Solid panels behind the text blocks, same as .landing-card */
+.landing :is(.landing-hero, .landing-phase, .landing-how, .landing-final) { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+.landing-hero { margin-block: 16px 40px; padding: 32px 28px !important; }
+.landing-phase { padding: 4px 20px 18px; margin-top: 12px; }
+.landing-phase h3 { margin-top: 16px; }
+.landing .landing-how { padding: 20px 20px 20px 40px; margin: 0; }
+.landing .landing-final { padding: 40px 24px; margin-top: 48px; }
 .landing { min-height: 100dvh; background: var(--paper); color: var(--ink); font-family: var(--body); padding: 0 16px 48px; }
 .landing > * { max-width: 880px; margin-inline: auto; }
 .landing section { padding: 48px 0; border-top: 1px solid var(--line); }
@@ -641,7 +657,7 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .landing h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.05; margin: 8px 0 16px; }
 .landing h2 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 16px; }
 .landing h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; }
-.landing .lede { font-size: 18px; line-height: 1.5; color: var(--muted); max-width: 640px; }
+.landing .lede { font-size: 18px; line-height: 1.55; color: var(--muted); max-width: 640px; }
 .landing .eyebrow { color: var(--accent); font-weight: 600; font-size: 14px; margin: 0; }
 .landing .btn.lg { padding: 12px 20px; font-size: 16px; }
 .landing-nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; }
@@ -650,7 +666,6 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .rll-logo { filter: var(--logo-filter); height: auto; }
 .landing-nav .rll-logo { width: 176px; max-width: 40vw; flex: none; } /* 714×165 source → ~41px tall */
 .login-card .rll-logo { width: 180px; align-self: center; margin-bottom: 4px; }
-.landing-hero { border-top: 0 !important; padding-top: 32px !important; }
 .landing-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .landing-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; }
 .landing-card p { margin: 0; line-height: 1.5; }
