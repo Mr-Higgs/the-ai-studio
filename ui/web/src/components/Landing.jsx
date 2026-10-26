@@ -29,13 +29,13 @@ export default function Landing() {
     <main className="landing">
       <FiberBackground />
       <header className="landing-nav">
-        <span className="nav-brand"><img className="rll-logo" src="/ratelimitlabs.png" alt="RateLimitLabs" width="714" height="165" /><span className="brand-name">GENESIS | {SPRINTS.holiday.name}</span></span>
+        <span className="nav-brand"><img className="rll-logo" src="/ratelimitlabs.png" alt="RateLimitLabs" width="714" height="165" /><span className="brand-name">GENESIS | {SPRINTS.growth.name}</span></span>
         <a className="btn ghost" href="#login">Sign in</a>
       </header>
 
       <section className="landing-hero">
         <p className="eyebrow">GENESIS · A hands-on workshop with Be One &amp; Branches</p>
-        <h1>{SPRINTS.holiday.name}: Build Your AI-Powered Sales Engine</h1>
+        <h1>{SPRINTS.growth.name}: Build Your AI-Powered Sales Engine</h1>
         <p className="lede">This hands-on workshop helps micro and small business owners use AI to turn the holiday season into a real growth opportunity. You’ll work on your own business and build a practical holiday sales campaign that attracts new customers, strengthens engagement and grows revenue.</p>
         <div className="landing-ctas">{cta}<a className="btn lg" href="#what">See what you get</a></div>
         <p className="partners-label">Presented by</p>
