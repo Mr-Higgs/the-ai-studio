@@ -15,8 +15,8 @@ export default function FiberBackground() {
       className="fiber-bg"
       lightMode={light}
       glowColor="#2f6bff"
-      lineColor="#dff4ff"
-      secondaryColor="#22d3ee"
+      lineColor={light ? '#2f6bff' : '#dff4ff'} /* near-white lines wash out on paper; light mode inks them blue */
+      secondaryColor={light ? '#0ea5e9' : '#22d3ee'}
       gradient="along"
       layers={2}
       twist={0.5}
@@ -30,7 +30,7 @@ export default function FiberBackground() {
       foldGlow={0.3}
       flow={0.25}
       sparkle={0.3}
-      brightness={0.7}
+      brightness={light ? 1.3 : 0.7}
       glow={0.5}
     />
   );
