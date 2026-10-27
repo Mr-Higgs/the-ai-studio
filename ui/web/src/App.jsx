@@ -13,6 +13,7 @@ import Tracker from './components/Tracker.jsx';
 import VideoStudio from './components/VideoStudio.jsx';
 import Setup from './components/Setup.jsx';
 import Login from './components/Login.jsx';
+import ResetPassword from './components/ResetPassword.jsx';
 import Landing from './components/Landing.jsx';
 import BuiltWithDevin from './components/BuiltWithDevin.jsx';
 
@@ -85,6 +86,7 @@ class StepBoundary extends Component {
 
 export default function App() {
   const [me, setMe] = useState(null); // { hosted, email?, admin? }
+  const [recovering, setRecovering] = useState(false);
   const [biz, setBiz] = useState(null);
   const [projects, setProjects] = useState([]);
   const [health, setHealth] = useState(null);
@@ -104,7 +106,7 @@ export default function App() {
       setMe(session ? await api('/api/auth/me').catch(() => null) : { hosted: true });
     };
     load();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => load());
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => { if (event === 'PASSWORD_RECOVERY') setRecovering(true); load(); });
     const unauth = () => setMe({ hosted: true });
     addEventListener('unauth', unauth);
     return () => { subscription.unsubscribe(); removeEventListener('unauth', unauth); };
@@ -118,7 +120,12 @@ export default function App() {
 
   const recheck = () => api('/api/health').then(r => setHealth(r.items));
   if (!me) return <div className="boot">Loading your workspace…</div>;
+<<<<<<< HEAD
   if (me.hosted && !me.email) return hash === 'login' || hash === 'help' ? <Login onDone={() => api('/api/auth/me').then(setMe)} /> : <Landing />;
+=======
+  if (recovering) return <ResetPassword onDone={() => { setRecovering(false); go(''); }} />;
+  if (me.hosted && !me.email) return hash === 'login' ? <Login onDone={() => api('/api/auth/me').then(setMe)} /> : <Landing />;
+>>>>>>> b4eb0ada9be4fed17822be372a966cd84f2b648c
   if (!biz) return <div className="boot">Loading your workspace…</div>;
 
   setSprint(biz.sprint?.id); // before anything reads STEPS
