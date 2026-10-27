@@ -2,7 +2,7 @@ import { post } from './api.js';
 
 // HeyGen OAuth in a popup: get the authorize URL from the API, navigate the popup, then call
 // onDone when the callback postMessages back — or when focus returns (user closed it).
-export async function connectHeyGen(onDone) {
+export async function connectHeyGen(onDone, onError) {
   const w = window.open('', '_blank'); // opened now so the popup blocker allows it
   let url;
   try { ({ url } = await post('/api/heygen/oauth/start')); }
@@ -10,7 +10,10 @@ export async function connectHeyGen(onDone) {
   if (!w) { window.location.href = url; return; }
   w.location = url;
   const done = () => { cleanup(); onDone?.(); };
-  const onMsg = e => { if (e?.data?.type === 'heygen-connected') done(); };
+  const onMsg = e => {
+    if (e?.data?.type === 'heygen-connected') done();
+    else if (e?.data?.type === 'heygen-failed') { cleanup(); onError?.(e.data); }
+  };
   const onFocus = () => done();
   const cleanup = () => { removeEventListener('message', onMsg); removeEventListener('focus', onFocus); };
   addEventListener('message', onMsg);

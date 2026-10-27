@@ -18,9 +18,13 @@ export const pkce = () => {
 };
 export const randomState = () => crypto.randomBytes(32).toString('base64url');
 
-// The public origin this request was served from (same trick as the lead-form URL).
+// The public origin this request was served from. HeyGen allowlists a single callback URL,
+// so PUBLIC_ORIGIN pins the callback to the canonical origin when the request came in on an
+// alias/preview host; localhost keeps its own origin so dev still works.
 export function publicOrigin(req) {
   const host = req.headers['x-forwarded-host'] || req.headers.host;
+  if (process.env.PUBLIC_ORIGIN && !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(String(host || '')))
+    return process.env.PUBLIC_ORIGIN.replace(/\/+$/, '');
   const proto = req.headers['x-forwarded-proto'] || (String(host || '').startsWith('localhost') ? 'http' : 'https');
   return `${proto}://${host}`;
 }

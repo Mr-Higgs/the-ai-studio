@@ -38,6 +38,7 @@ to install.
    | `STUDIO_SECRET_KEY` | 64 hex chars; generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` — it encrypts users' API keys at rest |
    | `DEVIN_API_KEY`, `DEVIN_ORG_ID` | Optional shared fallback credentials |
    | `DEVIN_MAX_ACU` | Optional per-session ACU cap |
+   | `PUBLIC_ORIGIN` | `https://beone.ratelimitlabs.com` — canonical origin for the HeyGen OAuth callback; the exact callback URL `https://beone.ratelimitlabs.com/api/heygen/oauth/callback` must be allowlisted by HeyGen via their Integrations Intake form |
 3. Deploy, then open the URL — you should see the sign-in screen.
 
 ## 4. Participant flow

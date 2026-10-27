@@ -127,9 +127,19 @@ const htmlPage = (res, inner, code = 200) => {
 };
 // Browser-redirect target for the HeyGen OAuth flow — unauthenticated; the pending row's
 // `state` identifies the user. Never puts tokens in the page or logs.
+// Failure page: show the reason and post it to the opener so the UI can react (e.g. an
+// unallowlisted redirect_uri means telling the user to fall back to an API key).
+const heygenFailPage = (res, text) => {
+  const reason = /redirect_uri/i.test(text) ? 'redirect_uri' : 'other';
+  const msg = reason === 'redirect_uri'
+    ? 'HeyGen hasn’t approved sign-in from this site yet. Close this tab and use a HeyGen API key in Studio instead.'
+    : `HeyGen didn’t connect: ${text}. Close this tab and try again.`;
+  const payload = JSON.stringify({ type: 'heygen-failed', reason, message: msg }).replace(/<\//g, '<\\/');
+  return htmlPage(res, `<p>${escHtml(msg)}</p><script>try{window.opener&&window.opener.postMessage(${payload},'*')}catch(e){}</script>`);
+};
 async function heygenOauthCallback(res, url) {
   const err = url.searchParams.get('error');
-  if (err) return htmlPage(res, `<p>HeyGen didn’t connect: ${escHtml(url.searchParams.get('error_description') || err)}. Close this tab and try again.</p>`);
+  if (err) return heygenFailPage(res, url.searchParams.get('error_description') || err);
   const code = url.searchParams.get('code'), state = url.searchParams.get('state') || '';
   const { data: rows } = await admin().from('user_settings').select('user_id, heygen_oauth_pending').not('heygen_oauth_pending', 'is', null);
   let hit = null;
@@ -155,7 +165,7 @@ async function heygenOauthCallback(res, url) {
     await settingsUpsert(hit.uid, { heygen_oauth: enc(JSON.stringify(stored)), heygen_oauth_pending: null });
     return htmlPage(res, `<p>HeyGen connected. You can close this tab.</p><script>try{window.opener&&window.opener.postMessage({type:'heygen-connected'},'*')}catch(e){};setTimeout(()=>window.close(),800)</script>`);
   } catch (e) {
-    return htmlPage(res, `<p>HeyGen didn’t connect: ${escHtml(e.message)}. Close this tab and try again.</p>`);
+    return heygenFailPage(res, e.message);
   }
 }
 

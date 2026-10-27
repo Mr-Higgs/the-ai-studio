@@ -65,7 +65,8 @@ prompt notes (`INTEGRATIONS` in api/index.js).
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
 (service role), `STUDIO_SECRET_KEY` (64 hex, key encryption), optional `DEVIN_API_KEY` + `DEVIN_ORG_ID`
 (shared fallback), `DEVIN_MAX_ACU`, `PORT` (dev only), optional `HEYGEN_OAUTH_CLIENT_ID` +
-`HEYGEN_OAUTH_RESOURCE` (HeyGen OAuth overrides).
+`HEYGEN_OAUTH_RESOURCE` (HeyGen OAuth overrides), optional `PUBLIC_ORIGIN` — canonical https
+origin used for the HeyGen OAuth callback on non-localhost hosts.
 
 ## Hard rules
 - Never log or return user API keys or OAuth tokens; they only travel user → /api/setup/env → ciphertext (or the OAuth token endpoint → ciphertext).

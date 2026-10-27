@@ -143,9 +143,17 @@ function DevinKeys({ item, recheck }) {
 function HeyGenRow({ item, recheck }) {
   const [state, setState] = useState('');
   const [busy, setBusy] = useState(false);
+  const [keyOpen, setKeyOpen] = useState(false);
   const connect = async () => {
     setBusy(true); setState('');
-    try { await connectHeyGen(recheck); } catch (err) { setState(err.message); }
+    // HeyGen allowlists one callback URL, so on an unapproved origin we steer to the API key.
+    const onError = d => {
+      if (d?.reason === 'redirect_uri') {
+        setState('HeyGen hasn’t approved sign-in from this site yet. Paste a HeyGen API key below instead (bills HeyGen API credits, which are separate from your plan).');
+        setKeyOpen(true);
+      } else setState(d?.message || 'HeyGen didn’t connect. Try again.');
+    };
+    try { await connectHeyGen(recheck, onError); } catch (err) { setState(err.message); }
     setBusy(false);
   };
   const disconnect = async () => {
@@ -162,7 +170,7 @@ function HeyGenRow({ item, recheck }) {
     <button className="btn primary" disabled={busy} onClick={connect}>{busy ? 'Connecting…' : 'Connect HeyGen'}</button>
     {item.apiKey && <span className="hint">Using your API key (API credits).</span>}
     {state && <p className="msg err" role="alert">{state}</p>}
-    <details className="integ-note">
+    <details className="integ-note" open={keyOpen} onToggle={e => setKeyOpen(e.currentTarget.open)}>
       <summary className="hint">Use an API key instead</summary>
       <p className="hint">API keys bill HeyGen API credits, which are separate from your plan.</p>
       <KeyInput item={item} recheck={recheck} />

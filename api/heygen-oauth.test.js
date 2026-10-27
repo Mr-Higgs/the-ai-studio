@@ -22,6 +22,22 @@ test('redirectUri honours forwarded headers and localhost', () => {
   assert.equal(publicOrigin({ headers: { 'x-forwarded-host': 'a.com', host: 'internal' } }), 'https://a.com');
 });
 
+test('redirectUri uses PUBLIC_ORIGIN on non-localhost hosts', () => {
+  const prev = process.env.PUBLIC_ORIGIN;
+  try {
+    process.env.PUBLIC_ORIGIN = 'https://beone.ratelimitlabs.com/';
+    assert.equal(redirectUri({ headers: { host: 'the-ai-studio.vercel.app' } }),
+      'https://beone.ratelimitlabs.com/api/heygen/oauth/callback');
+    assert.equal(redirectUri({ headers: { 'x-forwarded-host': 'the-ai-studio.vercel.app', 'x-forwarded-proto': 'https' } }),
+      'https://beone.ratelimitlabs.com/api/heygen/oauth/callback');
+    assert.equal(redirectUri({ headers: { host: 'localhost:4321' } }),
+      'http://localhost:4321/api/heygen/oauth/callback');
+    delete process.env.PUBLIC_ORIGIN;
+    assert.equal(redirectUri({ headers: { host: 'studio.example.com' } }),
+      'https://studio.example.com/api/heygen/oauth/callback');
+  } finally { prev === undefined ? delete process.env.PUBLIC_ORIGIN : process.env.PUBLIC_ORIGIN = prev; }
+});
+
 test('buildAuthorizeUrl carries code + PKCE params and no resource (HeyGen rejects api.heygen.com)', () => {
   const url = buildAuthorizeUrl({ clientId: 'cid', redirectUri: 'https://x/cb', state: 'st', challenge: 'ch' });
   const u = new URL(url);
