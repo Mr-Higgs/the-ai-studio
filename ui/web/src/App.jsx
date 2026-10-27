@@ -120,12 +120,8 @@ export default function App() {
 
   const recheck = () => api('/api/health').then(r => setHealth(r.items));
   if (!me) return <div className="boot">Loading your workspace…</div>;
-<<<<<<< HEAD
-  if (me.hosted && !me.email) return hash === 'login' || hash === 'help' ? <Login onDone={() => api('/api/auth/me').then(setMe)} /> : <Landing />;
-=======
   if (recovering) return <ResetPassword onDone={() => { setRecovering(false); go(''); }} />;
-  if (me.hosted && !me.email) return hash === 'login' ? <Login onDone={() => api('/api/auth/me').then(setMe)} /> : <Landing />;
->>>>>>> b4eb0ada9be4fed17822be372a966cd84f2b648c
+  if (me.hosted && !me.email) return hash === 'login' || hash === 'help' ? <Login onDone={() => api('/api/auth/me').then(setMe)} /> : <Landing />;
   if (!biz) return <div className="boot">Loading your workspace…</div>;
 
   setSprint(biz.sprint?.id); // before anything reads STEPS

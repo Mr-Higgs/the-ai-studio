@@ -70,13 +70,9 @@ export default function Login({ onDone }) {
         </div>}
         {mode === 'in' && <button type="button" className="link forgot" onClick={() => { setMode('reset'); setState(''); }}>Forgot password?</button>}
         {state && state !== 'busy' && <p className={state.startsWith('Check your email') ? 'msg' : 'msg err'} role="alert">{state}</p>}
-<<<<<<< HEAD
-        <button className="btn primary" disabled={state === 'busy'}>{state === 'busy' ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}</button>
-        <a className="back-link guide-link" href="/guide">First time? Read how it works</a>
-=======
         <button className="btn primary" disabled={state === 'busy'}>{state === 'busy' ? 'One moment…' : mode === 'in' ? 'Sign in' : mode === 'up' ? 'Create account' : 'Send reset link'}</button>
         {mode === 'reset' && <button type="button" className="link" onClick={() => { setMode('in'); setState(''); }}>Back to sign in</button>}
->>>>>>> b4eb0ada9be4fed17822be372a966cd84f2b648c
+        <a className="back-link guide-link" href="/guide">First time? Read how it works</a>
         <BuiltWithDevin />
       </form>
     </main>
