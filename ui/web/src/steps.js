@@ -42,7 +42,7 @@ export const PHASES = [
   { name: 'Lay the Groundwork', steps: ['profile', 'offer', 'research', 'visibility', 'strategy'] },
   { name: 'Create', steps: ['content', 'video'] },
   { name: 'Prepare to Launch', steps: ['calendar', 'automation', 'tracker'] },
-  { name: '🚀 Launch', steps: ['action-plan'] },
+  { name: '🚀 Launch', steps: ['action-plan', 'website'] },
 ];
 export const phaseOf = id => PHASES.find(p => p.steps.includes(id));
 
@@ -354,6 +354,16 @@ Include: a launch checklist for the next 7 days (each item under 1 hour, in orde
 
 ${rules('action-plan.md')}`,
   },
+  {
+    id: 'website', kind: 'site', title: 'Your website', uses: ['brain', 'offer', 'visibility', 'content'],
+    blurb: 'A one-page website designed just for your business — built and put online by Devin, from everything you made today.',
+    guide: {
+      time: 'After today · 30–60 min',
+      why: 'Your offer, your customers’ words and your local plan are already written. A site that uses them — and looks like nobody else’s — is where new customers land.',
+      done: ['A live link you can share and put on your Google Business Profile', 'Your offer and guarantee at the top, your lead form as the button', 'A look that could only be yours'],
+      tips: ['Press the button once; Devin opens in a new tab and messages you there within a minute.', 'Ask for changes by describing them like you would to a friend: “warmer colours”, “put the hours higher”.', 'Send Devin real photos in that conversation — they make the biggest difference.'],
+    },
+  },
 ];
 
   PROFILE_STEP = STEPS[0];
@@ -374,6 +384,7 @@ AGENDA = [
   { time: '20 min', what: 'Automate it', step: 'automation' },
   { time: '15 min', what: 'Lead tracker', step: 'tracker' },
   { time: '30 min', what: 'Action plan, then share one win with the room', step: 'action-plan' },
+  { time: 'After today', what: 'Your website — built by Devin', step: 'website' },
 ];
 
 TRACKER_INSIGHTS = `${CONTEXT}

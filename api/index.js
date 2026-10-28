@@ -7,10 +7,11 @@ import { enc, dec } from './_lib/secrets.js';
 import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusiness, snapshot, exportMarkdown, cleanCalendar, cleanExperiments, cleanPosts, BUSINESS_DOCS } from './_lib/business.js';
 import { devinCreds, devinClient } from './_lib/devin.js';
 import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
-import { contextParts, changedParts, partHashes, offerSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA } from './_lib/prompts.js';
+import { contextParts, changedParts, partHashes, offerSkill, siteSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA, GROUNDING } from './_lib/prompts.js';
 import { applyAdSpend, findInstagramAccounts, normalizeAccountId, NO_INSTAGRAM_ACCOUNT_MESSAGE, syncAds, syncInstagram, tryConnectInstagram } from './_lib/meta.js';
 import { leadToken, LEAD_TOKEN, cleanLead, appendLead, leadFormHtml } from './_lib/leads.js';
 import { pkce, randomState, redirectUri, registerClient, buildAuthorizeUrl, exchangeCode, refreshTokens, toStored, revoke, API_BASE } from './_lib/heygen-oauth.js';
+import * as google from './_lib/google-oauth.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
@@ -55,6 +56,96 @@ const heygenAccount = s => {
   try { return s.heygen_oauth ? JSON.parse(dec(s.heygen_oauth)).account || null : null; }
   catch { return null; }
 };
+// The Setup row's view of the Google connection — everything except tokens.
+const googleAccount = s => {
+  try {
+    if (!s.google_oauth) return null;
+    const stored = JSON.parse(dec(s.google_oauth));
+    return {
+      email: stored.account?.email || null,
+      locations: (stored.locations || []).map(l => ({ name: l.name, title: l.title, address: l.address })),
+      location: stored.location?.name || null,
+      pending: !!stored.pending_approval,
+    };
+  } catch { return null; }
+};
+// The chosen listing's full summary, inlined into Devin context as the authoritative NAP.
+async function gbpFor(uid) {
+  try {
+    const s = await settings(uid);
+    if (!s.google_oauth) return null;
+    const stored = JSON.parse(dec(s.google_oauth));
+    return (stored.locations || []).find(l => l.name === stored.location?.name) || null;
+  } catch { return null; }
+}
+// A valid Google access token, refreshing and re-encrypting when near expiry.
+async function googleAuth(uid) {
+  const s = await settings(uid);
+  if (s.google_oauth) {
+    let stored = null;
+    try { stored = JSON.parse(dec(s.google_oauth)); } catch { stored = null; }
+    if (stored?.access_token) {
+      if ((stored.expires_at || 0) - 60000 < Date.now() && stored.refresh_token) {
+        try {
+          const t = await google.refreshTokens({ refreshToken: stored.refresh_token });
+          stored = { ...google.toStored(t, stored), pending_approval: stored.pending_approval, account: stored.account };
+          await settingsUpsert(uid, { google_oauth: enc(JSON.stringify(stored)) });
+        } catch {
+          await settingsUpsert(uid, { google_oauth: null });
+          throw Object.assign(new Error('Your Google connection expired. Reconnect Google Business Profile in Setup.'), { status: 400 });
+        }
+      }
+      return stored.access_token;
+    }
+  }
+  throw Object.assign(new Error('Connect Google Business Profile in Setup first.'), { status: 400 });
+}
+// Read every account's locations and keep them in the ciphertext; one location auto-selects.
+async function syncGoogleLocations(uid) {
+  const token = await googleAuth(uid);
+  const s = await settings(uid);
+  const stored = s.google_oauth ? JSON.parse(dec(s.google_oauth)) : {};
+  const persist = fields => settingsUpsert(uid, { google_oauth: enc(JSON.stringify({ ...stored, ...fields })) });
+  try {
+    const accounts = await google.listAccounts(token);
+    const locations = [];
+    for (const a of accounts.slice(0, 5)) locations.push(...(await google.listLocations(token, a.name)).map(google.locationSummary));
+    const location = locations.length === 1 ? locations[0] : (locations.find(l => l.name === stored.location?.name) || null);
+    await persist({ locations, location, pending_approval: false });
+    return { pending: false };
+  } catch (e) {
+    if (e.code === 'pending_approval') { await persist({ pending_approval: true }); return { pending: true }; }
+    throw e;
+  }
+}
+// Browser-redirect target for the Google OAuth flow — unauthenticated; the pending row's
+// `state` identifies the user. Never puts tokens in the page or logs.
+async function googleOauthCallback(res, url) {
+  const err = url.searchParams.get('error');
+  if (err) return htmlPage(res, `<p>Google didn’t connect: ${escHtml(url.searchParams.get('error_description') || err)}. Close this tab and try again.</p>`);
+  const code = url.searchParams.get('code'), state = url.searchParams.get('state') || '';
+  const { data: rows } = await admin().from('user_settings').select('user_id, google_oauth_pending').not('google_oauth_pending', 'is', null);
+  let hit = null;
+  for (const row of rows || []) {
+    let p = null;
+    try { p = JSON.parse(dec(row.google_oauth_pending)); } catch { continue; }
+    if (!p?.state || Date.now() - (p.created_at || 0) > 15 * 60 * 1000) continue;
+    const a = Buffer.from(String(p.state)), b = Buffer.from(state);
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) { hit = { uid: row.user_id, pending: p }; break; }
+  }
+  if (!hit || !code) return htmlPage(res, '<p>This sign-in link expired. Go back to Studio Setup and click Connect Google Business Profile again.</p>', 400);
+  try {
+    const tokens = await google.exchangeCode({ code, redirectUri: hit.pending.redirect_uri });
+    const stored = google.toStored(tokens, {});
+    const info = await google.userInfo(stored.access_token);
+    if (info.email) stored.account = { email: info.email };
+    await settingsUpsert(hit.uid, { google_oauth: enc(JSON.stringify(stored)), google_oauth_pending: null });
+    try { await syncGoogleLocations(hit.uid); } catch { /* picks up again on Check again */ }
+    return htmlPage(res, `<p>Google Business Profile connected. You can close this tab.</p><script>try{window.opener&&window.opener.postMessage({type:'google-connected'},'*')}catch(e){};setTimeout(()=>window.close(),800)</script>`);
+  } catch (e) {
+    return htmlPage(res, `<p>Google didn’t connect: ${escHtml(e.message)}. Close this tab and try again.</p>`);
+  }
+}
 // Devin has no API for adding org MCPs and Meta needs the owner's own Facebook login, so for
 // custom (url) servers a Devin session walks them through it, then checks the tools respond.
 const SETUP_SCHEMA = { type: 'object', properties: { connected: { type: 'boolean' }, note: { type: 'string' } }, required: ['connected', 'note'] };
@@ -72,6 +163,8 @@ export function integrationNotes(on) {
   return lines.length ? `Connected tools:\n- ${lines.join('\n- ')}` : null;
 }
 const SNAP_ALLOWED = [...BUSINESS_DOCS.map(d => `${d}.md`), 'calendar.json'];
+const SITE_REQUEST = `My request: Build and publish my website by following the site-build skill above, start to finish. Begin by sending me the first message the skill describes, then design, build, run the anti-generic-audit until everything passes, publish to GitHub Pages, and send me the live link with desktop and phone screenshots. I’m not technical — keep every message in plain words and never ask me a technical question.`;
+const DEAD_STATUSES = ['expired', 'finished', 'suspended', 'exit', 'error'];
 
 async function settings(uid) {
   const { data } = await admin().from('user_settings').select('*').eq('user_id', uid).maybeSingle();
@@ -187,6 +280,15 @@ const leadFormUrl = (req, token) => {
   return `${proto}://${host}/api/lead/${token}`;
 };
 
+// Docs + business context for a new Devin session's first prompt.
+async function docContext(uid, biz, req) {
+  const { data: docs } = await admin().from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id);
+  const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
+  const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) };
+  const parts = contextParts(b2, docMap);
+  return { docMap, b2, parts, ctx: parts.map(part => part.text).join('\n\n') };
+}
+
 async function latestContext(uid, bizId, req) {
   const db = admin();
   const [{ data: biz }, { data: docs }] = await Promise.all([
@@ -194,7 +296,7 @@ async function latestContext(uid, bizId, req) {
     db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', bizId),
   ]);
   const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, leadFormUrl: leadFormUrl(req, biz.lead_token) } : null;
+  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) } : null;
   return { biz: contextBiz, parts: contextBiz ? contextParts(contextBiz, docMap) : [] };
 }
 
@@ -287,6 +389,8 @@ export default async function handler(req, res) {
     // HeyGen OAuth browser redirect — unauthenticated; state in the pending row identifies the user.
     if (req.method === 'GET' && parts[0] === 'api' && parts[1] === 'heygen' && parts[2] === 'oauth' && parts[3] === 'callback')
       return heygenOauthCallback(res, url);
+    if (req.method === 'GET' && parts[0] === 'api' && parts[1] === 'google' && parts[2] === 'oauth' && parts[3] === 'callback')
+      return googleOauthCallback(res, url);
 
     const user = await userFromReq(req);
     if (!user) return send(res, 401, { error: 'Sign in first.' });
@@ -319,6 +423,7 @@ export default async function handler(req, res) {
         { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: devinOwn || devinShared, shared: devinShared, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
         ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: !!s.integrations?.[id], setup: s.integrations?._setup?.[id] })),
         { id: 'heygen', group: 'optional', name: 'HeyGen', why: 'Makes avatar videos from your scripts and imports them. Connect your HeyGen account to use your plan credits.', ok: !!(s.heygen_oauth || s.heygen_api_key), oauth: !!s.heygen_oauth, apiKey: !!s.heygen_api_key, account: heygenAccount(s), key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
+        { id: 'google_business', group: 'optional', name: 'Google Business Profile', why: 'Studio reads your listing — exact name, address, phone, hours and categories — so every document and your website match Google word for word.', ok: !!s.google_oauth, oauth: !!s.google_oauth, available: google.configured(), account: googleAccount(s), link: 'https://business.google.com/' },
         metaHealthItem(s, active?.instagram_insights?.account?.username || null),
       ] });
     }
@@ -516,6 +621,41 @@ export default async function handler(req, res) {
       return send(res, 200, { ok: true });
     }
 
+    // ---- Google Business Profile OAuth ----
+    if (req.method === 'POST' && url.pathname === '/api/google/oauth/start') {
+      if (!google.configured()) return send(res, 400, { error: 'Google Business Profile isn’t available yet — Studio is waiting on Google’s approval.' });
+      const redirect_uri = google.redirectUri(req);
+      const state = randomState();
+      await settingsUpsert(uid, { google_oauth_pending: enc(JSON.stringify({ state, redirect_uri, created_at: Date.now() })) });
+      return send(res, 200, { url: google.buildAuthorizeUrl({ redirectUri: redirect_uri, state }) });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/google/oauth/disconnect') {
+      const s = await settings(uid);
+      if (s.google_oauth) {
+        try {
+          const st = JSON.parse(dec(s.google_oauth));
+          if (st?.access_token) await google.revoke(st.access_token);
+        } catch { /* best effort */ }
+      }
+      await settingsUpsert(uid, { google_oauth: null, google_oauth_pending: null });
+      return send(res, 200, { ok: true });
+    }
+    if (req.method === 'GET' && url.pathname === '/api/google')
+      return send(res, 200, googleAccount(await settings(uid)) || {});
+    if (req.method === 'POST' && url.pathname === '/api/google/sync') {
+      await syncGoogleLocations(uid);
+      return send(res, 200, googleAccount(await settings(uid)) || {});
+    }
+    if (req.method === 'POST' && url.pathname === '/api/google/location') {
+      const { name } = await readJson(req);
+      const s = await settings(uid);
+      const stored = s.google_oauth ? JSON.parse(dec(s.google_oauth)) : null;
+      const loc = (stored?.locations || []).find(l => l.name === name);
+      if (!loc) return send(res, 400, { error: 'Unknown listing. Sync your locations first.' });
+      await settingsUpsert(uid, { google_oauth: enc(JSON.stringify({ ...stored, location: loc })) });
+      return send(res, 200, googleAccount(await settings(uid)) || {});
+    }
+
     // ---- HeyGen passthrough (OAuth bearer or per-user API key) ----
     if (req.method === 'GET' && url.pathname === '/api/heygen/videos') {
       const q = new URLSearchParams({ limit: '24' });
@@ -565,6 +705,44 @@ export default async function handler(req, res) {
       return send(res, 201, { file: `heygen-${id}.mp4` });
     }
 
+    // ---- website session: a plain interactive Devin session the owner works in directly ----
+    if (parts[0] === 'api' && parts[1] === 'site') {
+      const biz = await activeBusiness(uid);
+      const row = await agentRow(uid, biz.id, 'site');
+      if (req.method === 'GET' && parts.length === 2 && !row?.devin_session_id) return send(res, 200, {});
+      const client = devinClient(await devinCreds(uid)); // throws 400 with setup hint when missing
+      const refreshStatus = async () => {
+        if (!row?.devin_session_id) return null;
+        try { const s = await client.getSession(row.devin_session_id); return s.status_enum || s.status; }
+        catch { return 'expired'; }
+      };
+
+      if (req.method === 'POST' && parts[2] === 'start') {
+        const { fresh } = await readJson(req);
+        if (row?.devin_session_id && row.devin_url && !fresh) {
+          const status = await refreshStatus();
+          if (status && !DEAD_STATUSES.includes(status)) {
+            if (status !== row.devin_status) await agentUpsert(uid, biz.id, 'site', { devin_status: status });
+            return send(res, 200, { url: row.devin_url, reused: true });
+          }
+        }
+        const { ctx } = await docContext(uid, biz, req);
+        const skill = siteSkill(f => fs.readFileSync(path.join(process.cwd(), '.devin/skills', f), 'utf8'));
+        const prompt = [skill, ctx, GROUNDING, SITE_REQUEST].join('\n\n'); // no OUTPUT_CONTRACT: this session has a filesystem
+        const s = await client.createSession({ prompt, title: `${biz.name || biz.profile?.name || 'Studio'} · Website`, tags: ['studio', 'website'] });
+        await agentUpsert(uid, biz.id, 'site', { devin_session_id: s.session_id, devin_status: 'working', devin_url: s.url, last_prompt_at: new Date().toISOString(), applied_hash: null });
+        return send(res, 201, { url: s.url });
+      }
+
+      if (req.method === 'GET' && parts.length === 2) {
+        if (!row?.devin_url) return send(res, 200, {});
+        const status = await refreshStatus();
+        if (status && status !== row.devin_status) await agentUpsert(uid, biz.id, 'site', { devin_status: status });
+        return send(res, 200, { url: row.devin_url, status: status || row.devin_status, startedAt: row.last_prompt_at });
+      }
+      return send(res, 404, { error: 'not found' });
+    }
+
     // ---- agent (Devin cloud sessions) ----
     if (parts[0] === 'api' && parts[1] === 'agent' && parts[2]) {
       const scope = parts[2] === 'business' ? 'business' : validProject(parts[2]) ? parts[2] : null;
@@ -594,12 +772,8 @@ export default async function handler(req, res) {
           const content = snap === 'calendar.json' ? JSON.stringify(cur.calendar) : cur.docs[kind]?.content;
           if (content != null) await snapshot(uid, biz.id, kind, content);
         }
-        if (!row?.devin_session_id || ['expired', 'finished', 'suspended', 'exit', 'error'].includes(row.devin_status)) {
-          const { data: docs } = await db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id);
-          const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-          const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, leadFormUrl: leadFormUrl(req, biz.lead_token) };
-          const parts = contextParts(b2, docMap);
-          const ctx = parts.map(part => part.text).join('\n\n');
+        if (!row?.devin_session_id || DEAD_STATUSES.includes(row.devin_status)) {
+          const { parts, ctx } = await docContext(uid, biz, req);
           const extra = [scope !== 'business' ? `This conversation is about the promo video project '${scope}'.` : null, integrationNotes((await settings(uid)).integrations)].filter(Boolean).join('\n\n') || null;
           let skill = null;
           if (step === 'offer') skill = offerSkill(file => fs.readFileSync(path.join(process.cwd(), '.devin/skills/grand-slam-offer', file), 'utf8'));

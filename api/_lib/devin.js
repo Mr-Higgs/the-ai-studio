@@ -42,7 +42,7 @@ export async function devinCreds(uid) {
 }
 export const devinClient = creds => ({
   createSession: ({ prompt, title, schema, tags }) =>
-    api(creds, '/sessions', { method: 'POST', body: JSON.stringify({ prompt, title, tags, structured_output_schema: schema, structured_output_required: true, ...(process.env.DEVIN_MAX_ACU && { max_acu_limit: Number(process.env.DEVIN_MAX_ACU) }) }) }),
+    api(creds, '/sessions', { method: 'POST', body: JSON.stringify({ prompt, title, tags, ...(schema !== undefined && { structured_output_schema: schema, structured_output_required: true }), ...(process.env.DEVIN_MAX_ACU && { max_acu_limit: Number(process.env.DEVIN_MAX_ACU) }) }) }),
   sendMessage: (id, text) => api(creds, `/sessions/${id}/messages`, { method: 'POST', body: JSON.stringify({ message: text }) }),
   getSession: id => api(creds, `/sessions/${id}`),
   // `after` is an opaque page cursor, not an event_id, so fetch every page and let the caller slice.

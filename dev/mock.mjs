@@ -27,7 +27,7 @@ const USER = { id: 'mock-user-maria', email: 'maria@example.com', aud: 'authenti
 
 // ---- stage -----------------------------------------------------------------
 const ALL_STEPS = ['profile', 'offer', 'research', 'visibility', 'strategy', 'content', 'video', 'calendar', 'automation', 'tracker', 'action-plan'];
-const stage = { done: new Set(ALL_STEPS), brain: 1, devin: 1, heygen: 1, chat: 1, busy: 0 };
+const stage = { done: new Set(ALL_STEPS), brain: 1, devin: 1, heygen: 1, chat: 1, busy: 0, site: null, google: null };
 
 // ---- supabase auth ---------------------------------------------------------
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -469,6 +469,7 @@ const healthItems = () => [
   { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: !!stage.devin, shared: false, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
   ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: false })),
   { id: 'heygen', group: 'optional', name: 'HeyGen', why: 'Makes avatar videos from your scripts and imports them. Connect your HeyGen account to use your plan credits.', ok: !!stage.heygen, oauth: !!stage.heygen, apiKey: false, account: stage.heygen ? { email: 'maria@maplestreetauto.example.com' } : null, key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
+  { id: 'google_business', group: 'optional', name: 'Google Business Profile', why: 'Studio reads your listing — exact name, address, phone, hours and categories — so every document and your website match Google word for word.', ok: !!stage.google && !stage.google.availableOnly, oauth: !!stage.google && !stage.google.availableOnly, available: !!stage.google, account: stage.google && !stage.google.availableOnly ? stage.google : null, link: 'https://business.google.com/' },
   { id: 'meta_api', group: 'optional', name: 'Meta ad results', why: 'Studio reads spend, clicks and leads from your Meta ad account. Read-only.', ok: false, meta: true, instagram: null },
 ];
 
@@ -500,6 +501,7 @@ function businessState() {
       brain: stage.brain ? mt(66) : null,
       posts: done('content') ? mt(30) : null,
     },
+    site: stage.site,
     agent: 'devin', busy: !!stage.busy,
   };
 }
@@ -591,6 +593,19 @@ http.createServer(async (req, res) => {
       const q = url.searchParams;
       if (q.has('done')) stage.done = new Set(q.get('done').split(',').map(s => s.trim()).filter(Boolean));
       for (const k of ['brain', 'devin', 'heygen', 'chat', 'busy']) if (q.has(k)) stage[k] = q.get(k) === '1' ? 1 : 0;
+      if (q.has('site')) stage.site = q.get('site') === '1' ? { url: 'https://app.devin.ai/sessions/devin-mock', status: 'working', startedAt: new Date(Date.now() - 42 * 60000).toISOString() } : null;
+      if (q.has('google')) {
+        const v = q.get('google');
+        const locs = [
+          { name: 'accounts/1/locations/1', title: 'Maple Street Auto Repair', address: '1234 Maple St SE, Decatur, GA 30030' },
+          { name: 'accounts/1/locations/2', title: 'Maple Street Auto — Avondale', address: '22 N Avondale Rd, Avondale Estates, GA 30002' },
+        ];
+        stage.google = v === 'connected' ? { email: USER.email, locations: [locs[0]], location: locs[0].name, pending: false }
+          : v === 'pending' ? { email: USER.email, locations: [], location: null, pending: true }
+          : v === 'multi' ? { email: USER.email, locations: locs, location: locs[0].name, pending: false }
+          : v === 'available' ? { availableOnly: true }
+          : null;
+      }
       return json(res, 200, { ok: true, stage: { done: [...stage.done], brain: stage.brain, devin: stage.devin, heygen: stage.heygen, chat: stage.chat, busy: stage.busy } });
     }
     if (url.pathname === '/mock/demo.mp4' && req.method === 'GET') {
@@ -654,9 +669,34 @@ http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/heygen/videos') return json(res, 200, { videos: [], next_token: null });
     if (req.method === 'GET' && parts[1] === 'heygen' && parts[2] === 'videos' && parts[3]) return json(res, 200, { status: 'completed', failure_message: null });
     if (req.method === 'POST' && url.pathname === '/api/heygen/oauth/start') return json(res, 200, { url: `http://localhost:${PORT}/mock/heygen-callback` });
+    if (req.method === 'POST' && url.pathname === '/api/google/oauth/start') {
+      if (!stage.google) return json(res, 400, { error: 'Google Business Profile isn’t available yet — Studio is waiting on Google’s approval.' });
+      return json(res, 200, { url: `http://localhost:${PORT}/mock/google-callback` });
+    }
+    if (req.method === 'GET' && url.pathname === '/api/google') return json(res, 200, stage.google && !stage.google.availableOnly ? stage.google : {});
+    if (req.method === 'POST' && url.pathname === '/api/google/sync') return json(res, 200, stage.google && !stage.google.availableOnly ? stage.google : {});
+    if (req.method === 'POST' && url.pathname === '/api/google/location') {
+      const b = JSON.parse(await readBody(req) || '{}');
+      const loc = stage.google?.locations?.find(l => l.name === b.name);
+      if (!loc) return json(res, 400, { error: 'Unknown listing.' });
+      stage.google.location = loc.name;
+      return json(res, 200, stage.google);
+    }
+    if (req.method === 'POST' && url.pathname === '/api/google/oauth/disconnect') { stage.google = { availableOnly: true }; return json(res, 200, { ok: true }); }
+    if (url.pathname === '/mock/google-callback') {
+      stage.google = { email: USER.email, locations: [{ name: 'accounts/1/locations/1', title: 'Maple Street Auto Repair', address: '1234 Maple St SE, Decatur, GA 30030' }], location: 'accounts/1/locations/1', pending: false };
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      return res.end('<!doctype html><p>Google Business Profile connected. You can close this tab.</p><script>try{window.opener&&window.opener.postMessage({type:"google-connected"},"*")}catch(e){};setTimeout(()=>window.close(),800)</script>');
+    }
     if (req.method === 'POST' && parts[1] === 'agent' && parts[3] === 'new') return json(res, 200, { ok: true });
     if (req.method === 'POST' && parts[1] === 'agent' && parts[3] === 'prompt') { await readBody(req); return json(res, 202, { ok: true }); }
     if (req.method === 'GET' && parts[1] === 'agent' && parts[3] === 'poll') return json(res, 200, poll(parts[2], url.searchParams.get('cursor')));
+    if (req.method === 'GET' && url.pathname === '/api/site') return json(res, 200, stage.site || {});
+    if (req.method === 'POST' && url.pathname === '/api/site/start') {
+      await readBody(req);
+      if (!stage.site) stage.site = { url: 'https://app.devin.ai/sessions/devin-mock', status: 'working', startedAt: new Date().toISOString() };
+      return json(res, 201, { url: stage.site.url });
+    }
     if (req.method === 'POST' && parts[1] === 'projects' && parts[3] === 'heygen' && parts[4] === 'generate') { await readBody(req); return json(res, 202, { video_id: 'mockvid1' }); }
     if (req.method === 'POST' && parts[1] === 'projects' && parts[3] === 'heygen') { await readBody(req); return json(res, 201, { file: 'heygen-mockvid1.mp4' }); }
     if (req.method === 'POST' && url.pathname === '/api/projects') { await readBody(req); return json(res, 201, { name: 'brake-special' }); }

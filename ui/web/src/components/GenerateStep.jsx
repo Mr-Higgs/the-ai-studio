@@ -48,7 +48,7 @@ export function BuildsOn({ step, ctx }) {
   const uses = (step.uses || []).map(id => ctx.byId[id]).filter(Boolean);
   if (!uses.length) return null;
   const mine = ctx.mtimeOf(step.id);
-  const changed = mine == null ? [] : uses.filter(u => u.kind !== 'tracker' && u.kind !== 'video' && (ctx.mtimeOf(u.id) ?? 0) > mine);
+  const changed = mine == null ? [] : uses.filter(u => u.kind !== 'tracker' && u.kind !== 'video' && u.kind !== 'site' && (ctx.mtimeOf(u.id) ?? 0) > mine);
   const missing = uses.filter(u => !ctx.isDone(u.id));
   return (
     <>
