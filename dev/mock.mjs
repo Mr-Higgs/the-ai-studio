@@ -466,7 +466,7 @@ const INTEGRATIONS = {
   google_maps: { name: 'Google Maps', marketplace: 'Google Maps', why: 'Lets Devin look up local competitors, ratings and review themes near you.' },
 };
 const healthItems = () => [
-  { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: !!stage.devin, shared: false, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
+  { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: !!stage.devin, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
   ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: false })),
   { id: 'heygen', group: 'optional', name: 'HeyGen', why: 'Makes avatar videos from your scripts and imports them. Connect your HeyGen account to use your plan credits.', ok: !!stage.heygen, oauth: !!stage.heygen, apiKey: false, account: stage.heygen ? { email: 'maria@maplestreetauto.example.com' } : null, key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
   { id: 'google_business', group: 'optional', name: 'Google Business Profile', why: 'Studio reads your listing — exact name, address, phone, hours and categories — so every document and your website match Google word for word.', ok: !!stage.google && !stage.google.availableOnly, oauth: !!stage.google && !stage.google.availableOnly, available: !!stage.google, account: stage.google && !stage.google.availableOnly ? stage.google : null, link: 'https://business.google.com/' },

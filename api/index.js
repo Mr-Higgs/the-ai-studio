@@ -418,9 +418,9 @@ export default async function handler(req, res) {
         await db.from('user_settings').upsert({ user_id: uid, integrations: integ, updated_at: new Date().toISOString() });
         s.integrations = integ;
       }
-      const devinOwn = !!(s.devin_api_key && s.devin_org_id), devinShared = !devinOwn && !!(process.env.DEVIN_API_KEY && process.env.DEVIN_ORG_ID);
+      const devinOwn = !!(s.devin_api_key && s.devin_org_id);
       return send(res, 200, { hosted: true, items: [
-        { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: devinOwn || devinShared, shared: devinShared, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
+        { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: devinOwn, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
         ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: !!s.integrations?.[id], setup: s.integrations?._setup?.[id] })),
         { id: 'heygen', group: 'optional', name: 'HeyGen', why: 'Makes avatar videos from your scripts and imports them. Connect your HeyGen account to use your plan credits.', ok: !!(s.heygen_oauth || s.heygen_api_key), oauth: !!s.heygen_oauth, apiKey: !!s.heygen_api_key, account: heygenAccount(s), key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
         { id: 'google_business', group: 'optional', name: 'Google Business Profile', why: 'Studio reads your listing — exact name, address, phone, hours and categories — so every document and your website match Google word for word.', ok: !!s.google_oauth, oauth: !!s.google_oauth, available: google.configured(), account: googleAccount(s), link: 'https://business.google.com/' },

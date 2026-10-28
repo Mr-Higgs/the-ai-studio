@@ -18,3 +18,19 @@ test('Devin api surfaces a long 429 as a retryable 429', async t => {
   await assert.rejects(api(creds, '/sessions/x'), e => e.status === 429 && e.retryAfter === 30 && /rate-limiting/.test(e.message));
   assert.equal(n, 1);
 });
+
+test('Devin creds: only a saved key + org pair, never a server fallback', async () => {
+  const { pickDevinCreds } = await import('./_lib/devin.js');
+  const saved = process.env.DEVIN_API_KEY;
+  process.env.DEVIN_API_KEY = 'srv-key'; process.env.DEVIN_ORG_ID = 'srv-org';
+  try {
+    assert.deepEqual(pickDevinCreds({ key: 'mine', org: 'my-org' }), { key: 'mine', org: 'my-org' });
+    assert.throws(() => pickDevinCreds({}), e => e.status === 400 && /first/.test(e.message));
+    assert.throws(() => pickDevinCreds(null), e => e.status === 400);
+    assert.throws(() => pickDevinCreds({ org: 'evil-org' }), e => e.status === 400 && /both/.test(e.message));
+    assert.throws(() => pickDevinCreds({ key: 'mine' }), e => e.status === 400 && /both/.test(e.message));
+  } finally {
+    if (saved === undefined) delete process.env.DEVIN_API_KEY; else process.env.DEVIN_API_KEY = saved;
+    delete process.env.DEVIN_ORG_ID;
+  }
+});

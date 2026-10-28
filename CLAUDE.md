@@ -68,8 +68,8 @@ prompt notes (`INTEGRATIONS` in api/index.js).
 
 ## Env vars
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
-(service role), `STUDIO_SECRET_KEY` (64 hex, key encryption), optional `DEVIN_API_KEY` + `DEVIN_ORG_ID`
-(shared fallback), `DEVIN_MAX_ACU`, `PORT` (dev only), optional `HEYGEN_OAUTH_CLIENT_ID` +
+(service role), `STUDIO_SECRET_KEY` (64 hex, key encryption), `DEVIN_MAX_ACU`
+(no shared Devin key: each user saves their own key + Org ID, used only as a pair), `PORT` (dev only), optional `HEYGEN_OAUTH_CLIENT_ID` +
 `HEYGEN_OAUTH_RESOURCE` (HeyGen OAuth overrides), optional `PUBLIC_ORIGIN` — canonical https
 origin used for the HeyGen OAuth callback on non-localhost hosts, optional `GOOGLE_OAUTH_CLIENT_ID` +
 `GOOGLE_OAUTH_CLIENT_SECRET` (Google Business Profile connection; the Setup row shows
