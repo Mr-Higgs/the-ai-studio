@@ -69,7 +69,8 @@ prompt notes (`INTEGRATIONS` in api/index.js).
 ## Env vars
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
 (service role), `STUDIO_SECRET_KEY` (64 hex, key encryption), optional `DEVIN_API_KEY` + `DEVIN_ORG_ID`
-(shared fallback), `DEVIN_MAX_ACU`, `PORT` (dev only), optional `HEYGEN_OAUTH_CLIENT_ID` +
+(shared fallback, only for Supabase user IDs in `DEVIN_SHARED_USER_IDS`; a user's own key + org are
+used only as a pair, never mixed with the server values), `DEVIN_MAX_ACU`, `PORT` (dev only), optional `HEYGEN_OAUTH_CLIENT_ID` +
 `HEYGEN_OAUTH_RESOURCE` (HeyGen OAuth overrides), optional `PUBLIC_ORIGIN` — canonical https
 origin used for the HeyGen OAuth callback on non-localhost hosts, optional `GOOGLE_OAUTH_CLIENT_ID` +
 `GOOGLE_OAUTH_CLIENT_SECRET` (Google Business Profile connection; the Setup row shows

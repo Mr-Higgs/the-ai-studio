@@ -31,13 +31,25 @@ export const api = async (creds, path, opts, { retries = 2 } = {}) => {
   }
 };
 
-// Per-user keys from user_settings (encrypted), with a server-wide fallback.
+// The server-wide DEVIN_API_KEY/DEVIN_ORG_ID run sessions in the operator's own org, so only
+// user IDs listed in DEVIN_SHARED_USER_IDS may use them. A user's saved key and org are used only
+// as a pair: a user value is never combined with a server value.
+const sharedUserIds = env => new Set((env.DEVIN_SHARED_USER_IDS || '').split(/[\s,]+/).filter(Boolean));
+export const sharedDevinAllowed = (uid, env = process.env) =>
+  !!(env.DEVIN_API_KEY && env.DEVIN_ORG_ID && uid && sharedUserIds(env).has(uid));
+
+export function pickDevinCreds(saved, uid, env = process.env) {
+  const { key, org } = saved || {};
+  if (key && org) return { key, org, shared: false };
+  if (key || org) throw Object.assign(new Error('Add both your Devin API key and Org ID in Setup.'), { status: 400 });
+  if (sharedDevinAllowed(uid, env)) return { key: env.DEVIN_API_KEY, org: env.DEVIN_ORG_ID, shared: true };
+  throw Object.assign(new Error('Add your Devin API key and Org ID in Setup first.'), { status: 400 });
+}
+
 export async function devinCreds(uid) {
   const { data: s } = await admin().from('user_settings').select('devin_api_key, devin_org_id').eq('user_id', uid).maybeSingle();
   const grab = v => { try { return v ? dec(v) : null; } catch { return null; } };
-  const key = grab(s?.devin_api_key) || process.env.DEVIN_API_KEY;
-  const org = grab(s?.devin_org_id) || process.env.DEVIN_ORG_ID;
-  if (!key || !org) throw Object.assign(new Error('Add your Devin API key and Org ID in Setup first.'), { status: 400 });
+  const { key, org } = pickDevinCreds({ key: grab(s?.devin_api_key), org: grab(s?.devin_org_id) }, uid);
   return { key, org };
 }
 export const devinClient = creds => ({
