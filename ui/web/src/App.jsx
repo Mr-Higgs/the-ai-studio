@@ -1,5 +1,5 @@
 import { Component, useCallback, useEffect, useRef, useState } from 'react';
-import { api, ask, post, put, toast, useAgent } from './api.js';
+import { api, ask, downloadExport, post, put, toast, useAgent } from './api.js';
 import { supabase } from './supabase.js';
 import { PHASES, SPRINTS, STEPS, countdown, setSprint } from './steps.js';
 import { BRAIN_STEP, brainReady, sectionProgress, BRAIN_SECTIONS } from './brain.js';
@@ -228,7 +228,7 @@ export default function App() {
           </ol>
         </nav>
         <div className="rail-foot">
-          <a className="setup-link" href="/api/business/export.md" download>Download my sprint</a>
+          <a className="setup-link" href="/api/business/export.md" onClick={downloadExport}>Download my sprint</a>
           <a href="#setup" className={'setup-link' + (route === 'setup' ? ' active' : '')}>
             <span className={'dot ' + (!health ? '' : !setupOk ? 'bad' : 'ok')} />
             {setupOk === false ? 'Finish setup' : 'Setup'}

@@ -134,7 +134,7 @@ export async function exportMarkdown(uid) {
   if (b.profile) out.push('## Business profile', ...Object.entries(b.profile).filter(([, v]) => typeof v === 'string' && v).map(([k, v]) => `- **${PROFILE_LABELS[k] || k}:** ${v}`));
   const brain = brainContext(b.brain, b.profile);
   if (brain) out.push('\n---\n', brain);
-  for (const id of BUSINESS_DOCS) if (b.docs[id]) out.push(`\n---\n`, b.docs[id].content.trim());
+  for (const id of BUSINESS_DOCS) if (b.docs[id]?.content) out.push(`\n---\n`, b.docs[id].content.trim());
   if (b.experiments?.length) out.push('\n---\n', '## Growth experiments', ...b.experiments.map(e => `- **${e.name}** · ${e.status}${e.target != null ? ` · target: ${e.target} ${e.metric}` : ''}${e.verdict ? ` — ${e.verdict}` : ''}`));
   if (b.calendar?.length) out.push('\n---\n', '## Campaign calendar', ...b.calendar.map(c => `- **${c.date}** · ${c.channel || ''} ${c.format || ''} · ${c.title}${c.status === 'posted' ? ' ✓' : ''}\n\n  ${(c.copy || '').replace(/\n/g, '\n  ')}${c.cta ? `\n\n  _CTA:_ ${c.cta}` : ''}`));
   return out.join('\n\n') + '\n';

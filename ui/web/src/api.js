@@ -13,6 +13,19 @@ export async function api(url, opts = {}) {
 export const put = (url, data) => api(url, { method: 'PUT', body: JSON.stringify(data) });
 export const post = (url, data = {}) => api(url, { method: 'POST', body: JSON.stringify(data) });
 
+// "Download my sprint": a plain <a download> carries no Bearer token, so fetch with auth and save the text as a file.
+export async function downloadExport(e) {
+  e?.preventDefault();
+  const { data: { session } } = await supabase.auth.getSession();
+  const r = await fetch('/api/business/export.md', { headers: session ? { Authorization: `Bearer ${session.access_token}` } : {} });
+  if (r.status === 401) dispatchEvent(new CustomEvent('unauth'));
+  if (!r.ok) return toast((await r.json().catch(() => ({}))).error || 'Could not export your sprint.');
+  const href = URL.createObjectURL(new Blob([await r.text()], { type: 'text/markdown' }));
+  const a = Object.assign(document.createElement('a'), { href, download: 'sprint.md' });
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(href);
+}
+
 // App-wide toasts: call toast() from anywhere; <Toasts /> in App renders them. kind: 'err' | 'ok' | 'info'.
 export const toast = (text, kind = 'err') => dispatchEvent(new CustomEvent('toast', { detail: { text, kind } }));
 // Styled confirm(): resolves true/false. <Confirm /> in App renders it.

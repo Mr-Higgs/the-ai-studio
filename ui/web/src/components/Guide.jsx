@@ -1,4 +1,5 @@
 import { AGENDA, PHASES, SPRINT, STEPS } from '../steps.js';
+import { downloadExport } from '../api.js';
 
 const minutes = t => parseInt(t, 10) || 0;
 
@@ -82,7 +83,7 @@ export default function Guide({ ctx, agentName }) {
 
       <section>
         <h2>Your files</h2>
-        <p>Everything is saved to your account. Before a rewrite, the previous version is kept under <em>Previous versions</em>. When you’re done, use <a href="/api/business/export.md" download>Download my sprint</a> to get it all in one document.</p>
+        <p>Everything is saved to your account. Before a rewrite, the previous version is kept under <em>Previous versions</em>. When you’re done, use <a href="/api/business/export.md" onClick={downloadExport}>Download my sprint</a> to get it all in one document.</p>
       </section>
     </article>
   );
