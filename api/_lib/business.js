@@ -84,13 +84,14 @@ export async function businessState(uid) {
   const [{ data: docs }, { data: hist }, { data: sess }] = await Promise.all([
     db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id),
     db.from('doc_history').select('id, kind, created_at').eq('user_id', uid).eq('business_id', biz.id).order('created_at', { ascending: false }),
-    db.from('agent_sessions').select('scope, devin_status').eq('user_id', uid).eq('business_id', biz.id),
+    db.from('agent_sessions').select('scope, devin_status, devin_url, last_prompt_at').eq('user_id', uid).eq('business_id', biz.id),
   ]);
   const docsOut = {}, history = {};
   for (const k of BUSINESS_DOCS) docsOut[k] = null;
   for (const d of docs || []) docsOut[d.kind] = { content: d.content, mtime: Date.parse(d.updated_at) };
   for (const h of hist || []) (history[h.kind] ||= []).push({ id: h.id, at: Date.parse(h.created_at) });
   const cal = cleanCalendar(biz.calendar);
+  const siteRow = (sess || []).find(s => s.scope === 'site');
   const mt = f => fieldMtime(biz, f);
   return {
     sprint: biz.sprint, profile: biz.profile, inputs: biz.inputs || {}, tracker: biz.tracker, brain: biz.brain || {},
@@ -100,7 +101,8 @@ export async function businessState(uid) {
     instagramInsights: biz.instagram_insights || null,
     calendar: cal.items, calendarIssues: Math.max(cal.issues, biz.calendar_issues || 0), docs: docsOut, history,
     mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null, posts: biz.posts_updated_at ? Date.parse(biz.posts_updated_at) : null },
-    agent: 'devin', busy: (sess || []).some(s => s.devin_status === 'working'),
+    site: siteRow?.devin_url ? { url: siteRow.devin_url, status: siteRow.devin_status, startedAt: siteRow.last_prompt_at } : null,
+    agent: 'devin', busy: (sess || []).some(s => s.devin_status === 'working' && s.scope !== 'site'),
   };
 }
 

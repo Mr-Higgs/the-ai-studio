@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SETUP_ACCOUNT } from '../steps.js';
 import { post } from '../api.js';
 import { connectHeyGen } from '../heygen.js';
+import { connectGoogle } from '../google.js';
 
 const GROUPS = [
   ['required', 'Needed for everything'],
@@ -122,8 +123,8 @@ function DevinKeys({ item, recheck }) {
     } catch (err) { setState(err.message); }
   };
   if (!open) return <>
-    {item.shared ? <span className="hint">Using the workshop’s shared Devin account — add your own key to run on your own usage.</span> : <span className="hint">Ready</span>}
-    <button className="btn ghost" onClick={() => setOpen(true)}>{item.shared ? 'Add my own' : 'Replace'}</button>
+    <span className="hint">Ready</span>
+    <button className="btn ghost" onClick={() => setOpen(true)}>Replace</button>
   </>;
   return (
     <form className="key-form" onSubmit={save}>
@@ -175,6 +176,66 @@ function HeyGenRow({ item, recheck }) {
       <p className="hint">API keys bill HeyGen API credits, which are separate from your plan.</p>
       <KeyInput item={item} recheck={recheck} />
     </details>
+  </>;
+}
+
+// Google Business Profile: Studio-owned OAuth reads the listing so docs and the
+// website match Google's name/address/phone/hours word for word.
+function GoogleRow({ item, recheck }) {
+  const [state, setState] = useState('');
+  const [busy, setBusy] = useState(false);
+  const connect = async () => {
+    setBusy(true); setState('');
+    try { await connectGoogle(recheck); } catch (err) { setState(err.message); }
+    setBusy(false);
+  };
+  const disconnect = async () => {
+    setBusy(true); setState('');
+    try { await post('/api/google/oauth/disconnect'); await recheck(); } catch (err) { setState(err.message); }
+    setBusy(false);
+  };
+  const sync = async () => {
+    setBusy(true); setState('');
+    try { await post('/api/google/sync'); await recheck(); } catch (err) { setState(err.message); }
+    setBusy(false);
+  };
+  const pick = async name => {
+    setState('');
+    try { await post('/api/google/location', { name }); await recheck(); } catch (err) { setState(err.message); }
+  };
+  const account = item.account;
+  if (!item.available) return <>
+    <button className="btn primary" disabled>Connect Google Business Profile</button>
+    <p className="hint">Coming soon — Studio is waiting on Google’s approval to read Business Profiles. Until then, keep your listing up to date at business.google.com.</p>
+    {item.link && <a className="btn ghost" href={item.link} target="_blank" rel="noreferrer">Open Google Business Profile</a>}
+  </>;
+  if (!item.oauth) return <>
+    <button className="btn primary" disabled={busy} onClick={connect}>{busy ? 'Connecting…' : 'Connect Google Business Profile'}</button>
+    {state && <p className="msg err" role="alert">{state}</p>}
+  </>;
+  return <>
+    <span className="hint">Connected{account?.email ? ` as ${account.email}` : ''}</span>
+    {account?.pending && <>
+      <p className="hint">Connected. Google hasn’t finished approving Studio’s access to read listings yet — we’ll pick up your listing automatically once it has.</p>
+      <button className="btn ghost" disabled={busy} onClick={sync}>{busy ? 'Checking…' : 'Check again'}</button>
+    </>}
+    {!account?.pending && account?.locations?.length > 1 && (
+      <label className="agent-pick">
+        <span>Listing</span>
+        <select value={account.location || ''} onChange={e => pick(e.target.value)}>
+          <option value="" disabled>Choose your listing</option>
+          {account.locations.map(l => <option key={l.name} value={l.name}>{l.title}{l.address ? ` — ${l.address}` : ''}</option>)}
+        </select>
+      </label>
+    )}
+    {!account?.pending && account?.locations?.length === 1 && (
+      <span className="hint">Listing: {account.locations[0].title}{account.locations[0].address ? `, ${account.locations[0].address}` : ''}</span>
+    )}
+    {!account?.pending && account && !account.locations?.length && (
+      <p className="hint">No Business Profile found on this Google account. Sign in with the account that manages your listing.</p>
+    )}
+    <button className="btn ghost" disabled={busy} onClick={disconnect}>{busy ? 'Working…' : 'Disconnect'}</button>
+    {state && <p className="msg err" role="alert">{state}</p>}
   </>;
 }
 
@@ -285,6 +346,7 @@ export default function Setup({ health, recheck }) {
                 {h.id === 'devin' ? <DevinKeys item={h} recheck={recheck} />
                   : h.id === 'meta_api' ? <MetaApiInput item={h} recheck={recheck} />
                   : h.id === 'heygen' ? <HeyGenRow item={h} recheck={recheck} />
+                  : h.id === 'google_business' ? <GoogleRow item={h} recheck={recheck} />
                   : h.key ? <KeyInput item={h} recheck={recheck} />
                   : h.ok ? <span className="hint">Ready</span> : null}
               </li>

@@ -9,6 +9,7 @@ export function contextParts(biz, docs) {
   const out = [{ key: 'profile', text: `Business profile (JSON): ${JSON.stringify(biz.profile || {})}` }];
   const brain = brainContext(biz.brain, biz.profile);
   if (brain) out.push({ key: 'brain', text: brain });
+  if (biz.gbp) out.push({ key: 'gbp', text: `Google Business Profile (read by Studio from the owner's connected Google account — the name, address, phone, hours, categories, description and links below are authoritative; every document and the website must use them character-for-character, and say so if the profile disagrees with the Business Brain): ${JSON.stringify(biz.gbp)}` });
   if (biz.inputs && Object.keys(biz.inputs).length) out.push({ key: 'inputs', text: `Step answers (JSON): ${JSON.stringify(biz.inputs)}` });
   if (biz.leadFormUrl) out.push({ key: 'leadForm', text: `Website lead form (use this URL wherever a call-to-action needs a link, instead of [link]): ${biz.leadFormUrl}` });
   if (biz.tracker?.length) out.push({ key: 'tracker', text: `Lead tracker (JSON): ${cut(JSON.stringify(biz.tracker))}` });
@@ -44,6 +45,15 @@ export function offerSkill(readFile) {
     ['.devin/skills/grand-slam-offer/SKILL.md', readFile('SKILL.md')],
     ['.devin/skills/grand-slam-offer/references/framework.md', readFile('references/framework.md')],
     ['.devin/skills/grand-slam-offer/templates/offer-doc.md', readFile('templates/offer-doc.md')],
+  ].map((part, i) => i === 0 ? part : `### ${part[0]}\n${part[1]}`).join('\n\n');
+}
+
+export function siteSkill(readFile) {
+  return [
+    'The site-build, anti-generic-audit and seo-ai-search skills are included below. Unlike other Studio sessions, in THIS session you do have a filesystem, a browser, a shell and the owner’s GitHub account — follow the skills literally, including creating the repository and publishing to GitHub Pages. The owner will read your messages directly in this session, so write to them exactly as the skill’s “How to talk to the owner” section says.',
+    ['.devin/skills/site-build/SKILL.md', readFile('site-build/SKILL.md')],
+    ['.devin/skills/anti-generic-audit/SKILL.md', readFile('anti-generic-audit/SKILL.md')],
+    ['.devin/skills/seo-ai-search/SKILL.md', readFile('seo-ai-search/SKILL.md')],
   ].map((part, i) => i === 0 ? part : `### ${part[0]}\n${part[1]}`).join('\n\n');
 }
 

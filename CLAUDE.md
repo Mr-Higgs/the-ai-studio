@@ -10,8 +10,8 @@ sprint; Devin (cloud API) writes each step's documents. This file is the archite
   `userFromReq`), `secrets.js` (AES-256-GCM `enc`/`dec` for user API keys under
   `STUDIO_SECRET_KEY`), `business.js` (business state + cleanCalendar + export), `devin.js`
   (v3 org-sessions client), `prompts.js` (context builder + output contract + schema).
-- **Supabase**: auth.users + tables `user_settings` (encrypted keys; `heygen_oauth` holds
-  encrypted OAuth tokens and is preferred over `heygen_api_key`), `businesses`
+- **Supabase**: auth.users + tables `user_settings` (encrypted keys; `heygen_oauth` and
+  `google_oauth` hold encrypted OAuth tokens and are preferred over `heygen_api_key`), `businesses`
   (one `is_active` per user, holds sprint/profile/inputs/tracker/calendar/brain JSON,
   `lead_token` for the public lead form, and per-field `profile/calendar/tracker_updated_at`
   timestamps that drive the "changed" notices instead of the shared `updated_at`),
@@ -43,6 +43,7 @@ The content step also returns `posts.json` (a per-post structured copy saved to
 `businesses.posts`); the video step prefills HeyGen scripts from Facebook/Instagram posts
 (`ui/web/src/posts.js`, with a markdown fallback parser for older kits), and a finished
 video is linked back via `post.video` / `calendarItem.video` = `{project, file}`.
+The **Your website** step (`kind: 'site'`, `SiteStep.jsx`) is different: `POST /api/site/start` creates a plain interactive Devin session (no structured output) in the user's org with the context + `.devin/skills/site-build` + `anti-generic-audit` inlined (`siteSkill`), stores its `url` in `agent_sessions` (scope `site`, `devin_url`), and the UI opens it in a new tab; the owner works with Devin there, not in Studio's chat.
 
 ## Business Brain (`ui/web/src/brain.js`, `#brain`)
 Questions (8 sections, each answer tagged known/estimate/help), the offer math (`brainMath`) and
@@ -60,13 +61,19 @@ prompt notes (`INTEGRATIONS` in api/index.js).
   `GET /api/heygen/oauth/callback` (the pending row's `state` identifies the user) — bills the
   user's *plan* credits. An API key bills separate *API* credits; `heygenAuth()` picks OAuth
   first and refreshes the token on demand, falling back to `X-Api-Key`.
+- **Google Business Profile** (`api/_lib/google-oauth.js`): standard Google OAuth (web client,
+  offline access, scope business.manage); the chosen location's summary is inlined into Devin
+  context as the authoritative NAP (`gbp` part). GBP APIs need Google's per-project approval —
+  until then calls return quota errors, stored as `pending_approval`.
 
 ## Env vars
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
-(service role), `STUDIO_SECRET_KEY` (64 hex, key encryption), optional `DEVIN_API_KEY` + `DEVIN_ORG_ID`
-(shared fallback), `DEVIN_MAX_ACU`, `PORT` (dev only), optional `HEYGEN_OAUTH_CLIENT_ID` +
+(service role), `STUDIO_SECRET_KEY` (64 hex, key encryption), `DEVIN_MAX_ACU`
+(no shared Devin key: each user saves their own key + Org ID, used only as a pair), `PORT` (dev only), optional `HEYGEN_OAUTH_CLIENT_ID` +
 `HEYGEN_OAUTH_RESOURCE` (HeyGen OAuth overrides), optional `PUBLIC_ORIGIN` — canonical https
-origin used for the HeyGen OAuth callback on non-localhost hosts.
+origin used for the HeyGen OAuth callback on non-localhost hosts, optional `GOOGLE_OAUTH_CLIENT_ID` +
+`GOOGLE_OAUTH_CLIENT_SECRET` (Google Business Profile connection; the Setup row shows
+"coming soon" until both are set).
 
 ## Hard rules
 - Never log or return user API keys or OAuth tokens; they only travel user → /api/setup/env → ciphertext (or the OAuth token endpoint → ciphertext).

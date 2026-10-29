@@ -14,6 +14,7 @@ import VideoStudio from './components/VideoStudio.jsx';
 import Setup from './components/Setup.jsx';
 import Login from './components/Login.jsx';
 import ResetPassword from './components/ResetPassword.jsx';
+import SiteStep from './components/SiteStep.jsx';
 import Landing from './components/Landing.jsx';
 import BuiltWithDevin from './components/BuiltWithDevin.jsx';
 
@@ -134,6 +135,7 @@ export default function App() {
     const s = byId[id];
     if (!s) return null;
     if (s.kind === 'brain') return biz.mtimes.brain ?? null;
+    if (s.kind === 'site') return biz.site?.url ? Date.parse(biz.site.startedAt) || 0 : null;
     if (s.kind === 'doc') return biz.docs[s.file.replace('.md', '')]?.mtime ?? null;
     if (s.kind === 'video') return projects.some(p => p.videos.length) ? 0 : null;
     return biz.profile?.name || s.kind !== 'profile' ? biz.mtimes[s.kind] ?? null : null;
@@ -162,6 +164,7 @@ export default function App() {
   else if (route === 'help') page = <main className="main wide"><Help ctx={ctx} /></main>;
   else if (route === 'guide' || !step) page = <main className="main wide"><Guide ctx={ctx} agentName={agentName} /></main>;
   else if (step.kind === 'video') page = <StepBoundary key="video"><VideoStudio step={step} projects={projects} ctx={ctx} /></StepBoundary>;
+  else if (step.kind === 'site') page = <StepBoundary key="site"><SiteStep step={step} ctx={ctx} /></StepBoundary>;
   else page = (
     <>
       <main className="main">

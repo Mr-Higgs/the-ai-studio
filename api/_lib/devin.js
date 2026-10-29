@@ -31,18 +31,22 @@ export const api = async (creds, path, opts, { retries = 2 } = {}) => {
   }
 };
 
-// Per-user keys from user_settings (encrypted), with a server-wide fallback.
+// Every user runs Devin on their own key + org; there is no server-wide fallback, and a saved
+// key is never used without its saved org (or vice versa).
+export function pickDevinCreds(saved) {
+  const { key, org } = saved || {};
+  if (key && org) return { key, org };
+  throw Object.assign(new Error(key || org ? 'Add both your Devin API key and Org ID in Setup.' : 'Add your Devin API key and Org ID in Setup first.'), { status: 400 });
+}
+
 export async function devinCreds(uid) {
   const { data: s } = await admin().from('user_settings').select('devin_api_key, devin_org_id').eq('user_id', uid).maybeSingle();
   const grab = v => { try { return v ? dec(v) : null; } catch { return null; } };
-  const key = grab(s?.devin_api_key) || process.env.DEVIN_API_KEY;
-  const org = grab(s?.devin_org_id) || process.env.DEVIN_ORG_ID;
-  if (!key || !org) throw Object.assign(new Error('Add your Devin API key and Org ID in Setup first.'), { status: 400 });
-  return { key, org };
+  return pickDevinCreds({ key: grab(s?.devin_api_key), org: grab(s?.devin_org_id) });
 }
 export const devinClient = creds => ({
   createSession: ({ prompt, title, schema, tags }) =>
-    api(creds, '/sessions', { method: 'POST', body: JSON.stringify({ prompt, title, tags, structured_output_schema: schema, structured_output_required: true, ...(process.env.DEVIN_MAX_ACU && { max_acu_limit: Number(process.env.DEVIN_MAX_ACU) }) }) }),
+    api(creds, '/sessions', { method: 'POST', body: JSON.stringify({ prompt, title, tags, ...(schema !== undefined && { structured_output_schema: schema, structured_output_required: true }), ...(process.env.DEVIN_MAX_ACU && { max_acu_limit: Number(process.env.DEVIN_MAX_ACU) }) }) }),
   sendMessage: (id, text) => api(creds, `/sessions/${id}/messages`, { method: 'POST', body: JSON.stringify({ message: text }) }),
   getSession: id => api(creds, `/sessions/${id}`),
   // `after` is an opaque page cursor, not an event_id, so fetch every page and let the caller slice.
