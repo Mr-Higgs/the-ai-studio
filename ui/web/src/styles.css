@@ -96,7 +96,7 @@ code { font-family: var(--mono); font-size: .88em; }
 
 /* ---------- shell ---------- */
 /* chat column width = --chat-w (dragged via .side-grip), capped so the page never gets squeezed out */
-.shell { --chat-col: clamp(280px, var(--chat-w), 55vw); display: grid; grid-template-columns: 268px minmax(0, 1fr) var(--chat-col); height: 100%; }
+.shell { --rail-w: 268px; --chat-col: clamp(280px, var(--chat-w), 55vw); display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--chat-col); height: 100%; }
 .main { overflow: auto; padding: 40px 48px 64px; min-width: 0; container-type: inline-size; } /* content rules use @container: the chat column squeezes this, not the viewport */
 .shell > .main:last-child { grid-column: 2 / -1; }
 .video > .main:only-child { grid-column: 1 / -1; }
@@ -106,7 +106,7 @@ code { font-family: var(--mono); font-size: .88em; }
 .video { grid-column: 2 / -1; display: grid; grid-template-columns: minmax(0, 1fr) var(--chat-col); min-height: 0; }
 
 /* ---------- rail (the sprint path) ---------- */
-.rail { background: var(--rail-bg); color: var(--rail-ink); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 28px 18px 18px; overflow: auto; }
+.rail { position: relative; background: var(--rail-bg); color: var(--rail-ink); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 28px 18px 18px; overflow: auto; }
 .rail > * { flex-shrink: 0; } /* the rail scrolls; nothing in it should squash */
 .brand-name { font: 600 13px/1.2 var(--body); color: var(--rail-muted); letter-spacing: .01em; }
 .countdown { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 22px; }
@@ -128,7 +128,19 @@ code { font-family: var(--mono); font-size: .88em; }
 .steps a.active .step-n { border-color: var(--rail-active-ink); }
 .steps a.active.done .step-n { border-color: var(--accent); }
 .working { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1s ease-in-out infinite alternate; }
-.rail-foot { border-top: 1px solid var(--rail-line); margin-top: 14px; padding-top: 12px; display: grid; gap: 4px; }
+.rail-toggle { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border: 0; border-radius: var(--r-sm); background: none; color: var(--rail-muted); font-size: 15px; line-height: 1; cursor: pointer; }
+.rail-toggle:hover, .rail-toggle:focus-visible { background: var(--rail-hover); color: var(--rail-ink); }
+/* collapsed rail (desktop only): just the numbered step circles */
+@media (min-width: 861px) {
+  .shell.rail-min { --rail-w: 60px; }
+  .rail-min .rail { padding: 44px 8px 12px; }
+  .rail-min .rail-toggle { right: 17px; }
+  .rail-min .rail > :not(nav, .rail-toggle), .rail-min .start-here, .rail-min .phase-name, .rail-min .steps a > span:not(.step-n, .working) { display: none; }
+  .rail-min .steps a { position: relative; justify-content: center; padding: 6px 0; }
+  .rail-min .phase + .phase { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rail-line); }
+  .rail-min .working { position: absolute; top: 4px; right: 6px; margin: 0; }
+}
+.rail-foot { border-top: 1px solid var(--rail-line); margin-top: 14px; padding-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; } /* minmax(0,…): a long email must ellipsize, not widen the track past the rail */
 .setup-link { display: flex; align-items: center; gap: 9px; padding: 6px 10px; border-radius: var(--r-sm); text-decoration: none; font-size: 14px; color: var(--rail-ink); }
 .setup-link:hover, .setup-link.active { background: var(--rail-hover); }
 .agent-pick { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 10px; font-size: 13px; color: var(--rail-muted); }
@@ -484,7 +496,7 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 
 /* ---------- responsive ---------- */
 @media (max-width: 1180px) {
-  .shell { --chat-col: clamp(280px, var(--chat-w), 40vw); grid-template-columns: 236px minmax(0, 1fr) var(--chat-col); }
+  .shell { --rail-w: 236px; --chat-col: clamp(280px, var(--chat-w), 40vw); }
   .main { padding: 32px 30px 56px; }
 }
 @container (max-width: 960px) {
@@ -495,13 +507,14 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 @media (max-width: 860px) {
   .shell, .video { display: block; height: auto; }
   .rail { padding: 18px 16px 12px; }
+  .rail-toggle { display: none; }
   .countdown { margin: 6px 0 14px; }
   .countdown-n { font-size: 44px; }
   .steps { display: flex; overflow-x: auto; gap: 4px; padding-bottom: 6px; }
   .steps a { white-space: nowrap; }
   .phase, .steps ol { display: contents; }
   .phase-name { display: none; }
-  .rail-foot { grid-template-columns: 1fr 1fr; }
+  .rail-foot { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .main { padding: 24px 16px 40px; overflow: visible; }
   .side { border-left: 0; border-top: 1px solid var(--line); height: 80vh; height: 80dvh; }
   .side-grip { display: none; }

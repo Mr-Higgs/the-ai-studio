@@ -91,6 +91,8 @@ export default function App() {
   const [projects, setProjects] = useState([]);
   const [health, setHealth] = useState(null);
   const [workingOn, setWorkingOn] = useState(null);
+  const [railMin, setRailMin] = useState(() => pref('railMin') === '1');
+  const toggleRail = () => setRailMin(m => { pref('railMin', m ? null : '1'); return !m; });
   const [hash, go] = useHash();
 
   const refresh = useCallback(() => Promise.all([
@@ -185,8 +187,9 @@ export default function App() {
   );
 
   return (
-    <div className="shell">
+    <div className={'shell' + (railMin ? ' rail-min' : '')}>
       <aside className="rail">
+        <button type="button" className="rail-toggle" onClick={toggleRail} aria-expanded={!railMin} aria-label={railMin ? 'Expand sidebar' : 'Collapse sidebar'} title={railMin ? 'Expand sidebar' : 'Collapse sidebar'}>{railMin ? '»' : '«'}</button>
         <div className="brand">
           <span className="brand-name">{SPRINTS[biz.sprint?.id]?.name || SPRINTS.growth.name}</span>
           <div className="countdown" aria-label={`${days} days to ${label}`}>
@@ -215,7 +218,7 @@ export default function App() {
                 <ol>
                   {p.steps.map(id => byId[id]).filter(Boolean).map(s => (
                     <li key={s.id}>
-                      <a href={'#' + s.id} className={(s === step ? 'active ' : '') + (isDone(s.id) ? 'done' : '')} aria-current={s === step ? 'page' : undefined}>
+                      <a href={'#' + s.id} title={s.title} className={(s === step ? 'active ' : '') + (isDone(s.id) ? 'done' : '')} aria-current={s === step ? 'page' : undefined}>
                         <span className="step-n">{isDone(s.id) ? '✓' : STEPS.indexOf(s) + 1}</span>
                         <span>{s.title}</span>
                         {workingOn === s.title && <span className="working" title={`${agentName} is working on this`} />}
