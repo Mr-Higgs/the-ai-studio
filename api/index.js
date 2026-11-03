@@ -10,13 +10,38 @@ import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
 import { contextParts, changedParts, partHashes, offerSkill, siteSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA, GROUNDING } from './_lib/prompts.js';
 import { applyAdSpend, findInstagramAccounts, normalizeAccountId, NO_INSTAGRAM_ACCOUNT_MESSAGE, syncAds, syncInstagram, tryConnectInstagram } from './_lib/meta.js';
 import { leadToken, LEAD_TOKEN, cleanLead, appendLead, leadFormHtml } from './_lib/leads.js';
+import { INTAKE_MAX_BODY, cleanIntake } from './_lib/intake.js';
 import { pkce, randomState, redirectUri, registerClient, buildAuthorizeUrl, exchangeCode, refreshTokens, toStored, revoke, API_BASE } from './_lib/heygen-oauth.js';
 import * as google from './_lib/google-oauth.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
 const send = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
+let cold = true;
+// Low-cardinality route label for logs: dynamic segments collapsed.
+export function routeLabel(method, parts) {
+  const mapped = [...parts];
+  if (mapped[1] === 'lead' && mapped[2]) mapped[2] = ':token';
+  else if (mapped[1] === 'projects' && mapped[2]) mapped[2] = ':name';
+  else if (mapped[1] === 'agent' && mapped[2]) mapped[2] = ':scope';
+  else if (mapped[1] === 'business' && mapped[2] === 'history' && mapped[3]) mapped[3] = ':id';
+  else if (mapped[1] === 'setup' && mapped[2] === 'integration' && mapped[3]) mapped[3] = ':id';
+  return `${method} /${mapped.join('/')}`;
+}
 const readJson = async req => req.body ?? JSON.parse(await new Promise(r => { let b = ''; req.on('data', c => b += c); req.on('end', () => r(b || '{}')); }));
+// Capped JSON body for public routes. Pre-parsed req.body (Vercel/dev server) is honoured; null = unparsable.
+async function readCapped(req, cap) {
+  if (Number(req.headers['content-length']) > cap) throw Object.assign(new Error('too big'), { status: 413 });
+  let raw = req.body;
+  if (raw == null) raw = await new Promise((resolve, reject) => {
+    let b = '';
+    req.on('data', c => { b += c; if (b.length > cap) reject(Object.assign(new Error('too big'), { status: 413 })); });
+    req.on('end', () => resolve(b));
+    req.on('error', reject);
+  });
+  if (typeof raw !== 'string') return raw && typeof raw === 'object' ? raw : null;
+  try { return JSON.parse(raw || 'null'); } catch { return null; }
+}
 const BIZ_FIELDS = { 'brain.json': 'brain', 'profile.json': 'profile', 'inputs.json': 'inputs', 'tracker.json': 'tracker', 'sprint.json': 'sprint', 'calendar.json': 'calendar', 'experiments.json': 'experiments', 'posts.json': 'posts' };
 const ENV_KEYS = { DEVIN_API_KEY: 'devin_api_key', DEVIN_ORG_ID: 'devin_org_id', HEYGEN_API_KEY: 'heygen_api_key' };
 // MCP servers Devin can use. Devin is the MCP client, so users add these in their own Devin
@@ -348,6 +373,10 @@ async function applyOutput(uid, biz, row, session) {
 export default async function handler(req, res) {
   const url = new URL(req.url, 'http://x');
   const parts = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  const t0 = Date.now(), wasCold = cold; cold = false;
+  const route = routeLabel(req.method, parts);
+  let uid = null;
+  res.once('finish', () => console.log(JSON.stringify({ t: 'req', route, status: res.statusCode, ms: Date.now() - t0, cold: wasCold, uid: uid && crypto.createHash('sha256').update(uid).digest('hex').slice(0, 8) })));
   try {
     if (req.method === 'GET' && url.pathname === '/api/health' && !/^Bearer /.test(req.headers.authorization || ''))
       return send(res, 200, { hosted: true, items: [] });
@@ -386,6 +415,19 @@ export default async function handler(req, res) {
       return res.end('{"error":"method"}');
     }
 
+    // Public project-intake survey (/intake) — no auth, same-origin. Always 200 on a honeypot drop so bots learn nothing.
+    if (parts[0] === 'api' && parts[1] === 'intake' && parts.length === 2) {
+      if (req.method !== 'POST') return send(res, 405, { error: 'method' });
+      const body = await readCapped(req, INTAKE_MAX_BODY);
+      if (!body || typeof body !== 'object') return send(res, 400, { error: 'bad request' });
+      const row = cleanIntake(body);
+      if (row) {
+        const { error } = await admin().from('intake_submissions').insert(row);
+        if (error) throw Object.assign(new Error('Could not save your answers. Please try again.'), { status: 500 });
+      }
+      return send(res, 200, { ok: true });
+    }
+
     // HeyGen OAuth browser redirect — unauthenticated; state in the pending row identifies the user.
     if (req.method === 'GET' && parts[0] === 'api' && parts[1] === 'heygen' && parts[2] === 'oauth' && parts[3] === 'callback')
       return heygenOauthCallback(res, url);
@@ -394,7 +436,7 @@ export default async function handler(req, res) {
 
     const user = await userFromReq(req);
     if (!user) return send(res, 401, { error: 'Sign in first.' });
-    const uid = user.id;
+    uid = user.id;
     const db = admin();
 
     if (req.method === 'GET' && url.pathname === '/api/auth/me') return send(res, 200, { hosted: true, email: user.email });
@@ -828,6 +870,7 @@ export default async function handler(req, res) {
 
     send(res, 404, { error: 'not found' });
   } catch (e) {
+    if ((e.status || 500) >= 500) console.error(JSON.stringify({ t: 'err', route, status: e.status || 500, message: e.message, stack: String(e.stack || '').split('\n').slice(1, 4).map(s => s.trim()) }));
     if (!res.headersSent) send(res, e.status || 500, { error: e.message, ...(e.retryAfter && { retryAfter: e.retryAfter }) });
   }
 }

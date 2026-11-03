@@ -1,6 +1,7 @@
 import { Component, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ask, downloadExport, post, put, toast, useAgent } from './api.js';
 import { supabase } from './supabase.js';
+import { mark } from './boot.js';
 import { PHASES, SPRINTS, STEPS, countdown, setSprint } from './steps.js';
 import { BRAIN_STEP, brainReady, sectionProgress, BRAIN_SECTIONS } from './brain.js';
 import Brain from './components/Brain.jsx';
@@ -85,8 +86,33 @@ class StepBoundary extends Component {
   }
 }
 
+// First load: after a few seconds say which leg we're waiting on; on failure say why, with a way out.
+function Boot({ phase, error, onRetry }) {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => { setSecs(0); const t = setInterval(() => setSecs(s => s + 1), 1000); return () => clearInterval(t); }, [phase, error]);
+  const what = phase === 'me' ? 'the sign-in check' : 'your workspace';
+  const signOut = async () => {
+    await supabase.auth.signOut().catch(() => {});
+    try { for (const k of Object.keys(localStorage)) if (/^sb-.*-auth-token/.test(k)) localStorage.removeItem(k); } catch {}
+    location.reload();
+  };
+  if (error) return (
+    <div className="boot" role="alert">
+      <div className="boot-box">
+        <p>Couldn’t load {what}: {error.message}{error.status ? ` (HTTP ${error.status})` : ''}</p>
+        <div className="boot-actions">
+          <button type="button" className="btn primary" onClick={onRetry}>Try again</button>
+          <button type="button" className="btn ghost" onClick={signOut}>Sign out</button>
+        </div>
+      </div>
+    </div>
+  );
+  return <div className="boot" role="status">{secs < 6 ? 'Loading your workspace…' : `Still loading… waiting for ${what} (${secs}s)`}</div>;
+}
+
 export default function App() {
   const [me, setMe] = useState(null); // { hosted, email?, admin? }
+  const [bootErr, setBootErr] = useState(null); // { phase: 'me' | 'business', error }
   const [recovering, setRecovering] = useState(false);
   const [biz, setBiz] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -97,17 +123,25 @@ export default function App() {
   const [hash, go] = useHash();
 
   const refresh = useCallback(() => Promise.all([
-    api('/api/business').then(setBiz),
+    api('/api/business').then(b => { setBiz(b); setBootErr(null); }, e => setBootErr({ phase: 'business', error: e })),
     api('/api/projects').then(r => setProjects(r.projects)),
   ]).catch(() => {}), []);
   const signedIn = me && (!me.hosted || me.email);
   const agent = useAgent(signedIn ? '/api/agent/business' : null, refresh);
 
-  useEffect(() => {
-    const load = async () => {
+  const load = useCallback(async () => {
+    try {
+      const t0 = performance.now();
       const { data: { session } } = await supabase.auth.getSession();
-      setMe(session ? await api('/api/auth/me').catch(() => null) : { hosted: true });
-    };
+      mark('session', { ms: performance.now() - t0, ok: true });
+      if (!session) return setMe({ hosted: true });
+      setMe(await api('/api/auth/me'));
+      setBootErr(null);
+    } catch (e) {
+      if (e.status !== 401) setBootErr({ phase: 'me', error: e }); // 401: the 'unauth' listener already switched to the landing page
+    }
+  }, []);
+  useEffect(() => {
     load();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => { if (event === 'PASSWORD_RECOVERY') setRecovering(true); load(); });
     const unauth = () => setMe({ hosted: true });
@@ -122,10 +156,10 @@ export default function App() {
   useEffect(() => { if (!agent.busy) setWorkingOn(null); }, [agent.busy]);
 
   const recheck = () => api('/api/health').then(r => setHealth(r.items));
-  if (!me) return <div className="boot">Loading your workspace…</div>;
+  if (!me) return <Boot phase="me" error={bootErr?.phase === 'me' ? bootErr.error : null} onRetry={() => { setBootErr(null); load(); }} />;
   if (recovering) return <ResetPassword onDone={() => { setRecovering(false); go(''); }} />;
   if (me.hosted && !me.email) return hash === 'login' || hash === 'help' ? <Login onDone={() => api('/api/auth/me').then(setMe)} /> : <Landing />;
-  if (!biz) return <div className="boot">Loading your workspace…</div>;
+  if (!biz) return <Boot phase="business" error={bootErr?.phase === 'business' ? bootErr.error : null} onRetry={() => { setBootErr(null); refresh(); }} />;
 
   setSprint(biz.sprint?.id); // before anything reads STEPS
   const agentName = AGENT_NAMES[biz.agent] || 'Devin';

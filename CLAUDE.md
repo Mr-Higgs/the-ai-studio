@@ -16,7 +16,8 @@ sprint; Devin (cloud API) writes each step's documents. This file is the archite
   `lead_token` for the public lead form, and per-field `profile/calendar/tracker_updated_at`
   timestamps that drive the "changed" notices instead of the shared `updated_at`),
   `docs` (per-kind markdown), `doc_history`, `agent_sessions` (Devin session per scope),
-  `projects`; private storage bucket `videos` under `<uid>/<project>/`. RLS on everything.
+  `projects`, `intake_submissions` (public project-intake survey rows; RLS on, no
+  policies → service role only); private storage bucket `videos` under `<uid>/<project>/`. RLS on everything.
 - **Devin**: v3 `POST /v3/organizations/{org}/sessions` with `structured_output_schema` —
   the agent returns `{"files": {"offer.md": "…", "calendar.json": [...]}}` which the server
   applies to docs/calendar on poll (`applied_hash` dedups; changed docs are snapshotted to
@@ -27,6 +28,11 @@ sprint; Devin (cloud API) writes each step's documents. This file is the archite
 - **Lead form**: public `GET/POST /api/lead/<token>` (api/_lib/leads.js) appends to
   `businesses.tracker`; `?exp=<id>&src=<channel>` tag the row; URL is inlined into Devin
   context as the CTA link.
+- **Intake survey**: public `/intake` (Vite entry `ui/web/intake.html` → `src/intake-main.js`;
+  field spec + markdown summary shared with the API in `ui/web/src/intake.js`).
+  `POST /api/intake` (api/_lib/intake.js `cleanIntake`: honeypot, 32 KB cap, strict field
+  whitelist) inserts one `intake_submissions` row per completed submission; notifications are a
+  Supabase Database Webhook on insert (see DEPLOY.md).
 - Local dev: `npm run dev` (vite :5173; also spawns dev/server.mjs :4321 with `--watch`, skip via
   `STUDIO_NO_API=1`). `npm run dev:api` alone runs the API + static ui/dist (.env → env, /api → handler).
 

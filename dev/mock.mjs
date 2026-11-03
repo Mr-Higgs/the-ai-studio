@@ -14,6 +14,7 @@
 //      brain  0 empty Business Brain · 1 filled Brain + Devin's review
 //      devin  health devin.ok        heygen  health heygen.ok (+avatars)
 //      chat   0 empty agent chat     busy   1 = poll reports Devin working
+//      fail   me|business → that boot call returns `code` (default 500); delay  ms added to both boot calls
 // ============================================================================
 import http from 'node:http';
 import fs from 'node:fs';
@@ -27,7 +28,7 @@ const USER = { id: 'mock-user-maria', email: 'maria@example.com', aud: 'authenti
 
 // ---- stage -----------------------------------------------------------------
 const ALL_STEPS = ['profile', 'offer', 'research', 'visibility', 'strategy', 'content', 'video', 'calendar', 'automation', 'tracker', 'action-plan'];
-const stage = { done: new Set(ALL_STEPS), brain: 1, devin: 1, heygen: 1, chat: 1, busy: 0, site: null, google: null };
+const stage = { done: new Set(ALL_STEPS), brain: 1, devin: 1, heygen: 1, chat: 1, busy: 0, site: null, google: null, fail: null, delay: 0, code: 500 };
 
 // ---- supabase auth ---------------------------------------------------------
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -606,7 +607,10 @@ http.createServer(async (req, res) => {
           : v === 'available' ? { availableOnly: true }
           : null;
       }
-      return json(res, 200, { ok: true, stage: { done: [...stage.done], brain: stage.brain, devin: stage.devin, heygen: stage.heygen, chat: stage.chat, busy: stage.busy } });
+      if (q.has('fail')) stage.fail = q.get('fail') || null;
+      if (q.has('delay')) stage.delay = Number(q.get('delay')) || 0;
+      if (q.has('code')) stage.code = Number(q.get('code')) || 500;
+      return json(res, 200, { ok: true, stage: { done: [...stage.done], brain: stage.brain, devin: stage.devin, heygen: stage.heygen, chat: stage.chat, busy: stage.busy, fail: stage.fail, delay: stage.delay, code: stage.code } });
     }
     if (url.pathname === '/mock/demo.mp4' && req.method === 'GET') {
       const buf = demoVideo();
@@ -646,6 +650,9 @@ http.createServer(async (req, res) => {
     }
 
     // every remaining /api route is "signed in" in mock-land
+    const leg = url.pathname === '/api/auth/me' ? 'me' : url.pathname === '/api/business' ? 'business' : null;
+    if (leg && stage.delay) await new Promise(r => setTimeout(r, stage.delay));
+    if (leg && stage.fail === leg) return json(res, stage.code, { error: `mock: ${leg} failed` });
     if (req.method === 'GET' && url.pathname === '/api/auth/me') return json(res, 200, { hosted: true, email: USER.email });
     if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { hosted: true, items: healthItems() });
     if (req.method === 'GET' && url.pathname === '/api/business') return json(res, 200, businessState());

@@ -7,6 +7,10 @@
       "destination": "/guide.html"
     },
     {
+      "source": "/intake",
+      "destination": "/intake.html"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index"
     }

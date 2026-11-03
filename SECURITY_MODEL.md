@@ -18,7 +18,7 @@ Studio is a multi-tenant SaaS (https://the-ai-studio.vercel.app). Small business
 | **api-router** | `api/index.js` routing and authz, `api/_lib/business.js` (business state, switch/new, export, history) |
 | **auth-and-secrets** | `api/_lib/supabase.js` (`userFromReq`), `api/_lib/secrets.js` (AES-256-GCM under `STUDIO_SECRET_KEY`), `/api/setup/env`, `/api/setup/meta`, `user_settings` key columns |
 | **integrations-oauth** | `api/_lib/heygen-oauth.js`, `api/_lib/google-oauth.js`, `api/_lib/meta.js`, `api/_lib/devin.js`, the OAuth start/callback/disconnect routes and the HeyGen video import into storage |
-| **public-lead-form** | `api/_lib/leads.js`, `GET/POST /api/lead/<token>`, lead-token rotation |
+| **public-lead-form** | `api/_lib/leads.js`, `GET/POST /api/lead/<token>`, lead-token rotation, `api/_lib/intake.js`, `POST /api/intake` |
 | **devin-agent** | `api/_lib/prompts.js` (context, output contract, structured output apply), `/api/agent/*`, `/api/site/*`, `/api/setup/integration/*/devin`, `.devin/skills/**` |
 | **database** | `supabase/migrations/**` (tables, RLS, `videos` storage bucket and policy) |
 | **dev-tooling** | `dev/**` (local server, mock, screenshots), `vercel.json`, `.env.example` |
@@ -26,6 +26,7 @@ Studio is a multi-tenant SaaS (https://the-ai-studio.vercel.app). Small business
 ## Entry points and who can reach them
 - **Anonymous internet**
   - `GET/POST /api/lead/<token>`: 24-hex token, `Access-Control-Allow-Origin: *`, writes into the owner's `businesses.tracker` through the service role. 8 KB body cap, honeypot, 500-row cap, and no rate limit.
+  - `POST /api/intake`: same-origin survey submit; 32 KB body cap, honeypot, strict per-field whitelist/caps (`cleanIntake`), writes one row to `intake_submissions` through the service role. No rate limit.
   - `GET /api/heygen/oauth/callback` and `GET /api/google/oauth/callback`: these scan **all** `user_settings` pending rows and match `state` with `timingSafeEqual` (15 min TTL). They render HTML with `escHtml` and `postMessage(…, '*')` to the opener.
   - `GET /api/health` without a Bearer token returns a stub.
   - Supabase Auth endpoints (sign-up/sign-in) are rate-limited by Supabase, not by Studio.

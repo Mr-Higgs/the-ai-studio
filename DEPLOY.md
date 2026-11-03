@@ -13,7 +13,7 @@ to install.
    **Project URL**, the **anon public key**, and the **service_role key** (Settings → API).
    The reference deployment uses project `owoaljgzwrecwcnkmxle`, already migrated.
 2. Run the migration files in `supabase/migrations/` in order, through
-   `0006_field_timestamps_lead_form.sql` (`supabase link --project-ref <ref>` then `supabase db push`, or
+   `0011_intake.sql` (`supabase link --project-ref <ref>` then `supabase db push`, or
    paste each file into the SQL editor).
 3. In **Authentication → Providers → Email**: keep "Allow new users to sign up" ON (sign-up
    happens through Supabase Auth directly). Turn OFF "Confirm email" if you want participants
@@ -24,6 +24,15 @@ to install.
    "Confirm email" off, or add custom SMTP (**Authentication → Emails → SMTP Settings**, e.g.
    Resend) and then raise the email limit under **Authentication → Rate Limits**. For a live
    workshop on shared Wi-Fi, also raise "sign-ups and sign-ins" there, since that limit is per IP.
+
+### Intake notifications (optional)
+
+The public project-intake survey lives at `https://<your domain>/intake` and supports
+`?name=&biz=&email=&site=` prefill on the link. Submissions land in `intake_submissions`
+(service role only). To get notified: **Dashboard → Database → Webhooks → Create a new hook** —
+table `intake_submissions`, events **Insert**, type **HTTP Request**, URL = your Zapier / Make /
+Slack incoming-webhook URL. The payload's `record.summary` is ready-to-paste markdown;
+`record.email` / `record.business` identify the client.
 
 ## 3. Vercel
 

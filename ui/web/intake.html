@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rate Limit Labs · Project Intake</title>
+  <meta name="description" content="A short project intake survey: confirm your details, pick what to build first, and share your budget and timing.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+:root{--bg:#f7f5f0;--ink:#15171a;--mute:#6b6f76;--line:#dcd8cf;--card:#fff;--acc:#1f6f5c;--accd:#17564a;--err:#b3261e}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:17px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;min-height:100vh}
+.bar{position:fixed;top:0;left:0;right:0;height:4px;background:var(--line);z-index:5}
+#prog{height:100%;width:0;background:var(--acc);transition:width .35s ease}
+header{max-width:680px;margin:0 auto;padding:28px 24px 0;display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--mute)}
+header b{color:var(--ink);letter-spacing:.2px}
+main{max-width:680px;margin:0 auto;padding:28px 24px 140px}
+.step{animation:in .3s ease}
+@keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+h1{font-size:34px;line-height:1.15;margin:8px 0 10px;letter-spacing:-.5px}
+h2{font-size:28px;line-height:1.2;margin:8px 0 8px;letter-spacing:-.4px}
+.sub{color:var(--mute);margin:0 0 28px}
+.field{margin:0 0 26px}
+label.q{display:block;font-weight:600;margin-bottom:4px}
+.hint{display:block;font-size:14px;color:var(--mute);margin:0 0 8px}
+input[type=text],input[type=email],input[type=url],textarea{width:100%;font:inherit;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s}
+textarea{min-height:104px;resize:vertical}
+input:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 4px rgba(31,111,92,.12)}
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{font:inherit;font-size:15.5px;padding:10px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;transition:all .15s}
+.chip:hover{border-color:var(--acc)}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.scale{display:flex;gap:10px;align-items:center}
+.scale .chip{width:52px;height:52px;padding:0;border-radius:14px;font-weight:600}
+.scale small{color:var(--mute);font-size:13px}
+.cards{display:grid;gap:12px}
+.card{display:flex;gap:14px;align-items:flex-start;text-align:left;font:inherit;padding:16px 18px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);cursor:pointer;transition:all .15s;width:100%}
+.card:hover{border-color:var(--acc)}
+.card .box{flex:none;width:22px;height:22px;border-radius:7px;border:1.5px solid var(--line);margin-top:2px;display:grid;place-items:center;color:#fff;font-size:14px}
+.card.on{border-color:var(--acc);background:#eef6f3}
+.card.on .box{background:var(--acc);border-color:var(--acc)}
+.card strong{display:block}
+.card span.d{display:block;font-size:14.5px;color:var(--mute)}
+.note{background:#eef6f3;border:1px solid #cfe5de;color:#17564a;border-radius:12px;padding:12px 14px;font-size:14.5px;margin:0 0 26px}
+.warn{background:#fff6e5;border-color:#f0dcae;color:#7a5a12}
+.err{color:var(--err);font-size:14px;margin-top:6px}
+nav{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(to top,var(--bg) 70%,rgba(247,245,240,0));padding:22px 24px 24px}
+nav div{max-width:680px;margin:0 auto;display:flex;justify-content:space-between;gap:12px}
+.btn{font:inherit;font-weight:600;padding:14px 26px;border-radius:12px;border:0;cursor:pointer;background:var(--acc);color:#fff;transition:background .15s}
+.btn:hover{background:var(--accd)}
+.btn.ghost{background:transparent;color:var(--mute);border:1.5px solid var(--line)}
+.btn.ghost:hover{color:var(--ink);border-color:var(--ink)}
+.btn[hidden]{display:none}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
+.sum{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 20px 14px;font-size:15px;max-height:360px;overflow:auto}
+.sum h3{font-size:20px;margin:16px 0 6px}.sum h4{font-size:16px;margin:16px 0 4px;color:var(--acc)}.sum p{margin:6px 0}.sum ul{margin:4px 0;padding-left:20px}.sum li{margin:4px 0}.sum code{background:#f0eee8;padding:1px 5px;border-radius:5px;font-size:.9em}.sum a,.sub a,.hint a{color:var(--acc)}
+.saved{font-size:13px;color:var(--mute);text-align:center;margin-top:10px}
+.hp{position:absolute;left:-9999px}
+@media(max-width:520px){h1{font-size:28px}h2{font-size:24px}.btn{padding:13px 20px}}
+</style>
+</head>
+<body>
+<div class="bar"><div id="prog"></div></div>
+<header><b>Rate Limit Labs</b><span id="count"></span></header>
+<main id="app"></main>
+<nav><div><button class="btn ghost" id="back">Back</button><button class="btn" id="next">Continue</button></div></nav>
+<script type="module" src="/src/intake-main.js"></script>
+</body>
+</html>

@@ -64,14 +64,17 @@ export function cleanPosts(data) {
 // Per-field timestamps: only bumps when that field is saved. Old rows fall back to updated_at.
 export const fieldMtime = (biz, f) => biz[f] ? Date.parse(biz[`${f}_updated_at`] || biz.updated_at) : null;
 
-export async function activeBusiness(uid) {
-  const db = admin();
-  const { data: rows } = await db.from('businesses').select('*').eq('user_id', uid).eq('is_active', true).limit(1);
+const dbError = error => { console.error(JSON.stringify({ t: 'db_error', code: error.code ?? null, message: error.message })); return Object.assign(new Error('Could not load your business. Try again in a moment.'), { status: 503 }); };
+
+export async function activeBusiness(uid, db = admin()) {
+  const { data: rows, error } = await db.from('businesses').select('*').eq('user_id', uid).eq('is_active', true).limit(1);
+  if (error) throw dbError(error);
   if (rows?.[0]) return rows[0];
-  const { data: ins, error } = await db.from('businesses').insert({ user_id: uid }).select().single();
-  if (error) {
+  const { data: ins, error: insertError } = await db.from('businesses').insert({ user_id: uid }).select().single();
+  if (insertError) {
     // lost the one-active race; re-read
-    const { data: r2 } = await db.from('businesses').select('*').eq('user_id', uid).eq('is_active', true).limit(1);
+    const { data: r2, error: e2 } = await db.from('businesses').select('*').eq('user_id', uid).eq('is_active', true).limit(1);
+    if (e2 || !r2?.[0]) throw dbError(e2 || insertError);
     return r2[0];
   }
   return ins;

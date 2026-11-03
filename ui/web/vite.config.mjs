@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
     envDir: ROOT,
     envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     plugins: [react(), apiServer(mode)],
-    build: { outDir: '../dist', emptyOutDir: true, rollupOptions: { input: { main: 'index.html', guide: 'guide.html' } } },
+    build: { outDir: '../dist', emptyOutDir: true, rollupOptions: { input: { main: 'index.html', guide: 'guide.html', intake: 'intake.html' } } },
     server: { proxy: { '/api': api, '/projects': api, '/mock': api } },
   };
 });

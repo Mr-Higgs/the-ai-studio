@@ -2,13 +2,22 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 
 // The server only accepts JSON writes (CSRF guard), so every call sets the content type.
 import { supabase } from './supabase.js';
+import { mark, BOOT_PATHS } from './boot.js';
 export async function api(url, opts = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(session && { Authorization: `Bearer ${session.access_token}` }), ...opts.headers } });
-  const body = await r.json().catch(() => ({}));
-  if (r.status === 401) dispatchEvent(new CustomEvent('unauth')); // hosted: session expired
-  if (!r.ok) throw Object.assign(new Error(body.error || r.statusText), { status: r.status, retryAfter: body.retryAfter });
-  return body;
+  const t0 = performance.now(), phase = BOOT_PATHS[url];
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(session && { Authorization: `Bearer ${session.access_token}` }), ...opts.headers } });
+    const body = await r.json().catch(() => ({}));
+    if (r.status === 401) dispatchEvent(new CustomEvent('unauth')); // hosted: session expired
+    if (!r.ok) throw Object.assign(new Error(body.error || r.statusText), { status: r.status, retryAfter: body.retryAfter });
+    if (phase) mark(phase, { ms: performance.now() - t0, ok: true, status: r.status });
+    return body;
+  } catch (e) {
+    const ms = performance.now() - t0;
+    if (phase) mark(phase, { ms, ok: false, status: e.status, message: e.message });
+    throw Object.assign(e, { ms: Math.round(ms) });
+  }
 }
 export const put = (url, data) => api(url, { method: 'PUT', body: JSON.stringify(data) });
 export const post = (url, data = {}) => api(url, { method: 'POST', body: JSON.stringify(data) });

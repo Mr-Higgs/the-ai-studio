@@ -5,11 +5,12 @@ import { createHash } from 'node:crypto';
 process.env.STUDIO_SECRET_KEY ||= 'a'.repeat(64);
 
 import { enc, dec } from './_lib/secrets.js';
-import { cleanCalendar, cleanExperiments, cleanPosts, fieldMtime } from './_lib/business.js';
+import { cleanCalendar, cleanExperiments, cleanPosts, fieldMtime, activeBusiness } from './_lib/business.js';
 import { buildContext, contextParts, partHashes, changedParts, offerSkill, applyStructuredOutput, sessionPrompt, hashOf, OUTPUT_CONTRACT } from './_lib/prompts.js';
 import { experimentStats } from '../ui/web/src/experiments.js';
 import { SCORE_EXPERIMENTS, STEPS, setSprint } from '../ui/web/src/steps.js';
-import { validProject, isBusy } from './index.js';
+import { validProject, isBusy, routeLabel } from './index.js';
+import { userFromReq } from './_lib/supabase.js';
 
 test('secrets round-trip AES-256-GCM', () => {
   const blob = enc('cog_secret_key_123');
@@ -224,4 +225,48 @@ test('isBusy follows v3 status + status_detail', () => {
   assert.equal(isBusy({ status: 'running', status_detail: 'waiting_for_user' }), false);
   assert.equal(isBusy({ status: 'running', status_detail: 'finished' }), false);
   for (const status of ['suspended', 'exit', 'error']) assert.equal(isBusy({ status }), false);
+});
+
+test('routeLabel collapses dynamic segments', () => {
+  assert.equal(routeLabel('GET', ['api', 'agent', 'business', 'poll']), 'GET /api/agent/:scope/poll');
+  assert.equal(routeLabel('GET', ['api', 'projects', 'demo']), 'GET /api/projects/:name');
+  assert.equal(routeLabel('POST', ['api', 'lead', 'abc123']), 'POST /api/lead/:token');
+  assert.equal(routeLabel('GET', ['api', 'business', 'history', '42']), 'GET /api/business/history/:id');
+  assert.equal(routeLabel('POST', ['api', 'setup', 'integration', 'stripe', 'devin']), 'POST /api/setup/integration/:id/devin');
+  assert.equal(routeLabel('GET', ['api', 'business']), 'GET /api/business');
+});
+
+test('userFromReq: no token, rejected token, auth outage, ok', async () => {
+  const silent = async fn => { const e = console.error; console.error = () => {}; try { return await fn(); } finally { console.error = e; } };
+  let called = false;
+  assert.equal(await userFromReq({ headers: {} }, { getUser: async () => { called = true; } }), null);
+  assert.equal(called, false);
+  const req = { headers: { authorization: 'Bearer tok' } };
+  const auth = result => ({ getUser: async () => result });
+  assert.equal(await userFromReq(req, auth({ data: { user: null }, error: { status: 401 } })), null);
+  await silent(() => assert.rejects(userFromReq(req, auth({ data: { user: null }, error: { status: 0, message: 'fetch failed' } })), e => e.status === 503));
+  await silent(() => assert.rejects(userFromReq(req, auth({ error: { status: 502 } })), e => e.status === 503));
+  assert.deepEqual(await userFromReq(req, auth({ data: { user: { id: 'u1', email: 'a@b.c' } }, error: null })), { id: 'u1', email: 'a@b.c' });
+});
+
+test('activeBusiness: select error throws 503, insert race re-reads', async () => {
+  const fakeDb = results => ({
+    from: () => {
+      const b = {};
+      for (const m of ['select', 'eq', 'limit', 'insert', 'single']) b[m] = () => b;
+      b.then = (ok, bad) => Promise.resolve(results.shift()).then(ok, bad);
+      return b;
+    },
+  });
+  const silent = async fn => { const e = console.error; console.error = () => {}; try { return await fn(); } finally { console.error = e; } };
+  const row = { id: 'b1', user_id: 'u1' };
+  assert.equal(await activeBusiness('u1', fakeDb([{ data: [row], error: null }])), row);
+  const results = [{ data: null, error: { code: 'PGRST', message: 'down' } }, { data: [{ id: 'x' }], error: null }];
+  await silent(() => assert.rejects(activeBusiness('u1', fakeDb(results)), e => e.status === 503));
+  assert.equal(results.length, 1); // insert never attempted
+  const ins = { id: 'b2' };
+  assert.equal(await activeBusiness('u1', fakeDb([{ data: [], error: null }, { data: ins, error: null }])), ins);
+  const reread = { id: 'b3' };
+  assert.equal(await activeBusiness('u1', fakeDb([{ data: [], error: null }, { data: null, error: { message: 'race' } }, { data: [reread], error: null }])), reread);
+  await silent(() => assert.rejects(activeBusiness('u1', fakeDb([{ data: [], error: null }, { data: null, error: { message: 'race' } }, { data: null, error: { message: 'still down' } }])), e => e.status === 503));
 });
