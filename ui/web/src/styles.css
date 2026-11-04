@@ -464,6 +464,16 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .btn.mic { padding: 0; width: 42px; height: 42px; flex: none; }
 .btn.mic svg { width: 18px; height: 18px; }
 .btn.mic.on { border-color: var(--accent); color: var(--accent); animation: pulse .9s infinite alternate; }
+.btn.attach { padding: 0; width: 42px; height: 42px; flex: none; }
+.btn.attach svg { width: 18px; height: 18px; }
+.btn.attach.on { color: var(--accent); animation: pulse .9s infinite alternate; cursor: progress; opacity: 1; }
+.chat-files { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 10px 12px 0; border-top: 1px solid var(--line); }
+.chat-files + .composer { border-top: 0; }
+.file-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 4px 3px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); font-size: 13px; }
+.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.file-note { color: var(--muted); font-size: 12px; }
+.file-chip button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 6px; border-radius: 999px; }
+.file-chip button:hover { color: var(--ink); }
 @keyframes pulse { to { opacity: .3; } }
 
 /* ---------- setup ---------- */

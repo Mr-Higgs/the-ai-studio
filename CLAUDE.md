@@ -16,7 +16,7 @@ sprint; Devin (cloud API) writes each step's documents. This file is the archite
   `lead_token` for the public lead form, and per-field `profile/calendar/tracker_updated_at`
   timestamps that drive the "changed" notices instead of the shared `updated_at`),
   `docs` (per-kind markdown), `doc_history`, `agent_sessions` (Devin session per scope),
-  `projects`, `intake_submissions` (public project-intake survey rows; RLS on, no
+  `projects`, `uploads` (owner-uploaded reference files per business — extracted text only, see below), `intake_submissions` (public project-intake survey rows; RLS on, no
   policies → service role only); private storage bucket `videos` under `<uid>/<project>/`. RLS on everything.
 - **Devin**: v3 `POST /v3/organizations/{org}/sessions` with `structured_output_schema` —
   the agent returns `{"files": {"offer.md": "…", "calendar.json": [...]}}` which the server
@@ -25,6 +25,12 @@ sprint; Devin (cloud API) writes each step's documents. This file is the archite
   every 4 s while busy, every 60 s when idle, not in hidden tabs, and backs off on Devin 429s
   (`api/_lib/devin.js` retries short 429s itself, else returns 429 + `retryAfter`). `sendMessage` continues a live session; a new session is created
   (with the full business context inlined) only when the old one is expired/finished/etc.
+- **Uploads**: the chat's paperclip (`Chat.jsx`) takes PDF, Markdown/text, CSV and Excel.
+  The browser extracts the text (`ui/web/src/extract.js`: pdf.js for PDFs, SheetJS turns each sheet
+  into CSV) and `POST /api/uploads` stores only that text (`cleanUpload` in `ui/web/src/uploads.js`:
+  10 files per business, 40k chars each); originals are never sent. Each file is an `upload:<id>`
+  context part fenced as untrusted reference data; removals are told to a live session on the next message
+  (`removedUploadsNote`). `DELETE /api/uploads/<id>` removes one.
 - **Lead form**: public `GET/POST /api/lead/<token>` (api/_lib/leads.js) appends to
   `businesses.tracker`; `?exp=<id>&src=<channel>` tag the row; URL is inlined into Devin
   context as the CTA link.

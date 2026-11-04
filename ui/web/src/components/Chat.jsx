@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ask } from '../api.js';
+import { api, ask, post, toast } from '../api.js';
 import { canDictate, useDictation } from '../dictation.js';
+import { MAX_UPLOADS, UPLOAD_ACCEPT, UPLOAD_KINDS } from '../uploads.js';
 
 const STATUS = { pending: '○', in_progress: '◐', completed: '✓', failed: '✕' };
 // Machine-wide grants and bypass mode don't belong behind a one-click button.
 
-export default function Chat({ agent, agentName, placeholder = 'Reply to ' + agentName, empty }) {
+export default function Chat({ agent, agentName, placeholder = 'Reply to ' + agentName, empty, uploads, onUploadsChange }) {
   const [text, setText] = useState('');
   const scroller = useRef(null);
   const pinned = useRef(true);
@@ -44,7 +45,9 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
         {agent.busy && <div className="typing" aria-label={`${agentName} is working`}><span /><span /><span /></div>}
         {agent.dead && <button className="btn" onClick={agent.restart}>Restart {agentName}</button>}
       </div>
+      {uploads && <Files uploads={uploads} agentName={agentName} onChange={onUploadsChange} />}
       <form className="composer" onSubmit={submit}>
+        {uploads && <AttachButton uploads={uploads} agentName={agentName} onChange={onUploadsChange} />}
         <textarea
           ref={ta}
           rows={1}
@@ -65,6 +68,62 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
         <button className="btn primary" disabled={!text.trim() || agent.busy}>Send</button>
       </form>
     </div>
+  );
+}
+
+const sizeLabel = n => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+
+function AttachButton({ uploads, agentName, onChange }) {
+  const [working, setWorking] = useState('');
+  const input = useRef(null);
+  const pick = async e => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    let room = MAX_UPLOADS - uploads.length, added = 0;
+    for (const file of files) {
+      if (room <= 0) { toast(`You can keep up to ${MAX_UPLOADS} files. Remove one first.`); break; }
+      setWorking(file.name);
+      try {
+        const { extractUpload } = await import('../extract.js');
+        await post('/api/uploads', await extractUpload(file));
+        room--; added++;
+      } catch (err) { toast(err.message); }
+    }
+    setWorking('');
+    if (added) {
+      toast(`${added === 1 ? 'File' : `${added} files`} attached — ${agentName} reads ${added === 1 ? 'it' : 'them'} with your next message.`, 'ok');
+      onChange?.();
+    }
+  };
+  return (
+    <>
+      <input ref={input} type="file" accept={UPLOAD_ACCEPT} multiple hidden onChange={pick} />
+      <button type="button" className={'btn attach' + (working ? ' on' : '')} disabled={!!working}
+        aria-label={working ? `Reading ${working}` : `Attach a file for ${agentName} (PDF, Markdown, CSV or Excel)`}
+        title={working ? `Reading ${working}…` : 'Attach a PDF, Markdown, CSV or Excel file'}
+        onClick={() => input.current?.click()}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.3 3.3 0 0 1 4.7 4.7L10.2 17.7a1.7 1.7 0 0 1-2.4-2.4L15.5 7.6" /></svg>
+      </button>
+    </>
+  );
+}
+
+function Files({ uploads, agentName, onChange }) {
+  if (!uploads.length) return null;
+  const remove = async u => {
+    if (!await ask(`Remove ${u.name}? ${agentName} stops using it from your next message.`, 'Remove')) return;
+    try { await api(`/api/uploads/${u.id}`, { method: 'DELETE' }); onChange?.(); } catch (e) { toast(`Couldn’t remove ${u.name}: ${e.message}`); }
+  };
+  return (
+    <ul className="chat-files" aria-label={`Files ${agentName} can read`}>
+      {uploads.map(u => (
+        <li key={u.id} className="file-chip" title={`${UPLOAD_KINDS[u.kind] || u.kind} · ${sizeLabel(u.size)}${u.truncated ? ` · ${agentName} reads the first 40,000 characters` : ''}`}>
+          <span className="file-name">{u.name}</span>
+          {u.truncated && <span className="file-note">partial</span>}
+          <button type="button" aria-label={`Remove ${u.name}`} onClick={() => remove(u)}>×</button>
+        </li>
+      ))}
+    </ul>
   );
 }
 

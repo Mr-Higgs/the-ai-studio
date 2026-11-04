@@ -84,10 +84,11 @@ export async function activeBusiness(uid, db = admin()) {
 export async function businessState(uid) {
   const db = admin();
   const biz = await activeBusiness(uid);
-  const [{ data: docs }, { data: hist }, { data: sess }] = await Promise.all([
+  const [{ data: docs }, { data: hist }, { data: sess }, { data: uploads }] = await Promise.all([
     db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id),
     db.from('doc_history').select('id, kind, created_at').eq('user_id', uid).eq('business_id', biz.id).order('created_at', { ascending: false }),
     db.from('agent_sessions').select('scope, devin_status, devin_url, last_prompt_at').eq('user_id', uid).eq('business_id', biz.id),
+    db.from('uploads').select('id, name, kind, size, truncated, created_at').eq('user_id', uid).eq('business_id', biz.id).order('created_at'),
   ]);
   const docsOut = {}, history = {};
   for (const k of BUSINESS_DOCS) docsOut[k] = null;
@@ -103,6 +104,7 @@ export async function businessState(uid) {
     adInsights: biz.ad_insights || null,
     instagramInsights: biz.instagram_insights || null,
     visibilityAudit: biz.visibility_audit || null,
+    uploads: (uploads || []).map(u => ({ id: u.id, name: u.name, kind: u.kind, size: u.size, truncated: u.truncated, at: Date.parse(u.created_at) })),
     calendar: cal.items, calendarIssues: Math.max(cal.issues, biz.calendar_issues || 0), docs: docsOut, history,
     mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null, posts: biz.posts_updated_at ? Date.parse(biz.posts_updated_at) : null, visibilityAudit: biz.visibility_audit_updated_at ? Date.parse(biz.visibility_audit_updated_at) : null },
     site: siteRow?.devin_url ? { url: siteRow.devin_url, status: siteRow.devin_status, startedAt: siteRow.last_prompt_at } : null,

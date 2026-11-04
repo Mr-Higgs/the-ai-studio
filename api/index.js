@@ -7,13 +7,14 @@ import { enc, dec } from './_lib/secrets.js';
 import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusiness, snapshot, exportMarkdown, cleanCalendar, cleanExperiments, cleanPosts, BUSINESS_DOCS } from './_lib/business.js';
 import { devinCreds, devinClient } from './_lib/devin.js';
 import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
-import { contextParts, changedParts, partHashes, offerSkill, siteSkill, sessionPrompt, followUp, ownerText, applyStructuredOutput, STRUCTURED_SCHEMA, GROUNDING } from './_lib/prompts.js';
+import { contextParts, changedParts, removedUploadsNote, partHashes, offerSkill, siteSkill, sessionPrompt, followUp, ownerText, applyStructuredOutput, STRUCTURED_SCHEMA, GROUNDING } from './_lib/prompts.js';
 import { applyAdSpend, findInstagramAccounts, normalizeAccountId, NO_INSTAGRAM_ACCOUNT_MESSAGE, syncAds, syncInstagram, tryConnectInstagram } from './_lib/meta.js';
 import { leadToken, LEAD_TOKEN, cleanLead, appendLead, leadFormHtml } from './_lib/leads.js';
 import { INTAKE_MAX_BODY, cleanIntake } from './_lib/intake.js';
 import { pkce, randomState, redirectUri, registerClient, buildAuthorizeUrl, exchangeCode, refreshTokens, toStored, revoke, API_BASE } from './_lib/heygen-oauth.js';
 import * as google from './_lib/google-oauth.js';
 import { runAudit, SITE_CHECKS } from './_lib/audit.js';
+import { cleanUpload, MAX_UPLOADS, UPLOAD_ID } from '../ui/web/src/uploads.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
@@ -26,6 +27,7 @@ export function routeLabel(method, parts) {
   else if (mapped[1] === 'projects' && mapped[2]) mapped[2] = ':name';
   else if (mapped[1] === 'agent' && mapped[2]) mapped[2] = ':scope';
   else if (mapped[1] === 'business' && mapped[2] === 'history' && mapped[3]) mapped[3] = ':id';
+  else if (mapped[1] === 'uploads' && mapped[2]) mapped[2] = ':id';
   else if (mapped[1] === 'setup' && mapped[2] === 'integration' && mapped[3]) mapped[3] = ':id';
   return `${method} /${mapped.join('/')}`;
 }
@@ -320,22 +322,27 @@ const leadFormUrl = (req, token) => {
 };
 
 // Docs + business context for a new Devin session's first prompt.
+const uploadsFor = async (uid, bizId) => (await admin().from('uploads').select('id, name, kind, text, truncated').eq('user_id', uid).eq('business_id', bizId).order('created_at')).data || [];
 async function docContext(uid, biz, req) {
-  const { data: docs } = await admin().from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id);
+  const [{ data: docs }, uploads] = await Promise.all([
+    admin().from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id),
+    uploadsFor(uid, biz.id),
+  ]);
   const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-  const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, visibilityAudit: biz.visibility_audit || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) };
+  const b2 = { ...biz, uploads, calendar: biz.calendar, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, visibilityAudit: biz.visibility_audit || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) };
   const parts = contextParts(b2, docMap);
   return { docMap, b2, parts, ctx: parts.map(part => part.text).join('\n\n') };
 }
 
 async function latestContext(uid, bizId, req) {
   const db = admin();
-  const [{ data: biz }, { data: docs }] = await Promise.all([
+  const [{ data: biz }, { data: docs }, uploads] = await Promise.all([
     db.from('businesses').select('*').eq('user_id', uid).eq('id', bizId).maybeSingle(),
     db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', bizId),
+    uploadsFor(uid, bizId),
   ]);
   const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, visibilityAudit: biz.visibility_audit || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) } : null;
+  const contextBiz = biz ? { ...biz, uploads, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, visibilityAudit: biz.visibility_audit || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) } : null;
   return { biz: contextBiz, parts: contextBiz ? contextParts(contextBiz, docMap) : [] };
 }
 
@@ -633,6 +640,23 @@ export default async function handler(req, res) {
       return send(res, 200, { kind: data.kind, content: data.content });
     }
 
+    // ---- uploaded reference files (text extracted in the browser) ----
+    if (req.method === 'POST' && url.pathname === '/api/uploads') {
+      const { item, error } = cleanUpload(await readCapped(req, 512 * 1024));
+      if (error) return send(res, 400, { error });
+      const biz = await activeBusiness(uid);
+      const { count } = await db.from('uploads').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('business_id', biz.id);
+      if ((count || 0) >= MAX_UPLOADS) return send(res, 400, { error: `You can keep up to ${MAX_UPLOADS} files. Remove one first.` });
+      const { data, error: dbErr } = await db.from('uploads').insert({ user_id: uid, business_id: biz.id, ...item }).select('id, name, kind, size, truncated, created_at').single();
+      if (dbErr) throw Object.assign(new Error('Could not save that file. Try again in a moment.'), { status: 500 });
+      return send(res, 201, { upload: data });
+    }
+    if (req.method === 'DELETE' && parts[0] === 'api' && parts[1] === 'uploads' && parts.length === 3) {
+      if (!UPLOAD_ID.test(parts[2])) return send(res, 404, { error: 'not found' });
+      await db.from('uploads').delete().eq('user_id', uid).eq('id', parts[2]);
+      return send(res, 200, { ok: true });
+    }
+
     // ---- projects + storage ----
     if (req.method === 'GET' && url.pathname === '/api/projects') {
       const { data: projs } = await db.from('projects').select('name').eq('user_id', uid).order('created_at');
@@ -870,10 +894,11 @@ export default async function handler(req, res) {
           const hashes = partHashes(parts);
           const changed = changedParts(parts, row.context_hashes, { skip: snap === 'brain.md' ? ['brain'] : [] });
           const fresh = changed.length ? `Things changed in Studio since my last message. Use these versions from now on, replacing earlier ones:\n\n${changed.map(part => part.text).join('\n\n')}\n\n---\n\n` : '';
+          const removed = removedUploadsNote(parts, row.context_hashes);
           const skill = step === 'offer'
             ? `${offerSkill(file => fs.readFileSync(path.join(process.cwd(), '.devin/skills/grand-slam-offer', file), 'utf8'))}\n\n`
             : '';
-          await client.sendMessage(row.devin_session_id, followUp(`${skill}${fresh}`.trimEnd(), text.trim()));
+          await client.sendMessage(row.devin_session_id, followUp(`${skill}${fresh}${removed ? `${removed}\n\n` : ''}`.trimEnd(), text.trim()));
           await agentUpsert(uid, biz.id, scope, { devin_status: 'working', last_prompt_at: new Date().toISOString(), context_hashes: hashes });
         }
         return send(res, 202, { ok: true });
