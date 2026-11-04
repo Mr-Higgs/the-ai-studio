@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ask } from '../api.js';
+import { canDictate, useDictation } from '../dictation.js';
 
 const STATUS = { pending: '○', in_progress: '◐', completed: '✓', failed: '✕' };
 // Machine-wide grants and bypass mode don't belong behind a one-click button.
@@ -10,14 +11,18 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
   const [text, setText] = useState('');
   const scroller = useRef(null);
   const pinned = useRef(true);
+  const dict = useDictation(setText);
+  const ta = useRef(null);
   useEffect(() => {
     const el = scroller.current;
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
   }, [agent.items]);
+  useEffect(() => { const el = ta.current; if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }, [text]);
 
   const submit = e => {
     e.preventDefault();
     if (!text.trim() || agent.busy) return;
+    dict.stop(true);
     agent.send(text.trim());
     setText('');
   };
@@ -41,13 +46,22 @@ export default function Chat({ agent, agentName, placeholder = 'Reply to ' + age
       </div>
       <form className="composer" onSubmit={submit}>
         <textarea
+          ref={ta}
           rows={1}
           value={text}
-          placeholder={placeholder}
+          placeholder={dict.listening ? 'Listening… speak, then press Send' : placeholder}
           aria-label={`Message ${agentName}`}
-          onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+          onChange={e => { dict.stop(true); setText(e.target.value); }}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) submit(e); }}
         />
+        {canDictate && (
+          <button type="button" className={'btn mic' + (dict.listening ? ' on' : '')} aria-pressed={dict.listening}
+            aria-label={dict.listening ? 'Stop dictating' : 'Dictate instead of typing'}
+            title={dict.listening ? 'Stop dictating' : 'Dictate instead of typing (tap again if it stops)'}
+            onClick={() => (dict.listening ? dict.stop() : dict.start(text.trim() ? text.trimEnd() + ' ' : ''))}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+          </button>
+        )}
         <button className="btn primary" disabled={!text.trim() || agent.busy}>Send</button>
       </form>
     </div>

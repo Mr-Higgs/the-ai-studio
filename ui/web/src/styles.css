@@ -461,6 +461,9 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .typing span:nth-child(2) { animation-delay: .3s; } .typing span:nth-child(3) { animation-delay: .6s; }
 .composer { display: flex; gap: 8px; align-items: flex-end; padding: 12px; border-top: 1px solid var(--line); }
 .composer textarea { min-height: 42px; max-height: 160px; resize: none; }
+.btn.mic { padding: 0; width: 42px; height: 42px; flex: none; }
+.btn.mic svg { width: 18px; height: 18px; }
+.btn.mic.on { border-color: var(--accent); color: var(--accent); animation: pulse .9s infinite alternate; }
 @keyframes pulse { to { opacity: .3; } }
 
 /* ---------- setup ---------- */

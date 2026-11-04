@@ -106,7 +106,7 @@ export const CHAPTERS = [
       {
         heading: 'The three parts',
         image: img('09-anatomy.png', 'A step page: list on the left, questions and button in the middle, chat on the right', ['The list of steps (left)', 'The questions for this step (middle)', 'The big black “Write it with Devin” button', 'The chat box where you talk to Devin (right)', 'The “How to do this step” box: how long it takes and what done looks like']),
-        steps: ['**Left**: the list of all 11 steps (mark 1). Click any step name to open it. A tick ✓ means it is done.', '**Middle**: the questions (mark 2) and the big black button (mark 3). Your finished document appears below the button.', '**Right**: the chat (mark 4). Devin writes here. You type here. Press Enter to send.', 'Open **How to do this step** (mark 5) on any step to see how long it takes, why it matters and what “done” looks like.'],
+        steps: ['**Left**: the list of all 11 steps (mark 1). Click any step name to open it. A tick ✓ means it is done.', '**Middle**: the questions (mark 2) and the big black button (mark 3). Your finished document appears below the button.', '**Right**: the chat (mark 4). Devin writes here. You type here. Press Enter to send. Prefer talking? Click the microphone next to Send, speak, then press Send.', 'Open **How to do this step** (mark 5) on any step to see how long it takes, why it matters and what “done” looks like.'],
       },
       {
         heading: 'Your progress',
@@ -258,6 +258,7 @@ export const CHAPTERS = [
       ['“Devin is starting up” has been there for 5 minutes.', 'That happens sometimes. Wait another 2 minutes. If still nothing, click New conversation in the chat and press the big button again.'],
       ['The chat shows a red message or a “Restart Devin” button.', 'Click Restart Devin, then press the big button again. Your documents are safe.'],
       ['The document doesn’t sound like me.', 'Tell Devin in the chat. Paste something you wrote before: “Here is a post I wrote last year — rewrite it in this voice.”'],
+      ['The microphone button is missing or does nothing.', 'Dictation works in Chrome, Edge and Safari. If the browser asked to use your microphone and you said no, click the padlock next to the address and allow it, then try again.'],
       ['I want to start the whole document over.', 'Click “Change the answers and rewrite”, edit the answers, then click Rewrite with Devin. The old version is kept under Previous versions.'],
     ],
   },

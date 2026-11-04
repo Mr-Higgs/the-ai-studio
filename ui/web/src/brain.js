@@ -344,8 +344,10 @@ export function brainMath(raw, profile) {
     const f = id => num(it?.[id]?.v) ?? 0;
     const price = f('price');
     const purchases = f('materials') + f('other') + f('seasonal');
-    const losses = purchases * Math.min(Math.max(f('loss'), 0), 100) / 100;
-    const labor = f('hours') * (rate ?? 0);
+    const lossPct = Math.min(Math.max(f('loss'), 0), 100) / 100;
+    const losses = purchases * lossPct;
+    const laborHours = f('hours') * (1 + lossPct);
+    const labor = laborHours * (rate ?? 0);
     const at = p => {
       const cashLeft = p - purchases - losses;
       return { price: round(p), cashLeft: round(cashLeft), earnings: round(cashLeft - labor) };
@@ -357,10 +359,10 @@ export function brainMath(raw, profile) {
     if (f('hours') > 0 && rate == null) gaps.push('Hourly labor cost');
     const need = goal => (per > 0 && goal != null && !gaps.length ? Math.ceil(goal / per) : null);
     const breakEven = need(fixed), forTarget = need(fixed == null ? null : fixed + profitTarget);
-    const hoursFor = n => (n == null ? null : round(n * f('hours'), 1));
+    const hoursFor = n => (n == null ? null : round(n * laborHours, 1));
     const estimated = ITEM_FIELDS.filter(x => it?.[x.id]?.s && it[x.id].s !== 'known').map(x => x.label);
     return {
-      name: it?.name?.v || 'Unnamed', unit: it?.unit?.v || '', purchases: round(purchases), losses: round(losses), labor: round(labor),
+      name: it?.name?.v || 'Unnamed', unit: it?.unit?.v || '', purchases: round(purchases), losses: round(losses), loss: f('loss'), laborHours: round(laborHours, 2), labor: round(labor),
       ...full, discounted: disc, breakEven, forTarget,
       hoursBreakEven: hoursFor(breakEven), hoursTarget: hoursFor(forTarget),
       fits: capacity != null && forTarget != null ? forTarget <= capacity : null,
@@ -381,18 +383,24 @@ export function brainMath(raw, profile) {
   const monthCosts = monthParts.some(x => x == null) ? null : round(monthParts.reduce((t, x) => t + x, 0));
   const revenueMonth = A('revenueMonth');
   const monthLeft = revenueMonth != null && monthCosts != null ? round(revenueMonth - monthCosts) : null;
-  const earnedRate = monthLeft != null && hoursWeek ? round(monthLeft / (hoursWeek * 52 / 12)) : null;
+  const earnedRate = monthLeft != null && hoursWeek ? round(monthLeft / (hoursWeek * WORK_WEEKS / 12)) : null;
   const monthForGoal = monthCosts != null && payGoal != null ? round(monthCosts + payGoal / 12) : null;
   // Lifetime value: the owner's figure, else average sale × purchases a year × years.
   const avgSale = num(profile?.price), buys = A('buysPerYear'), years = A('years');
   const ltvCalc = avgSale != null && buys != null && years != null ? round(avgSale * buys * years) : null;
   const ltv = A('ltv') ?? ltvCalc;
+  // Lifetime profit needs one item with complete costs that earns at full price.
+  const marginItem = items.find(it => !it.gaps.length && it.earnings > 0) || null;
+  const margin = marginItem ? marginItem.earnings / marginItem.price : null;
+  const ltvProfit = ltv != null && margin != null ? round(ltv * margin) : null;
   return {
     rate, discount, weeks, overheadShare: round(overheadShare), campaignSpend: round(campaignSpend), fixed: round(fixed), profitTarget,
     free, capacity, upfront: A('upfront'), minEarn, items,
     hoursWeek, payGoal, goalRate, replaceRate: A('replaceRate'),
     revenueMonth, monthCosts, monthLeft, earnedRate, monthForGoal, newMonth: A('newMonth'),
-    ltvCac: ltv != null && cac ? round(ltv / cac, 1) : null, ltv, ltvCalculated: A('ltv') == null && ltvCalc != null, cac,
+    ltvProfit, ltvCac: ltvProfit != null && cac ? round(ltvProfit / cac, 1) : null,
+    margin: margin == null ? null : round(margin, 3), marginItem: marginItem?.name ?? null,
+    ltv, ltvCalculated: A('ltv') == null && ltvCalc != null, cac,
     missing,
   };
 }
@@ -402,17 +410,17 @@ export function growthTargets(raw, profile) {
   const math = brainMath(cleaned, profile);
   const item = math.items.find(candidate => !candidate.gaps.length && !candidate.notProfitable) || null;
   const perSale = item ? (item.discounted?.earnings ?? item.earnings) : null;
-  const maxCac = math.ltv != null ? round(math.ltv / 3) : perSale > 0 ? perSale : null;
+  const maxCac = math.ltvProfit != null ? round(math.ltvProfit / 3) : perSale > 0 ? perSale : null;
   const campaignSpend = num(answerOf(cleaned, profile, QBY.campaignSpend).v);
   const missing = [...math.missing];
-  if (math.ltv == null && !(perSale > 0)) missing.push('Lifetime value or profitable per-sale earnings');
+  if (math.ltvProfit == null && !(perSale > 0)) missing.push('Lifetime value or profitable per-sale earnings');
   if (campaignSpend == null) missing.push('Sprint budget');
   return {
     item: item?.name || null,
     breakEven: item?.breakEven ?? null,
     forTarget: item?.forTarget ?? null,
     maxCac,
-    maxCacBasis: math.ltv != null ? 'ltv' : perSale > 0 ? 'first-sale' : null,
+    maxCacBasis: math.ltvProfit != null ? 'ltv' : perSale > 0 ? 'first-sale' : null,
     budget: campaignSpend,
     missing: [...new Set(missing)],
   };
@@ -448,15 +456,15 @@ export function brainContext(raw, profile) {
     : `- Fixed costs to recover this campaign: ${money(m.fixed)} (${money(m.overheadShare)} share of overhead + ${money(m.campaignSpend)} campaign costs).`);
   if (m.capacity != null) calc.push(`- Free capacity: ${m.free}/week × ${m.weeks} weeks = ${m.capacity} sales/appointments.`);
   for (const it of m.items) {
-    calc.push(`- ${it.name}${it.unit ? ` (per ${it.unit})` : ''}: price ${money(it.price)}; cash left after purchases ${money(it.cashLeft)}; labor allowance ${money(it.labor)}; earnings after labor ${money(it.earnings)}.`
+    calc.push(`- ${it.name}${it.unit ? ` (per ${it.unit})` : ''}: price ${money(it.price)}; cash left after purchases ${money(it.cashLeft)}; labor allowance ${money(it.labor)}${it.loss > 0 ? ` (${it.laborHours} h incl. extra work)` : ''}; earnings after labor ${money(it.earnings)}.`
       + (it.discounted ? ` At the max ${m.discount}% discount: price ${money(it.discounted.price)}, earnings after labor ${money(it.discounted.earnings)}.` : '')
       + (it.gaps.length ? ` INCOMPLETE — blank: ${it.gaps.join(', ')}. The earnings above count those as $0, so they are an upper bound; don’t call this offer profitable until they’re filled in.` : '')
-      + (it.notProfitable ? ' NOT PROFITABLE at this price once labor is paid.' : ` Break-even: ${it.breakEven ?? 'not calculated yet'} sales; for the profit target: ${it.forTarget ?? 'not calculated yet'} sales${it.hoursTarget != null ? ` (${it.hoursTarget} labor hours)` : ''}${it.fits == null ? '' : it.fits ? ', fits capacity' : ', MORE THAN CAPACITY'}.`)
+      + (it.notProfitable ? ' NOT PROFITABLE at this price once labor is paid.' : ` Break-even: ${it.breakEven ?? 'not calculated yet'} sales; for the profit target: ${it.forTarget ?? 'not calculated yet'} sales${it.hoursTarget != null ? ` (${it.hoursTarget} labor hours)` : ''}${it.fits == null ? '' : it.fits ? ', fits capacity' : ', MORE THAN CAPACITY'}${m.discount || m.overheadShare ? ` (${[m.discount ? `at the max ${m.discount}% discount` : '', m.overheadShare ? 'counting the full overhead share, as if this were the only thing sold' : ''].filter(Boolean).join(', ')})` : ''}.`)
       + (it.belowMin ? ` Below the owner’s minimum earnings per sale (${money(m.minEarn)}).` : '')
       + (it.firstSale != null ? ` A first sale to a NEW customer, after the ${money(m.cac)} it costs to win them: ${money(it.firstSale)}${it.firstSaleLoses ? ' — LOSES MONEY; it only pays off through repeat purchases' : ''}.` : '')
       + (it.estimated.length ? ` Based on estimates for: ${it.estimated.join(', ')}.` : ''));
   }
-  if (m.ltv != null || m.cac != null) calc.push(`- Lifetime value ${money(m.ltv)}${m.ltvCalculated ? ' (calculated: average sale × purchases a year × years)' : ''} vs. cost to win a customer (CAC) ${money(m.cac)}${m.ltvCac != null ? `: LTV:CAC = ${m.ltvCac}` : ''}. CAC is the everyday figure; if the campaign costs above already pay for the ads, don’t subtract both.`);
+  if (m.ltv != null || m.cac != null) calc.push(`- Lifetime sales ${money(m.ltv)}${m.ltvCalculated ? ' (calculated: average sale × purchases a year × years)' : ''}${m.ltvProfit != null ? ` → lifetime profit ${money(m.ltvProfit)} at ${Math.round(m.margin * 100)}% earnings per sale on ${m.marginItem}` : m.ltv != null ? ' → lifetime profit unknown until one product’s costs are complete' : ''} vs. cost to win a customer (CAC) ${money(m.cac)}${m.ltvCac != null ? `: lifetime profit : CAC = ${m.ltvCac}` : ''}. CAC is the everyday figure; if the campaign costs above already pay for the ads, don’t subtract both.`);
   if (m.missing.length) calc.push(`- Missing for a reliable profit estimate: ${m.missing.join('; ')}. Any offer is provisional until these are confirmed — say so.`);
   out.push(...calc);
   return out.join('\n');

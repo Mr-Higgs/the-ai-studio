@@ -56,8 +56,9 @@ export function BusinessNumbers({ m }) {
     m.monthCosts != null && ['Monthly break-even', money(m.monthCosts), 'sales that cover staff, materials and running costs', ''],
     m.monthForGoal != null && ['Monthly sales to also pay you', money(m.monthForGoal), 'break-even + your pay goal ÷ 12', ''],
     m.monthLeft != null && ['Left for you in a typical month', money(m.monthLeft), m.earnedRate != null ? `about ${money(m.earnedRate)}/hour for your hours` : 'add your weekly hours to see it per hour', m.monthLeft > 0 && !(m.goalRate != null && m.earnedRate < m.goalRate) ? 'ok' : 'bad'],
-    m.ltv != null && ['Customer lifetime value', money(m.ltv), m.ltvCalculated ? 'average sale × purchases a year × years' : 'your figure', ''],
-    m.ltvCac != null && ['Lifetime value ÷ cost to win a customer', `${m.ltvCac}×`, '3× or more is healthy', m.ltvCac >= 3 ? 'ok' : 'bad'],
+    m.ltv != null && ['Customer lifetime sales', money(m.ltv), `${m.ltvCalculated ? 'average sale × purchases a year × years' : 'your figure'}${m.margin == null ? ' — add complete costs for one product to see profit' : ''}`, ''],
+    m.ltvProfit != null && ['Customer lifetime profit', money(m.ltvProfit), `lifetime sales × ${Math.round(m.margin * 100)}% earnings per sale on ${m.marginItem}`, ''],
+    m.ltvCac != null && ['Lifetime profit ÷ cost to win a customer', `${m.ltvCac}×`, '3× or more is healthy', m.ltvCac >= 3 ? 'ok' : 'bad'],
   ].filter(Boolean);
   if (!rows.length) return null;
   return (
@@ -79,12 +80,12 @@ function Numbers({ m }) {
           <dl>
             <dt>Price</dt><dd>{money(it.price)}</dd>
             <dt>Cash left after purchases</dt><dd>{money(it.cashLeft)}<small>after materials, fees, extras and {money(it.losses)} losses</small></dd>
-            <dt>Your pay for the work</dt><dd>{money(it.labor)}<small>{m.rate == null ? 'add your hourly rate' : `at ${money(m.rate)}/hour`}</small></dd>
+            <dt>Your pay for the work</dt><dd>{money(it.labor)}<small>{m.rate == null ? 'add your hourly rate' : `at ${money(m.rate)}/hour${it.loss > 0 ? `, incl. ${it.loss}% extra work` : ''}`}</small></dd>
             <dt>Earnings per sale</dt><dd className={it.earnings > 0 ? 'ok' : 'bad'}>{money(it.earnings)}<small>after paying yourself</small></dd>
             {it.discounted && <><dt>At your {m.discount}% max discount</dt><dd className={it.discounted.earnings > 0 ? 'ok' : 'bad'}>{money(it.discounted.earnings)}<small>price {money(it.discounted.price)}</small></dd></>}
-            <dt>Sales to break even</dt><dd>{it.breakEven ?? '—'}<small>{m.fixed == null ? 'needs the campaign length to include your overhead' : m.fixed ? `covers ${money(m.fixed)} of campaign + overhead costs` : 'no fixed costs entered'}{it.hoursBreakEven != null && ` · ${it.hoursBreakEven} h of work`}</small></dd>
-            {it.firstSale != null && <><dt>First sale to a new customer</dt><dd className={it.firstSale > 0 ? 'ok' : 'bad'}>{money(it.firstSale)}<small>after the {money(m.cac)} it costs to win them</small></dd></>}
-            {m.profitTarget > 0 && <><dt>Sales for your {money(m.profitTarget)} profit goal</dt><dd>{it.forTarget ?? '—'}<small>{it.hoursTarget != null && `${it.hoursTarget} h of work`}{it.cashForTarget != null && ` · ${money(it.cashForTarget)} in purchases`}</small></dd></>}
+            <dt>Sales to break even</dt><dd>{it.breakEven ?? '—'}<small>{m.fixed == null ? 'needs the campaign length to include your overhead' : m.fixed ? `${it.discounted ? `at your ${m.discount}% max discount; ` : ''}covers ${money(m.fixed)} of campaign + overhead costs${m.overheadShare ? ' — as if this were your only sales' : ''}` : 'no fixed costs entered'}{it.hoursBreakEven != null && ` · ${it.hoursBreakEven} h of work`}</small></dd>
+            {it.firstSale != null && <><dt>First sale to a new customer</dt><dd className={it.firstSale > 0 ? 'ok' : 'bad'}>{money(it.firstSale)}<small>after the {money(m.cac)} it costs to win them{it.discounted ? ', at max discount' : ''}</small></dd></>}
+            {m.profitTarget > 0 && <><dt>Sales for your {money(m.profitTarget)} profit goal</dt><dd>{it.forTarget ?? '—'}<small>{it.discounted ? `at your ${m.discount}% max discount; ` : ''}{it.hoursTarget != null && `${it.hoursTarget} h of work`}{it.cashForTarget != null && ` · ${money(it.cashForTarget)} in purchases`}{m.overheadShare ? ' · as if this were your only sales' : ''}</small></dd></>}
           </dl>
           <ul className="flags">
             {it.notProfitable && <li className="bad">At this price you lose money on every sale once you’re paid for your time.</li>}

@@ -118,6 +118,12 @@ export function applyStructuredOutput(so) {
 }
 export const hashOf = files => crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex');
 
+const REQUEST_MARK = '\n\nMy request: ';
 export function sessionPrompt(ctx, text, { skill, extra } = {}) {
-  return [skill, ctx, GROUNDING, OUTPUT_CONTRACT, extra, `My request: ${text}`].filter(Boolean).join('\n\n');
+  return [skill, ctx, GROUNDING, OUTPUT_CONTRACT, extra].filter(Boolean).join('\n\n') + REQUEST_MARK + text;
 }
+// Follow-up message: injected skill/context first, the owner's words after the mark.
+export const followUp = (prefix, text) => (prefix ? prefix + REQUEST_MARK + text : text);
+// What the owner actually typed, for showing the chat back to them.
+// ponytail: lastIndexOf, so a doc containing the mark can't leak; only the owner typing it literally would truncate.
+export const ownerText = msg => { const i = (msg || '').lastIndexOf(REQUEST_MARK); return i < 0 ? msg : msg.slice(i + REQUEST_MARK.length); };

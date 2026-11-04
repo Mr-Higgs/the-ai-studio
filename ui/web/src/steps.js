@@ -30,7 +30,7 @@ const dollars = value => `$${Number(value).toLocaleString('en-US', { maximumFrac
 export const targetSummary = targets => [
   targets.breakEven != null && targets.item ? `break-even: ${targets.breakEven} sales of ${targets.item}` : null,
   targets.forTarget != null && targets.item ? `${targets.forTarget} sales for the goal` : null,
-  targets.maxCac != null ? `max cost to win a customer: ${dollars(targets.maxCac)} (${targets.maxCacBasis === 'ltv' ? 'LTV ÷ 3' : 'discount-adjusted first-sale earnings'})` : null,
+  targets.maxCac != null ? `max cost to win a customer: ${dollars(targets.maxCac)} (${targets.maxCacBasis === 'ltv' ? 'lifetime profit ÷ 3' : 'discount-adjusted first-sale earnings'})` : null,
   targets.budget != null ? `budget ${dollars(targets.budget)}` : null,
 ].filter(Boolean).join('; ');
 

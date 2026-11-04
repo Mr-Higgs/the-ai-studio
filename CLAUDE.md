@@ -4,7 +4,7 @@ Templated workflow. A hosted web app that walks a small business owner through a
 sprint; Devin (cloud API) writes each step's documents. This file is the architecture map.
 
 ## Stack
-- **UI**: Vite + React in `ui/web/` → built to `ui/dist`, deployed on Vercel.
+- **UI**: Vite + React in `ui/web/` → built to `ui/dist`, deployed on Vercel. Chat dictation is the browser Web Speech API (`ui/web/src/dictation.js`), client-only — no server or keys.
 - **API**: one Vercel Node function, `api/index.js` — a stdlib-style router dispatching on
   `req.url` parts. Helpers in `api/_lib/`: `supabase.js` (service-role client + Bearer
   `userFromReq`), `secrets.js` (AES-256-GCM `enc`/`dec` for user API keys under

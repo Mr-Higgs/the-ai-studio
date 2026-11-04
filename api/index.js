@@ -7,7 +7,7 @@ import { enc, dec } from './_lib/secrets.js';
 import { activeBusiness, businessState, listBusinesses, switchBusiness, newBusiness, snapshot, exportMarkdown, cleanCalendar, cleanExperiments, cleanPosts, BUSINESS_DOCS } from './_lib/business.js';
 import { devinCreds, devinClient } from './_lib/devin.js';
 import { cleanBrain, mergeDevinAnswers } from '../ui/web/src/brain.js';
-import { contextParts, changedParts, partHashes, offerSkill, siteSkill, sessionPrompt, applyStructuredOutput, STRUCTURED_SCHEMA, GROUNDING } from './_lib/prompts.js';
+import { contextParts, changedParts, partHashes, offerSkill, siteSkill, sessionPrompt, followUp, ownerText, applyStructuredOutput, STRUCTURED_SCHEMA, GROUNDING } from './_lib/prompts.js';
 import { applyAdSpend, findInstagramAccounts, normalizeAccountId, NO_INSTAGRAM_ACCOUNT_MESSAGE, syncAds, syncInstagram, tryConnectInstagram } from './_lib/meta.js';
 import { leadToken, LEAD_TOKEN, cleanLead, appendLead, leadFormHtml } from './_lib/leads.js';
 import { INTAKE_MAX_BODY, cleanIntake } from './_lib/intake.js';
@@ -829,7 +829,7 @@ export default async function handler(req, res) {
           const skill = step === 'offer'
             ? `${offerSkill(file => fs.readFileSync(path.join(process.cwd(), '.devin/skills/grand-slam-offer', file), 'utf8'))}\n\n`
             : '';
-          await client.sendMessage(row.devin_session_id, `${skill}${fresh}${text.trim()}`);
+          await client.sendMessage(row.devin_session_id, followUp(`${skill}${fresh}`.trimEnd(), text.trim()));
           await agentUpsert(uid, biz.id, scope, { devin_status: 'working', last_prompt_at: new Date().toISOString(), context_hashes: hashes });
         }
         return send(res, 202, { ok: true });
@@ -840,7 +840,7 @@ export default async function handler(req, res) {
         const [s, msgs] = await Promise.all([client.getSession(row.devin_session_id), client.getMessages(row.devin_session_id)]);
         const status = s.status_enum || s.status;
         const cursor = url.searchParams.get('cursor');
-        const items = (msgs.items || []).map(m => ({ id: m.event_id, kind: m.source === 'user' ? 'user' : 'agent', text: m.message, at: m.created_at }));
+        const items = (msgs.items || []).map(m => ({ id: m.event_id, kind: m.source === 'user' ? 'user' : 'agent', text: m.source === 'user' ? ownerText(m.message) : m.message, at: m.created_at }));
         const seen = cursor ? items.findIndex(m => m.id === cursor) : -1;
         const messages = seen >= 0 ? items.slice(seen + 1) : items;
         const res2 = await applyOutput(uid, biz, row, s);

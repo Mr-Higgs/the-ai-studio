@@ -20,15 +20,17 @@ test('brainMath: earnings, discount, break-even, capacity', () => {
   const it = m.items[0];
   assert.equal(it.purchases, 12);
   assert.equal(it.losses, 1.2);
+  assert.equal(it.laborHours, 0.55); // 0.5h + 10% extra work
   assert.equal(it.cashLeft, 26.8);   // 40 - 12 - 1.2
-  assert.equal(it.labor, 10);        // 0.5h × $20
-  assert.equal(it.earnings, 16.8);   // cash left minus owner pay
-  assert.equal(it.discounted.earnings, 12.8); // at $36
+  assert.equal(it.labor, 11);        // 0.55h × $20
+  assert.equal(it.earnings, 15.8);   // cash left minus owner pay
+  assert.equal(it.discounted.earnings, 11.8); // at $36
   assert.equal(m.free, 20);
   assert.equal(m.capacity, 80);
   assert.ok(Math.abs(m.fixed - (433 * (4 / (52 / 12)) + 100)) < 0.01);
-  assert.equal(it.breakEven, Math.ceil(m.fixed / 12.8));
-  assert.equal(it.forTarget, Math.ceil((m.fixed + 500) / 12.8));
+  assert.equal(it.breakEven, Math.ceil(m.fixed / 11.8));
+  assert.equal(it.forTarget, Math.ceil((m.fixed + 500) / 11.8));
+  assert.equal(it.hoursBreakEven, Math.round(it.breakEven * 0.55 * 10) / 10);
   assert.equal(it.fits, it.forTarget <= 80);
   assert.deepEqual(it.estimated, ['Losses / extra work (% of costs)']);
 });
@@ -46,7 +48,7 @@ test('growthTargets uses LTV for CAC cap and preserves the available target item
     items: [{ name: a('Candle box'), price: a('40'), materials: a('10'), hours: a('0'), other: a('0') }],
   }, {});
   assert.equal(result.item, 'Candle box');
-  assert.equal(result.maxCac, 40);
+  assert.equal(result.maxCac, 30); // 120 × 0.75 ÷ 3
   assert.equal(result.maxCacBasis, 'ltv');
   assert.equal(result.budget, 200);
 });
@@ -139,23 +141,54 @@ test('cleanBrain drops malformed data instead of breaking reads', () => {
 
 test('profile time, monthly costs and customer numbers feed the math', () => {
   const profile = { price: '$40', hoursWeek: '40', payGoal: '48000', rate: '20', revenueMonth: '6000', laborMonth: '0', materialsMonth: '1500', overhead: '500', cac: '30', buysPerYear: '3', years: '2' };
-  const m = brainMath({ items: [{ name: a('Box'), price: a('40'), materials: a('10'), hours: a('0.5'), other: a('2') }] }, profile);
+  const raw = { items: [{ name: a('Box'), price: a('40'), materials: a('10'), hours: a('0.5'), other: a('2') }] };
+  const m = brainMath(raw, profile);
   assert.equal(m.rate, 20);                 // read from the profile now
   assert.equal(m.goalRate, 25);             // 48000 / (40 × 48)
   assert.equal(m.monthCosts, 2000);
   assert.equal(m.monthLeft, 4000);
-  assert.equal(m.earnedRate, Math.round(4000 / (40 * 52 / 12) * 100) / 100);
+  assert.equal(m.earnedRate, 25);           // 4000 / (40 × 48 / 12)
+  assert.equal(m.earnedRate, m.goalRate);
   assert.equal(m.monthForGoal, 6000);
   assert.equal(m.ltv, 240);                 // $40 × 3 × 2
   assert.equal(m.ltvCalculated, true);
-  assert.equal(m.ltvCac, 8);
+  assert.equal(m.margin, 0.45);             // 18 earnings ÷ $40 on Box
+  assert.equal(m.marginItem, 'Box');
+  assert.equal(m.ltvProfit, 108);           // 240 × 0.45
+  assert.equal(m.ltvCac, 3.6);
   assert.equal(m.items[0].earnings, 18);    // 40 - 12 - 10
   assert.equal(m.items[0].firstSale, -12);  // minus $30 CAC
   assert.equal(m.items[0].firstSaleLoses, true);
-  const c = brainContext({}, profile);
+  const c = brainContext(raw, profile);
   assert.match(c, /works out to \$25\/hour — more than the \$20\/hour labor allowance/);
   assert.match(c, /Monthly break-even is \$2,000/);
-  assert.match(c, /LTV:CAC = 8/);
+  assert.match(c, /lifetime profit \$108 at 45% earnings per sale on Box/);
+  assert.match(c, /lifetime profit : CAC = 3\.6/);
+  assert.match(c, /about \$25\/hour/);
+});
+
+test('lifetime profit needs one complete, profitable item', () => {
+  const raw = { answers: { ltv: a('240'), cac: a('30') }, items: [{ name: a('Box'), price: a('40') }] };
+  const m = brainMath(raw, {});
+  assert.equal(m.ltv, 240);
+  assert.equal(m.margin, null);
+  assert.equal(m.ltvProfit, null);
+  assert.equal(m.ltvCac, null);
+  const t = growthTargets(raw, {});
+  assert.equal(t.maxCac, null);
+  assert.equal(t.maxCacBasis, null);
+  assert.ok(t.missing.includes('Lifetime value or profitable per-sale earnings'));
+  assert.match(brainContext(raw, {}), /lifetime profit unknown/);
+});
+
+test('worst-case assumptions are labeled', () => {
+  const c = brainContext(brain, { name: 'Juniper' });
+  assert.match(c, /at the max 10% discount/);
+  assert.match(c, /only thing sold/);
+  assert.match(c, /0\.55 h incl\. extra work/);
+  const c2 = brainContext({ answers: { rate: a('20'), weeks: a('4'), overhead: a('433') }, items: [{ price: a('40'), materials: a('10'), hours: a('0'), other: a('0') }] }, {});
+  assert.match(c2, /only thing sold/);
+  assert.doesNotMatch(c2, /discount/);
 });
 
 test('blank monthly costs stay unknown; old Brain answers carry into the profile', () => {
