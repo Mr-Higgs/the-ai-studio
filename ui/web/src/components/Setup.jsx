@@ -184,9 +184,10 @@ function HeyGenRow({ item, recheck }) {
 function GoogleRow({ item, recheck }) {
   const [state, setState] = useState('');
   const [busy, setBusy] = useState(false);
+  const audit = () => post('/api/visibility/audit', {}).then(() => recheck(), () => {});
   const connect = async () => {
     setBusy(true); setState('');
-    try { await connectGoogle(recheck); } catch (err) { setState(err.message); }
+    try { await connectGoogle(recheck); audit(); } catch (err) { setState(err.message); }
     setBusy(false);
   };
   const disconnect = async () => {
@@ -201,7 +202,7 @@ function GoogleRow({ item, recheck }) {
   };
   const pick = async name => {
     setState('');
-    try { await post('/api/google/location', { name }); await recheck(); } catch (err) { setState(err.message); }
+    try { await post('/api/google/location', { name }); await recheck(); audit(); } catch (err) { setState(err.message); }
   };
   const account = item.account;
   if (!item.available) return <>
@@ -234,6 +235,11 @@ function GoogleRow({ item, recheck }) {
     {!account?.pending && account && !account.locations?.length && (
       <p className="hint">No Business Profile found on this Google account. Sign in with the account that manages your listing.</p>
     )}
+    {item.audit && <span className="hint">Can people find you? {item.audit.score} of {item.audit.total} checks pass · <a href="#visibility">see what to fix</a></span>}
+    {account && !account.pending && !account.searchConsole && <>
+      <span className="hint">Reconnect to also let Studio set up Google Search Console for you.</span>
+      <button className="btn ghost" disabled={busy} onClick={connect}>{busy ? 'Connecting…' : 'Reconnect'}</button>
+    </>}
     <button className="btn ghost" disabled={busy} onClick={disconnect}>{busy ? 'Working…' : 'Disconnect'}</button>
     {state && <p className="msg err" role="alert">{state}</p>}
   </>;

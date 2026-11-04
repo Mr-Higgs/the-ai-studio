@@ -102,8 +102,9 @@ export async function businessState(uid) {
     posts: cleanPosts(biz.posts).items || [],
     adInsights: biz.ad_insights || null,
     instagramInsights: biz.instagram_insights || null,
+    visibilityAudit: biz.visibility_audit || null,
     calendar: cal.items, calendarIssues: Math.max(cal.issues, biz.calendar_issues || 0), docs: docsOut, history,
-    mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null, posts: biz.posts_updated_at ? Date.parse(biz.posts_updated_at) : null },
+    mtimes: { profile: mt('profile'), calendar: mt('calendar'), tracker: mt('tracker'), brain: biz.brain_updated_at ? Date.parse(biz.brain_updated_at) : null, posts: biz.posts_updated_at ? Date.parse(biz.posts_updated_at) : null, visibilityAudit: biz.visibility_audit_updated_at ? Date.parse(biz.visibility_audit_updated_at) : null },
     site: siteRow?.devin_url ? { url: siteRow.devin_url, status: siteRow.devin_status, startedAt: siteRow.last_prompt_at } : null,
     agent: 'devin', busy: (sess || []).some(s => s.devin_status === 'working' && s.scope !== 'site'),
   };

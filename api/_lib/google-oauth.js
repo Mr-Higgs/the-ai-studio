@@ -11,7 +11,9 @@ export const configured = () => !!(CLIENT_ID && CLIENT_SECRET);
 export const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 export const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
-export const SCOPE = 'openid email https://www.googleapis.com/auth/business.manage';
+export const SCOPE = 'openid email https://www.googleapis.com/auth/business.manage https://www.googleapis.com/auth/webmasters';
+// True when the stored grant already includes Search Console (older connections don't).
+export const hasSearchConsole = stored => /auth\/webmasters/.test(stored?.scope || '');
 
 export const redirectUri = req => `${publicOrigin(req)}/api/google/oauth/callback`;
 

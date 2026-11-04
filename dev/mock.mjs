@@ -466,11 +466,35 @@ const INTEGRATIONS = {
   firecrawl: { name: 'Firecrawl', marketplace: 'Firecrawl', why: 'Lets Devin read competitor websites for positioning research.' },
   google_maps: { name: 'Google Maps', marketplace: 'Google Maps', why: 'Lets Devin look up local competitors, ratings and review themes near you.' },
 };
+// Same shape api/_lib/audit.js runAudit returns — mixed fail/warn/pass/skip for the panel.
+const VISIBILITY_AUDIT = checkedAt => ({
+  score: 8, total: 12, checkedAt, siteUrl: 'https://maplestreetauto.example.com',
+  checks: [
+    { id: 'site_reachable', title: 'Your website loads', status: 'pass', detail: 'Your home page loads fine.', fix: '' },
+    { id: 'canonical_host', title: 'Your site has one official address', status: 'warn', detail: 'Your site works at one address, but it doesn’t mark one official address for Google (a “canonical” tag).', fix: 'Ask your website tool or developer to add a canonical link tag to the home page — it tells Google which address is the official one.' },
+    { id: 'robots_allows', title: 'Google is allowed to read your site', status: 'fail', detail: 'Your robots.txt file tells Google not to read your whole site.', fix: 'Remove the “Disallow: /” line from robots.txt so Google can read your pages.' },
+    { id: 'sitemap', title: 'Your site has a page map for Google', status: 'pass', detail: 'Your page map (sitemap) lists pages for Google to read.', fix: '' },
+    { id: 'title_h1', title: 'Your home page has a clear title and headline', status: 'pass', detail: 'Your title and headline are clear and the right length.', fix: '' },
+    { id: 'schema_local', title: 'Your site describes your business to Google', status: 'pass', detail: 'Your site labels your name, phone, address and hours for Google.', fix: '' },
+    { id: 'nap_phone', title: 'Your phone number is on your site', status: 'fail', detail: 'Your phone number is on your site but isn’t a tap-to-call link.', fix: 'Make the phone number a “tel:” link so visitors on phones can tap to call.' },
+    { id: 'nap_address', title: 'Your address is on your site', status: 'skip', detail: 'No address on your Google listing to compare against.', fix: '' },
+    { id: 'gbp_website', title: 'Google links your listing to your website', status: 'pass', detail: 'Your Google listing links to your website.', fix: '' },
+    { id: 'gbp_category', title: 'Your Google listing has a category', status: 'pass', detail: 'Your listing’s category is “Auto repair shop”.', fix: '' },
+    { id: 'gbp_description', title: 'Your Google listing describes what you do', status: 'warn', detail: 'Your listing description is only 140 characters — thin for Google and customers.', fix: 'Expand your Google Business Profile description to at least 250 characters: what you do, where, and what you’re known for.' },
+    { id: 'gbp_hours', title: 'Your Google listing shows your hours', status: 'pass', detail: 'Your listing shows opening hours.', fix: '' },
+    { id: 'llms_txt', title: 'AI assistants can read your site', status: 'pass', detail: 'Your site has an llms.txt file that helps AI assistants describe you.', fix: '' },
+  ],
+});
+// The audit only exists once Google is connected (UI triggers it after connect/pick).
+const visibilityAudit = () => (stage.google && !stage.google.availableOnly && !stage.google.pending)
+  ? VISIBILITY_AUDIT(new Date(Date.now() - 26 * 3600e3).toISOString())
+  : null;
+
 const healthItems = () => [
   { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: !!stage.devin, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
   ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: false })),
   { id: 'heygen', group: 'optional', name: 'HeyGen', why: 'Makes avatar videos from your scripts and imports them. Connect your HeyGen account to use your plan credits.', ok: !!stage.heygen, oauth: !!stage.heygen, apiKey: false, account: stage.heygen ? { email: 'maria@maplestreetauto.example.com' } : null, key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
-  { id: 'google_business', group: 'optional', name: 'Google Business Profile', why: 'Studio reads your listing — exact name, address, phone, hours and categories — so every document and your website match Google word for word.', ok: !!stage.google && !stage.google.availableOnly, oauth: !!stage.google && !stage.google.availableOnly, available: !!stage.google, account: stage.google && !stage.google.availableOnly ? stage.google : null, link: 'https://business.google.com/' },
+  { id: 'google_business', group: 'optional', name: 'Google Business Profile', why: 'Studio reads your listing — exact name, address, phone, hours and categories — so every document and your website match Google word for word.', ok: !!stage.google && !stage.google.availableOnly, oauth: !!stage.google && !stage.google.availableOnly, available: !!stage.google, account: stage.google && !stage.google.availableOnly ? stage.google : null, audit: visibilityAudit() ? { score: visibilityAudit().score, total: visibilityAudit().total } : null, link: 'https://business.google.com/' },
   { id: 'meta_api', group: 'optional', name: 'Meta ad results', why: 'Studio reads spend, clicks and leads from your Meta ad account. Read-only.', ok: false, meta: true, instagram: null },
 ];
 
@@ -491,6 +515,7 @@ function businessState() {
     experiments: done('strategy') ? experiments : [],
     posts: done('content') ? posts : [],
     adInsights: null, instagramInsights: null,
+    visibilityAudit: visibilityAudit(),
     calendar: done('calendar') ? calendar : null,
     calendarIssues: 0,
     docs,
@@ -501,6 +526,7 @@ function businessState() {
       tracker: done('tracker') ? mt(6) : null,
       brain: stage.brain ? mt(66) : null,
       posts: done('content') ? mt(30) : null,
+      visibilityAudit: visibilityAudit() ? Date.parse(visibilityAudit().checkedAt) : null,
     },
     site: stage.site,
     agent: 'devin', busy: !!stage.busy,
@@ -694,6 +720,16 @@ http.createServer(async (req, res) => {
       stage.google = { email: USER.email, locations: [{ name: 'accounts/1/locations/1', title: 'Maple Street Auto Repair', address: '1234 Maple St SE, Decatur, GA 30030' }], location: 'accounts/1/locations/1', pending: false };
       res.writeHead(200, { 'Content-Type': 'text/html' });
       return res.end('<!doctype html><p>Google Business Profile connected. You can close this tab.</p><script>try{window.opener&&window.opener.postMessage({type:"google-connected"},"*")}catch(e){};setTimeout(()=>window.close(),800)</script>');
+    }
+    if (req.method === 'POST' && url.pathname === '/api/site/fix') {
+      await readBody(req);
+      if (!stage.site) return json(res, 400, { error: 'No website to fix yet.' });
+      return json(res, 200, { url: 'https://app.devin.ai/sessions/mock' });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/visibility/audit') {
+      await readBody(req);
+      if (!stage.google) return json(res, 400, { error: 'Connect Google Business Profile in Setup first.' });
+      return json(res, 200, VISIBILITY_AUDIT(new Date().toISOString()));
     }
     if (req.method === 'POST' && parts[1] === 'agent' && parts[3] === 'new') return json(res, 200, { ok: true });
     if (req.method === 'POST' && parts[1] === 'agent' && parts[3] === 'prompt') { await readBody(req); return json(res, 202, { ok: true }); }

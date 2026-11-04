@@ -648,9 +648,24 @@ details.tool pre { font: 11.5px/1.45 var(--mono); background: var(--frost); padd
 .instagram-post > a { font-weight: 600; }
 .instagram-post p { margin: 6px 0 0; }
 .instagram-post-numbers { font-size: 13px; }
+.visibility-panel { min-width: 0; margin: 20px 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); }
+.visibility-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.visibility-head h2 { margin: 0; }
+.visibility-head .hint { margin: 4px 0 0; }
+.visibility-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 12px; }
+.visibility-item { display: flex; gap: 10px; align-items: flex-start; }
+.visibility-item .dot { flex: none; margin-top: 5px; }
+.visibility-item p { margin: 2px 0 0; }
+.visibility-item > div { flex: 1; min-width: 0; }
+.visibility-act { margin-left: auto; flex: none; }
+.visibility-actions { display: flex; gap: 8px; }
+.dot.status-pass { background: var(--ok); } .dot.status-fail { background: var(--bad); } .dot.status-warn { background: #e0a43a; } .dot.status-skip { background: var(--muted); }
+.visibility-good { margin-top: 12px; }
 @media (max-width: 520px) {
-  .instagram-panel { padding: 12px; }
+  .instagram-panel, .visibility-panel { padding: 12px; }
   .instagram-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .visibility-item { flex-wrap: wrap; }
+  .visibility-act { margin-left: 0; flex-basis: 100%; }
 }
 
 /* Landing (signed-out front page) */

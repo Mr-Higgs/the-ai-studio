@@ -10,6 +10,7 @@ export function contextParts(biz, docs) {
   const brain = brainContext(biz.brain, biz.profile);
   if (brain) out.push({ key: 'brain', text: brain });
   if (biz.gbp) out.push({ key: 'gbp', text: `Google Business Profile (read by Studio from the owner's connected Google account — the name, address, phone, hours, categories, description and links below are authoritative; every document and the website must use them character-for-character, and say so if the profile disagrees with the Business Brain): ${JSON.stringify(biz.gbp)}` });
+  if (biz.visibilityAudit) out.push({ key: 'audit', text: `Local visibility health check (run by Studio against the live website and Google listing on ${biz.visibilityAudit.checkedAt || 'unknown date'}; authoritative — do not re-fetch to contradict it, build on it): ${JSON.stringify(biz.visibilityAudit)}` });
   if (biz.inputs && Object.keys(biz.inputs).length) out.push({ key: 'inputs', text: `Step answers (JSON): ${JSON.stringify(biz.inputs)}` });
   if (biz.leadFormUrl) out.push({ key: 'leadForm', text: `Website lead form (use this URL wherever a call-to-action needs a link, instead of [link]): ${biz.leadFormUrl}` });
   if (biz.tracker?.length) out.push({ key: 'tracker', text: `Lead tracker (JSON): ${cut(JSON.stringify(biz.tracker))}` });

@@ -190,10 +190,10 @@ Create my local visibility plan for ${v.planFor}: how people nearby find me on G
 My website: ${biz?.profile?.website || '(none given)'}
 ${answers(i, s.inputs)}
 
-How to research — follow these rules exactly: use ONLY your built-in web search and web fetch tools; fetch my website’s home page and up to 5 service or contact pages, and search for my competitors and my business name. No shell, scripts, curl or logins. If a fetch is blocked, say so and work from search snippets. Label anything you couldn’t verify.
+How to research — follow these rules exactly: use ONLY your built-in web search and web fetch tools; fetch my website’s home page only for items the health check doesn’t cover, and up to 5 service or contact pages, and search for my competitors and my business name. No shell, scripts, curl or logins. If a fetch is blocked, say so and work from search snippets. Label anything you couldn’t verify.
 
 Write visibility.md with these sections, in this order:
-1. Website audit — for each page fetched: title tag, H1, whether it has a clear service description, phone number with click-to-call, address matching my Google listing, and a call to action. Then the fixes, each with the exact replacement text.
+1. Website audit — start from Studio's health check in the context if present (list each failing or warning item with the exact fix text the owner can paste; say which items pass); then for each page fetched: title tag, H1, whether it has a clear service description, phone number with click-to-call, address matching my Google listing, and a call to action. Then the fixes, each with the exact replacement text.
 2. Google Business Profile — the primary and secondary categories to set, the services list, attributes, a photo plan (what to shoot, how many), 3 Q&A entries to seed, 4 ${v.adj}posts ready to paste, and 2 review-reply templates (one for 5 stars, one for a complaint).
 3. Search phrases → pages — 10–20 local-intent phrases grouped by service (use the customers’ words from my research above), each with the page it belongs on and the written title tag (under 60 characters), meta description (under 155) and H1.
 4. Competitors on the map — for up to 3 competitors (mine above, else the closest you find): rating, review count, categories, what they seem to rank for, and one thing I can do better. Say when a figure comes from search snippets.

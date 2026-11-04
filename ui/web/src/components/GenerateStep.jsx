@@ -7,6 +7,7 @@ import { SPRINT, SPRINTS, STEPS, phaseOf, targetSummary } from '../steps.js';
 import { growthTargets } from '../brain.js';
 import Experiments from './Experiments.jsx';
 import InstagramPanel from './InstagramPanel.jsx';
+import VisibilityPanel from './VisibilityPanel.jsx';
 
 export function StepHead({ step, ctx, children }) {
   return (
@@ -108,7 +109,7 @@ export function Fields({ fields, values, onChange, after }) {
   });
 }
 
-const ago = ms => {
+export const ago = ms => {
   const m = Math.round((Date.now() - ms) / 60000);
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
@@ -190,6 +191,7 @@ export default function GenerateStep({ step, ...ctx }) {
           <Calendar items={biz.calendar} experiments={biz.experiments || []} projects={ctx.projects || []} refresh={refresh} />
         </>
       )}
+      {step.id === 'visibility' && <VisibilityPanel audit={biz.visibilityAudit} docMtime={doc?.mtime} refresh={refresh} site={biz.site} agent={agent} agentName={agentName} send={p => generate(step, p)} />}
       {doc && (
         <article className="doc">
           <div className="doc-bar">

@@ -12,6 +12,7 @@ test('buildAuthorizeUrl requests offline access and the business.manage scope', 
   assert.equal(u.searchParams.get('prompt'), 'consent');
   assert.equal(u.searchParams.get('include_granted_scopes'), 'true');
   assert.ok((u.searchParams.get('scope') || '').includes('https://www.googleapis.com/auth/business.manage'));
+  assert.ok((u.searchParams.get('scope') || '').includes('https://www.googleapis.com/auth/webmasters'));
 });
 
 test('toStored keeps previous refresh token, account and locations', () => {

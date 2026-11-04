@@ -13,6 +13,7 @@ import { leadToken, LEAD_TOKEN, cleanLead, appendLead, leadFormHtml } from './_l
 import { INTAKE_MAX_BODY, cleanIntake } from './_lib/intake.js';
 import { pkce, randomState, redirectUri, registerClient, buildAuthorizeUrl, exchangeCode, refreshTokens, toStored, revoke, API_BASE } from './_lib/heygen-oauth.js';
 import * as google from './_lib/google-oauth.js';
+import { runAudit, SITE_CHECKS } from './_lib/audit.js';
 
 export const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const validProject = name => SLUG.test(name) && name !== '_template';
@@ -91,6 +92,7 @@ const googleAccount = s => {
       locations: (stored.locations || []).map(l => ({ name: l.name, title: l.title, address: l.address })),
       location: stored.location?.name || null,
       pending: !!stored.pending_approval,
+      searchConsole: google.hasSearchConsole(stored),
     };
   } catch { return null; }
 };
@@ -187,6 +189,18 @@ export function integrationNotes(on) {
   const lines = Object.entries(INTEGRATIONS).filter(([id]) => on?.[id]).map(([, i]) => i.prompt);
   return lines.length ? `Connected tools:\n- ${lines.join('\n- ')}` : null;
 }
+// Deterministic visibility check against the live website + stored Google listing.
+async function runVisibilityAudit(uid) {
+  const biz = await activeBusiness(uid);
+  const gbp = await gbpFor(uid);
+  const audit = await runAudit({ siteUrl: biz.profile?.website || gbp?.website, gbp, profile: biz.profile });
+  await admin().from('businesses').update({
+    visibility_audit: audit,
+    visibility_audit_updated_at: new Date().toISOString(),
+  }).eq('user_id', uid).eq('id', biz.id);
+  return audit;
+}
+
 const SNAP_ALLOWED = [...BUSINESS_DOCS.map(d => `${d}.md`), 'calendar.json'];
 const SITE_REQUEST = `My request: Build and publish my website by following the site-build skill above, start to finish. Begin by sending me the first message the skill describes, then design, build, run the anti-generic-audit until everything passes, publish to GitHub Pages, and send me the live link with desktop and phone screenshots. I’m not technical — keep every message in plain words and never ask me a technical question.`;
 const DEAD_STATUSES = ['expired', 'finished', 'suspended', 'exit', 'error'];
@@ -309,7 +323,7 @@ const leadFormUrl = (req, token) => {
 async function docContext(uid, biz, req) {
   const { data: docs } = await admin().from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', biz.id);
   const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-  const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) };
+  const b2 = { ...biz, calendar: biz.calendar, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, visibilityAudit: biz.visibility_audit || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) };
   const parts = contextParts(b2, docMap);
   return { docMap, b2, parts, ctx: parts.map(part => part.text).join('\n\n') };
 }
@@ -321,7 +335,7 @@ async function latestContext(uid, bizId, req) {
     db.from('docs').select('kind, content, updated_at').eq('user_id', uid).eq('business_id', bizId),
   ]);
   const docMap = Object.fromEntries((docs || []).map(d => [d.kind, d]));
-  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) } : null;
+  const contextBiz = biz ? { ...biz, adInsights: biz.ad_insights || null, instagramInsights: biz.instagram_insights || null, visibilityAudit: biz.visibility_audit || null, leadFormUrl: leadFormUrl(req, biz.lead_token), gbp: await gbpFor(uid) } : null;
   return { biz: contextBiz, parts: contextBiz ? contextParts(contextBiz, docMap) : [] };
 }
 
@@ -442,7 +456,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && url.pathname === '/api/auth/me') return send(res, 200, { hosted: true, email: user.email });
     if (req.method === 'GET' && url.pathname === '/api/health') {
       const s = await settings(uid);
-      const { data: active } = await db.from('businesses').select('instagram_insights').eq('user_id', uid).eq('is_active', true).maybeSingle();
+      const { data: active } = await db.from('businesses').select('instagram_insights, visibility_audit').eq('user_id', uid).eq('is_active', true).maybeSingle();
       // Settle pending "Set up with Devin" sessions: Devin's structured output decides.
       const integ = { ...(s.integrations || {}) }, pending = { ...(integ._setup || {}) };
       const client = Object.keys(pending).length && await devinCreds(uid).then(devinClient, () => null);
@@ -465,7 +479,7 @@ export default async function handler(req, res) {
         { id: 'devin', group: 'required', name: 'Devin API key + Org ID', why: 'Runs the assistant on your own Devin account.', ok: devinOwn, key: 'DEVIN_API_KEY', key2: 'DEVIN_ORG_ID', link: 'https://app.devin.ai/settings' },
         ...Object.entries(INTEGRATIONS).map(([id, i]) => ({ id, group: 'integrations', name: i.name, why: i.why, url: i.url, marketplace: i.marketplace, toggle: true, ok: !!s.integrations?.[id], setup: s.integrations?._setup?.[id] })),
         { id: 'heygen', group: 'optional', name: 'HeyGen', why: 'Makes avatar videos from your scripts and imports them. Connect your HeyGen account to use your plan credits.', ok: !!(s.heygen_oauth || s.heygen_api_key), oauth: !!s.heygen_oauth, apiKey: !!s.heygen_api_key, account: heygenAccount(s), key: 'HEYGEN_API_KEY', link: 'https://app.heygen.com/settings?nav=API' },
-        { id: 'google_business', group: 'optional', name: 'Google Business Profile', why: 'Studio reads your listing — exact name, address, phone, hours and categories — so every document and your website match Google word for word.', ok: !!s.google_oauth, oauth: !!s.google_oauth, available: google.configured(), account: googleAccount(s), link: 'https://business.google.com/' },
+        { id: 'google_business', group: 'optional', name: 'Google Business Profile', why: 'Studio reads your listing — exact name, address, phone, hours and categories — so every document and your website match Google word for word.', ok: !!s.google_oauth, oauth: !!s.google_oauth, available: google.configured(), account: googleAccount(s), audit: active?.visibility_audit ? { score: active.visibility_audit.score, total: active.visibility_audit.total } : null, link: 'https://business.google.com/' },
         metaHealthItem(s, active?.instagram_insights?.account?.username || null),
       ] });
     }
@@ -682,6 +696,10 @@ export default async function handler(req, res) {
       await settingsUpsert(uid, { google_oauth: null, google_oauth_pending: null });
       return send(res, 200, { ok: true });
     }
+    if (req.method === 'POST' && url.pathname === '/api/visibility/audit') {
+      try { return send(res, 200, await runVisibilityAudit(uid)); }
+      catch (e) { return send(res, 400, { error: e.message }); }
+    }
     if (req.method === 'GET' && url.pathname === '/api/google')
       return send(res, 200, googleAccount(await settings(uid)) || {});
     if (req.method === 'POST' && url.pathname === '/api/google/sync') {
@@ -772,6 +790,32 @@ export default async function handler(req, res) {
         const skill = siteSkill(f => fs.readFileSync(path.join(process.cwd(), '.devin/skills', f), 'utf8'));
         const prompt = [skill, ctx, GROUNDING, SITE_REQUEST].join('\n\n'); // no OUTPUT_CONTRACT: this session has a filesystem
         const s = await client.createSession({ prompt, title: `${biz.name || biz.profile?.name || 'Studio'} · Website`, tags: ['studio', 'website'] });
+        await agentUpsert(uid, biz.id, 'site', { devin_session_id: s.session_id, devin_status: 'working', devin_url: s.url, last_prompt_at: new Date().toISOString(), applied_hash: null });
+        return send(res, 201, { url: s.url });
+      }
+
+      // "Fix it" buttons: send the audit's own wording to the website session — never trust client text.
+      if (req.method === 'POST' && parts[2] === 'fix') {
+        const { ids } = await readJson(req);
+        const audit = biz.visibility_audit;
+        const wanted = new Set(Array.isArray(ids) ? ids : []);
+        const items = (audit?.checks || []).filter(c => wanted.has(c.id) && ['fail', 'warn'].includes(c.status) && SITE_CHECKS.includes(c.id));
+        if (!items.length) return send(res, 400, { error: 'Nothing fixable in that list.' });
+        const gbp = await gbpFor(uid);
+        const message = `Studio's "Can people find you?" health check found these problems on the website you built for me. Fix each one, put the change online, confirm the live site actually updated, then tell me in plain words what you changed — no technical questions.\n${items.map(c => `- ${c.title}: ${c.detail} ${c.fix}`.trim()).join('\n')}${gbp ? `\n\nUse these facts exactly (from my Google Business Profile): ${JSON.stringify(gbp)}` : ''}`;
+        if (row?.devin_session_id) {
+          const status = await refreshStatus();
+          if (status && !DEAD_STATUSES.includes(status)) {
+            await client.sendMessage(row.devin_session_id, message);
+            await agentUpsert(uid, biz.id, 'site', { last_prompt_at: new Date().toISOString() });
+            return send(res, 200, { url: row.devin_url });
+          }
+        }
+        if (!audit?.siteUrl) return send(res, 400, { error: 'No website to fix yet.' });
+        const { ctx } = await docContext(uid, biz, req);
+        const skill = siteSkill(f => fs.readFileSync(path.join(process.cwd(), '.devin/skills', f), 'utf8'));
+        const request = `My website already exists at ${audit.siteUrl}. ${message} If you can't reach the code for that site, tell me so in one plain sentence and write the exact text to give whoever runs it.`;
+        const s = await client.createSession({ prompt: [skill, ctx, GROUNDING, request].join('\n\n'), title: `${biz.name || biz.profile?.name || 'Studio'} · Website`, tags: ['studio', 'website'] });
         await agentUpsert(uid, biz.id, 'site', { devin_session_id: s.session_id, devin_status: 'working', devin_url: s.url, last_prompt_at: new Date().toISOString(), applied_hash: null });
         return send(res, 201, { url: s.url });
       }
