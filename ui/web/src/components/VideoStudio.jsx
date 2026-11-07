@@ -130,6 +130,8 @@ function ProjectWorkspace({ project, refresh, biz, pick, onPick, top, bottom }) 
         agent={agent}
         agentName={agentName}
         placeholder={started ? `Reply to ${agentName}` : 'Or describe the video you want'}
+        uploads={biz.uploads || []}
+        onUploadsChange={refresh}
         empty={<><strong>Write the script, then make it in HeyGen.</strong><p>{agentName} drafts a presenter script from your offer; you make the video in HeyGen and import it back here.</p></>}
       />
     </aside>

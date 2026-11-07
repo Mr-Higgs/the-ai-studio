@@ -218,7 +218,7 @@ export default function App() {
           <span>{agentName}</span>
           {agent.busy && <span className="side-status">{workingOn ? `Working on ${workingOn.toLowerCase()}` : 'Working'}</span>}
         </div>
-        <Chat agent={agent} agentName={agentName} empty={chatEmpty} />
+        <Chat agent={agent} agentName={agentName} empty={chatEmpty} uploads={biz.uploads || []} onUploadsChange={refresh} />
       </aside>
     </>
   );

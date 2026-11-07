@@ -21,6 +21,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
+import { cleanUpload, MAX_UPLOADS } from '../ui/web/src/uploads.js';
 
 const PORT = 4322;
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -529,9 +531,11 @@ function businessState() {
       visibilityAudit: visibilityAudit() ? Date.parse(visibilityAudit().checkedAt) : null,
     },
     site: stage.site,
+    uploads: mockUploads.map(({ text, ...u }) => u),
     agent: 'devin', busy: !!stage.busy,
   };
 }
+const mockUploads = [];
 const projects = () => [{ name: 'brake-special', videos: done('video') ? [{ file: 'heygen-demo.mp4', url: '/mock/demo.mp4' }] : [] }];
 
 const CHAT_BUSINESS = [
@@ -742,6 +746,20 @@ http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && parts[1] === 'projects' && parts[3] === 'heygen' && parts[4] === 'generate') { await readBody(req); return json(res, 202, { video_id: 'mockvid1' }); }
     if (req.method === 'POST' && parts[1] === 'projects' && parts[3] === 'heygen') { await readBody(req); return json(res, 201, { file: 'heygen-mockvid1.mp4' }); }
+    if (req.method === 'POST' && url.pathname === '/api/uploads') {
+      const { item, error } = cleanUpload(JSON.parse(await readBody(req) || '{}'));
+      if (error) return json(res, 400, { error });
+      if (mockUploads.length >= MAX_UPLOADS) return json(res, 400, { error: `You can keep up to ${MAX_UPLOADS} files. Remove one first.` });
+      const upload = { id: crypto.randomUUID(), ...item, at: Date.now() };
+      mockUploads.push(upload);
+      console.log(`[mock] upload ${upload.name}: ${upload.text.length} chars${upload.truncated ? ' (truncated)' : ''}\n${upload.text.slice(0, 400)}`);
+      return json(res, 201, { upload });
+    }
+    if (req.method === 'DELETE' && url.pathname.startsWith('/api/uploads/')) {
+      const i = mockUploads.findIndex(u => u.id === url.pathname.split('/')[3]);
+      if (i >= 0) mockUploads.splice(i, 1);
+      return json(res, 200, { ok: true });
+    }
     if (req.method === 'POST' && url.pathname === '/api/projects') { await readBody(req); return json(res, 201, { name: 'brake-special' }); }
     if (['POST', 'PUT'].includes(req.method) && parts[0] === 'api') { await readBody(req); return json(res, 200, { ok: true }); }
 
