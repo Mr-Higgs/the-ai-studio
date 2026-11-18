@@ -8,13 +8,42 @@ the "Can people find you?" health check on the Get found locally step._
 The connection itself works: an owner clicks Connect, signs in with Google, and Studio
 stores their token. What does **not** work yet is reading the listing (name, address,
 phone, hours, categories). Google gates the Business Profile APIs behind a **manual,
-per-project access approval**, and ours is still pending. Until it is granted, every
-listing call returns a quota/permission error, which Studio shows as:
+per-project access approval**, and our first application was **rejected** (see below).
+Until it is granted, every listing call returns a quota/permission error, which Studio
+shows as:
 
 > Connected. Google hasn't finished approving Studio's access to read listings yet — we'll
 > pick up your listing automatically once it has.
 
 This is not a bug in Studio. No code change will unblock it; only Google's approval does.
+
+## Application rejected (2026-11-04) — and how to re-apply
+
+Case 8-6000000042321 was declined the day after filing. Google's stated reason:
+
+> The website URL listed on your application form does not exactly match the website URL
+> displayed on your Google Business Profile.
+
+Root cause: the form's "Company website" field was filled with the Studio URL
+(`https://beone.ratelimitlabs.com`), but the only qualifying Business Profile we manage is
+Super Fast Auto Repair, whose listing shows `superfastautorepair.com`. Google compares the
+two literally. Nothing about Studio itself was judged.
+
+**Re-apply** (same form, signed in as samershaqour08@gmail.com, a manager on that listing):
+1. In business.google.com → Super Fast Auto Repair, copy the **Website** field exactly as
+   shown (www / no www, trailing slash).
+2. Project number `796231445241`; **Company website = that exact URL**.
+3. Verified 60+ days: Yes. Existing allowlisted project: No.
+4. Describe Studio in the "primary reason" text, not in the URL field: manager of the
+   verified Super Fast Auto Repair profile; building Studio, which with each owner's OAuth
+   consent reads their own listing (name, address, phone, hours, categories, description)
+   so website and documents match Google, plus a read-only health check; Business
+   Information + Account Management, read-only, single-location owners, no bulk data.
+5. Note the new case ID here.
+
+Longer term, create and verify a Business Profile for the company itself (Patterned /
+Ratelimit Labs) with its real website, so applicant, project owner and form all match; it
+must be verified 60+ days before it can be used on the form.
 
 ## Rolled back behind a flag (2026-11-18)
 
