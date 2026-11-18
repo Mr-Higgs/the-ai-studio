@@ -191,7 +191,7 @@ export default function GenerateStep({ step, ...ctx }) {
           <Calendar items={biz.calendar} experiments={biz.experiments || []} projects={ctx.projects || []} refresh={refresh} />
         </>
       )}
-      {step.id === 'visibility' && <VisibilityPanel audit={biz.visibilityAudit} docMtime={doc?.mtime} refresh={refresh} site={biz.site} agent={agent} agentName={agentName} send={p => generate(step, p)} />}
+      {step.id === 'visibility' && ctx.features?.visibilityAudit && <VisibilityPanel audit={biz.visibilityAudit} docMtime={doc?.mtime} refresh={refresh} site={biz.site} agent={agent} agentName={agentName} send={p => generate(step, p)} />}
       {doc && (
         <article className="doc">
           <div className="doc-bar">

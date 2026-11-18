@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runAudit, safeFetch, isPrivateHost } from './_lib/audit.js';
+import { runAudit, safeFetch, isPrivateHost, visibilityEnabled } from './_lib/audit.js';
 
 const HOME = `<!doctype html><html><head>
 <title>Brake repair in Decatur | Maple Street Auto</title>
@@ -111,4 +111,18 @@ test('no gbp skips the listing checks', async () => {
   const audit = await runAudit({ siteUrl: 'maple.example.com', gbp: null, fetchImpl: fakeFetch() });
   assert.ok(audit.checks.filter(c => c.id.startsWith('gbp_')).every(c => c.status === 'skip'));
   assert.ok(audit.checks.filter(c => c.status === 'skip').length >= 4);
+});
+
+test('visibilityEnabled is on only for the literal value "on"', () => {
+  delete process.env.STUDIO_VISIBILITY_AUDIT;
+  assert.equal(visibilityEnabled(), false);
+  for (const v of ['', 'off', 'yes', '1', 'enabled']) {
+    process.env.STUDIO_VISIBILITY_AUDIT = v;
+    assert.equal(visibilityEnabled(), false, v);
+  }
+  for (const v of ['on', 'ON', 'On']) {
+    process.env.STUDIO_VISIBILITY_AUDIT = v;
+    assert.equal(visibilityEnabled(), true, v);
+  }
+  delete process.env.STUDIO_VISIBILITY_AUDIT;
 });

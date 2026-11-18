@@ -117,6 +117,7 @@ export default function App() {
   const [biz, setBiz] = useState(null);
   const [projects, setProjects] = useState([]);
   const [health, setHealth] = useState(null);
+  const [features, setFeatures] = useState({});
   const [workingOn, setWorkingOn] = useState(null);
   const [railMin, setRailMin] = useState(() => pref('railMin') === '1');
   const toggleRail = () => setRailMin(m => { pref('railMin', m ? null : '1'); return !m; });
@@ -151,11 +152,11 @@ export default function App() {
   useEffect(() => {
     if (!signedIn) return;
     refresh();
-    api('/api/health').then(r => setHealth(r.items)).catch(() => {});
+    api('/api/health').then(r => { setHealth(r.items); setFeatures(r.features || {}); }).catch(() => {});
   }, [refresh, signedIn]);
   useEffect(() => { if (!agent.busy) setWorkingOn(null); }, [agent.busy]);
 
-  const recheck = () => api('/api/health').then(r => setHealth(r.items));
+  const recheck = () => api('/api/health').then(r => { setHealth(r.items); setFeatures(r.features || {}); });
   if (!me) return <Boot phase="me" error={bootErr?.phase === 'me' ? bootErr.error : null} onRetry={() => { setBootErr(null); load(); }} />;
   if (recovering) return <ResetPassword onDone={() => { setRecovering(false); go(''); }} />;
   if (me.hosted && !me.email) return hash === 'login' || hash === 'help' ? <Login onDone={() => api('/api/auth/me').then(setMe)} /> : <Landing />;
@@ -188,7 +189,7 @@ export default function App() {
   const saveInputs = (id, inputs) => put('/api/business/inputs.json', { ...biz.inputs, [id]: inputs }).then(refresh).catch(e => toast(`Couldn’t save your answers: ${e.message}`));
   const generate = (s, prompt, snapshot) => { setWorkingOn(s.title); agent.send(prompt, snapshot, s.id); };
 
-  const ctx = { biz, agent, agentName, workingOn, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId, projects };
+  const ctx = { biz, agent, agentName, workingOn, generate, saveInputs, refresh, next, go, isDone, mtimeOf, byId, projects, features };
   const chatEmpty = step?.kind === 'profile'
     ? <><strong>{agentName} can help with the numbers.</strong><p>Don’t know a figure? Mark it “Not sure”, then press “Work out … with {agentName}”. It walks you through each one and fills in the answers for you to check.</p></>
     : <><strong>{agentName} is your campaign partner.</strong><p>Use the button on the left to write this step, then ask for changes here — “make it shorter”, “more playful”, “add a gift-card option”.</p></>;

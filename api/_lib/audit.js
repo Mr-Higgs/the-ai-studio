@@ -2,6 +2,9 @@
 // the Google listing Studio already read. No LLM; plain-English results for the owner.
 import net from 'node:net';
 
+// Kill switch: whole feature (audit + Google connection) hidden unless explicitly on.
+export const visibilityEnabled = () => /^on$/i.test(process.env.STUDIO_VISIBILITY_AUDIT || '');
+
 // localhost names, .local/.internal, and literal IPs in private/loopback/link-local ranges.
 export function isPrivateHost(host) {
   const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');

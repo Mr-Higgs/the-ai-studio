@@ -684,7 +684,7 @@ http.createServer(async (req, res) => {
     if (leg && stage.delay) await new Promise(r => setTimeout(r, stage.delay));
     if (leg && stage.fail === leg) return json(res, stage.code, { error: `mock: ${leg} failed` });
     if (req.method === 'GET' && url.pathname === '/api/auth/me') return json(res, 200, { hosted: true, email: USER.email });
-    if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { hosted: true, items: healthItems() });
+    if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { hosted: true, features: { visibilityAudit: true }, items: healthItems() });
     if (req.method === 'GET' && url.pathname === '/api/business') return json(res, 200, businessState());
     if (req.method === 'GET' && url.pathname === '/api/businesses') return json(res, 200, { current: 'Maple Street Auto Repair', list: [{ id: 'b1', name: 'Maple Street Auto Repair' }] });
     if (req.method === 'POST' && parts[1] === 'businesses' && ['new', 'switch'].includes(parts[2]))

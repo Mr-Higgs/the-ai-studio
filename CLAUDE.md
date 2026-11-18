@@ -85,7 +85,9 @@ prompt notes (`INTEGRATIONS` in api/index.js).
 `HEYGEN_OAUTH_RESOURCE` (HeyGen OAuth overrides), optional `PUBLIC_ORIGIN` — canonical https
 origin used for the HeyGen OAuth callback on non-localhost hosts, optional `GOOGLE_OAUTH_CLIENT_ID` +
 `GOOGLE_OAUTH_CLIENT_SECRET` (Google Business Profile connection; the Setup row shows
-"coming soon" until both are set).
+"coming soon" until both are set), optional `STUDIO_VISIBILITY_AUDIT` — set to `on` to
+enable the Google Business Profile connection + "Can people find you?" health check
+(feature-flagged off by default; see GOOGLE_BUSINESS_PROFILE_STATUS.md).
 
 ## Hard rules
 - Never log or return user API keys or OAuth tokens; they only travel user → /api/setup/env → ciphertext (or the OAuth token endpoint → ciphertext).
